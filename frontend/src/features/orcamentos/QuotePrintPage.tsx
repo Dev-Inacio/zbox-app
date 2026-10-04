@@ -3,6 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { Button } from '../../components/ui/Button'
 import { useRequest } from '../../hooks/useRequest'
 import { QuoteDocument } from './QuoteDocument'
+import { getCompany } from '../empresa/companyApi'
 import { getQuote } from './quotesApi'
 import './QuotePrint.css'
 
@@ -16,8 +17,11 @@ export function QuotePrintPage() {
   const version = Number(params.get('versao')) || undefined
   const autoPrint = params.get('imprimir') === '1'
 
-  const fetcher = useCallback(() => getQuote(quoteId, version), [quoteId, version])
-  const { loading, data, error } = useRequest(`${quoteId}|${version}`, fetcher)
+  // Orçamento + dados da empresa (cabeçalho), juntos
+  const fetcher = useCallback(() => Promise.all([getQuote(quoteId, version), getCompany()]), [quoteId, version])
+  const { loading, data: both, error } = useRequest(`${quoteId}|${version}`, fetcher)
+  const data = both?.[0]
+  const company = both?.[1]
 
   useEffect(() => {
     if (data) document.title = `Orçamento ${data.number}-v${data.version} · ${data.customer.name}`
@@ -36,7 +40,7 @@ export function QuotePrintPage() {
       <div className="qp__page">
         {loading && <p className="qp__msg" role="status">Carregando…</p>}
         {!loading && Boolean(error) && <p className="qp__msg" role="alert">Não foi possível carregar o orçamento.</p>}
-        {data && <QuoteDocument quote={data} />}
+        {data && company && <QuoteDocument quote={data} company={company} />}
       </div>
     </div>
   )

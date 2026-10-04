@@ -43,6 +43,11 @@
   font-weight: 600;
 }
 
+/* Com selo E link: o selo já empurrou tudo para a direita; o link fica colado nele */
+.section-card__badge + .section-card__action {
+  margin-left: 0;
+}
+
 .section-card__action a {
   color: var(--color-accent);
   text-decoration: none;

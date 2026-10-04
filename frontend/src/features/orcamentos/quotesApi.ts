@@ -121,6 +121,7 @@ function seed() {
       approvalMethod: s.status === 'APPROVED' ? 'WHATSAPP' : null,
       rejectionReason: s.status === 'REJECTED' ? 'PRICE' : null,
       decisionNote: null,
+      order: null,
       events: [{ id: nextEventId++, type: 'CREATED', version: 1, detail: null, userName: 'Thayná', createdAt: created }],
     }
     recalc(quote)
@@ -190,7 +191,7 @@ export async function createQuote(customerId: number): Promise<Quote> {
     id: nextQuoteId++, number: String(nextNumber++).padStart(6, '0'), version: 1, latestVersion: 1, status: 'DRAFT',
     customer: toQuoteCustomer(customer), items: [], subtotalCents: 0, discountType: null, discountValue: null, discountCents: 0, totalCents: 0,
     paymentTerms: null, notes: null, versionReason: null, createdAt: created, updatedAt: created,
-    confirmedAt: null, sentAt: null, decidedAt: null, approvalMethod: null, rejectionReason: null, decisionNote: null, events: [],
+    confirmedAt: null, sentAt: null, decidedAt: null, approvalMethod: null, rejectionReason: null, decisionNote: null, order: null, events: [],
   }
   event(quote, 'CREATED')
   store.set(quote.id, { versions: [quote] })
@@ -356,10 +357,62 @@ export async function createVersion(id: number, reason: string | null): Promise<
     items: current.items.map((i) => ({ ...structuredClone(i), id: nextItemId++ })),
     versionReason: reason?.trim() || null,
     updatedAt: created, confirmedAt: null, sentAt: null, decidedAt: null,
-    approvalMethod: null, rejectionReason: null, decisionNote: null,
+    approvalMethod: null, rejectionReason: null, decisionNote: null, order: null,
     events: [],
   }
   event(next, 'NEW_VERSION', next.versionReason)
   stored!.versions.push(next)
   return snapshot(next)
+}
+
+// ---------- Usado pelo mock de Pedidos (no back real, é o mesmo banco/transação) ----------
+
+// Orçamento atual, para converter em pedido (POST /api/quotes/{id}/convert-to-order)
+export function mockQuoteForConversion(id: number): Quote {
+  const quote = latest(id)
+  if (quote.order) throw new ApiError(409, 'QUOTE_ALREADY_CONVERTED', `Este orçamento já virou o pedido #${quote.order.number}.`)
+  if (quote.status !== 'APPROVED') throw new ApiError(409, 'QUOTE_NOT_APPROVED', 'Só orçamento aprovado vira pedido.')
+  return snapshot(quote)
+}
+
+export function mockMarkQuoteConverted(id: number, order: { id: number; number: string }, when?: string) {
+  const quote = latest(id)
+  quote.order = order
+  quote.events.unshift({ id: nextEventId++, type: 'CONVERTED', version: quote.version, detail: order.number, userName: userName(), createdAt: when ?? now() })
+}
+
+// Dados de exemplo: cria um orçamento já aprovado (os pedidos de exemplo nascem dele)
+export function mockCreateApprovedQuote(customerId: number, items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[], daysAgo: number, discountPercent?: number): Quote | null {
+  const customer = mockFindCustomer(customerId)
+  if (!customer) return null
+  const created = new Date(Date.now() - daysAgo * 86400000).toISOString()
+  const quote: Quote = {
+    id: nextQuoteId++, number: String(nextNumber++).padStart(6, '0'), version: 1, latestVersion: 1, status: 'APPROVED',
+    customer: toQuoteCustomer(customer),
+    items: items.map((i) => ({ ...i, id: nextItemId++, areaPerPieceCm2: null, subtotalCents: 0 })),
+    subtotalCents: 0, discountType: discountPercent ? 'PERCENT' : null, discountValue: discountPercent ?? null, discountCents: 0, totalCents: 0,
+    paymentTerms: '50% de entrada e 50% na entrega', notes: null, versionReason: null,
+    createdAt: created, updatedAt: created, confirmedAt: created, sentAt: created, decidedAt: created,
+    approvalMethod: 'WHATSAPP', rejectionReason: null, decisionNote: null, order: null,
+    events: [{ id: nextEventId++, type: 'APPROVED', version: 1, detail: 'WHATSAPP', userName: 'Thayná', createdAt: created }],
+  }
+  recalc(quote)
+  store.set(quote.id, { versions: [quote] })
+  return quote
+}
+
+// Para o "Recentes" do Início: tudo o que aconteceu nos orçamentos (no back real, vem do AuditLog)
+export function mockQuoteEvents(): { quoteId: number; number: string; customerName: string; event: QuoteEvent }[] {
+  const seen = new Set<number>()
+  const out: { quoteId: number; number: string; customerName: string; event: QuoteEvent }[] = []
+  for (const stored of store.values()) {
+    for (const version of stored.versions) {
+      for (const ev of version.events) {
+        if (seen.has(ev.id)) continue
+        seen.add(ev.id)
+        out.push({ quoteId: version.id, number: version.number, customerName: version.customer.name, event: ev })
+      }
+    }
+  }
+  return out
 }

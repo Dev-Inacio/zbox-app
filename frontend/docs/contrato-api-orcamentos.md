@@ -121,7 +121,9 @@ Sem `version` → versão atual. Erros: 404 `QUOTE_NOT_FOUND`, 404 `QUOTE_VERSIO
 }
 ```
 
-`events[].type`: `CREATED | UPDATED | CONFIRMED | BACK_TO_DRAFT | DISPATCHED | APPROVED | REJECTED | CANCELED | NEW_VERSION` (vem do AuditLog).
+`events[].type`: `CREATED | UPDATED | CONFIRMED | BACK_TO_DRAFT | DISPATCHED | APPROVED | REJECTED | CANCELED | NEW_VERSION | CONVERTED` (vem do AuditLog).
+
+`order`: `null` ou `{ "id": 45, "number": "000045" }` quando o orçamento aprovado já virou pedido (HU19). Conversão: `POST /api/quotes/{id}/convert-to-order`, ver `docs/contrato-api-pedidos-financeiro.md`.
 
 ### `PUT /api/quotes/{id}` (só DRAFT)
 ```json

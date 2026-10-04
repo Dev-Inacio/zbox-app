@@ -131,7 +131,7 @@ export function QuotesListPage() {
             </div>
             <div className="cl-field">
               <label htmlFor="periodo-orcamentos" className="cl-field__label">Período</label>
-              <select id="periodo-orcamentos" className="cl-input" value={period} onChange={(e) => updateParams({ periodo: e.target.value === 'ALL' ? null : e.target.value, pagina: null })}>
+              <select autoComplete="off" id="periodo-orcamentos" className="cl-input" value={period} onChange={(e) => updateParams({ periodo: e.target.value === 'ALL' ? null : e.target.value, pagina: null })}>
                 {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
             </div>

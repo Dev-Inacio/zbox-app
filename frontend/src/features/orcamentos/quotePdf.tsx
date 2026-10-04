@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { flushSync } from 'react-dom'
+import { getCompany } from '../empresa/companyApi'
 import { QuoteDocument } from './QuoteDocument'
 import type { Quote } from './types'
 
@@ -19,7 +20,7 @@ export function quotePdfFileName(quote: Quote): string {
 
 export async function generateQuotePdf(quote: Quote): Promise<File> {
   // As bibliotecas só são baixadas quando alguém gera um PDF (não pesam no carregamento do sistema)
-  const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import('html2canvas-pro'), import('jspdf')])
+  const [{ default: html2canvas }, { jsPDF }, company] = await Promise.all([import('html2canvas-pro'), import('jspdf'), getCompany()])
 
   const host = document.createElement('div')
   host.setAttribute('aria-hidden', 'true')
@@ -28,7 +29,7 @@ export async function generateQuotePdf(quote: Quote): Promise<File> {
   const root = createRoot(host)
 
   try {
-    flushSync(() => root.render(<QuoteDocument quote={quote} paper />))
+    flushSync(() => root.render(<QuoteDocument quote={quote} company={company} paper />))
     await document.fonts.ready
     await Promise.all(
       Array.from(host.querySelectorAll('img')).map((img) =>
