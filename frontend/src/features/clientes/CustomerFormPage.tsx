@@ -279,11 +279,11 @@ function CustomerForm({ customer }: { customer?: Customer }) {
                 <span className="cl-field__label" id="cliente-tipo-label">Tipo de cliente</span>
                 <div className="cl-segmented" role="radiogroup" aria-labelledby="cliente-tipo-label">
                   <label className="cl-segmented__option">
-                    <input type="radio" name="type" value="PERSON" checked={values.type === 'PERSON'} onChange={handleChange('type')} />
+                    <input autoComplete="off" type="radio" name="type" value="PERSON" checked={values.type === 'PERSON'} onChange={handleChange('type')} />
                     Pessoa física
                   </label>
                   <label className="cl-segmented__option">
-                    <input type="radio" name="type" value="COMPANY" checked={values.type === 'COMPANY'} onChange={handleChange('type')} />
+                    <input autoComplete="off" type="radio" name="type" value="COMPANY" checked={values.type === 'COMPANY'} onChange={handleChange('type')} />
                     Empresa
                   </label>
                 </div>
@@ -383,7 +383,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
               </div>
               <div className="cl-span-2 cl-field">
                 <label htmlFor="cliente-state" className="cl-field__label">UF</label>
-                <select
+                <select autoComplete="off"
                   id="cliente-state"
                   className="cl-input"
                   value={values.state}
@@ -407,7 +407,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
             <div className="cl-form__fields">
               <div className="cl-field">
                 <label htmlFor="cliente-notes" className="cl-field__label">Observações</label>
-                <textarea
+                <textarea autoComplete="off"
                   id="cliente-notes"
                   className="cl-input cl-textarea"
                   rows={4}

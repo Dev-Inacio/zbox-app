@@ -31,6 +31,9 @@ export function Input({ label, error, endAdornment, id, className = '', ...rest 
           className={classes}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? errorId : undefined}
+          // Padrão "off": o Chrome não oferece salvar endereço/dados na conta Google.
+          // Quem precisa (login: "username", "current-password") passa outro valor e ele vale (vem depois, no rest)
+          autoComplete="off"
           {...rest}
         />
         {endAdornment && <div className="field__end">{endAdornment}</div>}

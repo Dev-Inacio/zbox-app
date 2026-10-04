@@ -47,7 +47,7 @@ export type QuoteCustomer = {
 
 export type QuoteEvent = {
   id: number
-  type: 'CREATED' | 'UPDATED' | 'CONFIRMED' | 'BACK_TO_DRAFT' | 'DISPATCHED' | 'APPROVED' | 'REJECTED' | 'CANCELED' | 'NEW_VERSION'
+  type: 'CREATED' | 'UPDATED' | 'CONFIRMED' | 'BACK_TO_DRAFT' | 'DISPATCHED' | 'APPROVED' | 'REJECTED' | 'CANCELED' | 'NEW_VERSION' | 'CONVERTED'
   version: number
   detail: string | null // ex.: "WHATSAPP", "Preço: achou caro", "R$ 3.363,00"
   userName: string
@@ -79,6 +79,8 @@ export type Quote = {
   approvalMethod: ApprovalMethod | null
   rejectionReason: RejectionReason | null
   decisionNote: string | null
+  // Aprovado que já virou pedido (HU19). Um orçamento vira UM pedido só.
+  order: { id: number; number: string } | null
   events: QuoteEvent[]
 }
 

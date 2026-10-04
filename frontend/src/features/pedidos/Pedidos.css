@@ -1,0 +1,209 @@
+/* Pedidos e Financeiro (prefixo pd-). Usa também Clientes.css (cl-) e Orcamentos.css (oc-). */
+
+/* ---------- Selos: sempre com texto ---------- */
+.pd-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.pd-badge--new { background: #F0EFEC; color: #3F454B; }
+.pd-badge--in_production { background: #E6EEF8; color: #1F4E85; }
+.pd-badge--ready { background: #E3F2F1; color: #145C57; }
+.pd-badge--delivered { background: #E8F5EC; color: #1D5B33; }
+.pd-badge--canceled { background: #F0EFEC; color: #5A6067; }
+.pd-badge--late { background: #FDF1EC; color: #8A3A10; }
+.pd-badge--pay-unpaid { background: #F0EFEC; color: #3F454B; }
+.pd-badge--pay-partial { background: #FFF3E6; color: #7A3E06; }
+.pd-badge--pay-paid { background: #E8F5EC; color: #1D5B33; }
+.pd-badge--pay-overdue { background: #FDECEA; color: #9B1C1C; }
+.pd-badges { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+/* ---------- Lista ---------- */
+.pd-chip--late { border-color: #F2C6AE; background: #FDF1EC; color: #8A3A10; display: inline-flex; align-items: center; gap: 6px; }
+.pd-chip--late[aria-pressed='true'] { background: #8A3A10; border-color: #8A3A10; color: #FFFFFF; }
+.pd-chip--late[aria-pressed='true'] .oc-chip__count { color: #FBE3D6; }
+.pd-chip-sep { width: 1px; height: 28px; background: #DCDDDF; align-self: center; margin: 0 4px; }
+.pd-filters { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 12px 16px; align-items: start; }
+.pd-table td { padding-top: 14px; padding-bottom: 14px; vertical-align: middle; }
+.pd-due { display: flex; flex-direction: column; gap: 2px; }
+.pd-due__hint { font-size: 13px; color: var(--color-text-muted); }
+.pd-due__hint.is-late { color: #8A3A10; font-weight: 600; }
+.pd-due__hint.is-soon { color: #7A3E06; font-weight: 600; }
+.pd-table__rest { font-weight: 700; }
+.pd-table__rest.is-overdue { color: #9B1C1C; }
+.pd-table__rest-label { display: none; font-weight: 500; color: var(--color-text-muted); }
+.pd-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pd-strong { font-weight: 700; }
+.pd-red { color: #9B1C1C; }
+.pd-green { color: #1D5B33; }
+.pd-dash { color: var(--color-text-muted); }
+
+/* ---------- Detalhe ---------- */
+.pd-stage { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #EEF3FA; flex-wrap: wrap; }
+.pd-stage--late { background: #FDF1EC; }
+.pd-stage--done { background: #E8F5EC; }
+.pd-stage--canceled { background: #F0EFEC; }
+.pd-stage__text { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 4px; }
+.pd-stage__title { margin: 0; font-family: var(--font-display); font-size: 20px; }
+.pd-stage__text p { margin: 0; color: #3F454B; }
+.pd-links { display: flex; gap: 20px; flex-wrap: wrap; }
+.pd-link { min-height: 44px; padding: 0; border: 0; background: none; font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--color-accent); cursor: pointer; }
+.pd-link--muted { color: var(--color-text-muted); }
+.pd-link:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
+.pd-totals { display: flex; justify-content: flex-end; gap: 8px 24px; flex-wrap: wrap; color: #3F454B; font-variant-numeric: tabular-nums; }
+.pd-totals strong { color: var(--color-ink); }
+.pd-customer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.pd-customer__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-customer__text a { font-weight: 600; color: var(--color-ink); text-decoration: none; }
+.pd-customer__text a:hover { text-decoration: underline; }
+
+/* Cartão de pagamento */
+.pd-pay { display: flex; flex-direction: column; gap: 14px; }
+.pd-pay__row { display: flex; justify-content: space-between; gap: 12px; color: #3F454B; font-variant-numeric: tabular-nums; }
+.pd-pay__row strong { color: var(--color-ink); font-weight: 600; }
+.pd-progress { height: 10px; border-radius: 5px; background: #ECEBE7; overflow: hidden; }
+.pd-progress__bar { height: 100%; background: #1D5B33; border-radius: 5px; }
+.pd-pay__remaining { display: flex; flex-direction: column; gap: 2px; padding-top: 10px; border-top: 1px solid #DCDDDF; }
+.pd-pay__value { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.pd-pay__label { font-size: 14px; color: var(--color-text-muted); display: flex; align-items: center; gap: 6px; }
+.pd-pay__label--overdue { color: #9B1C1C; font-weight: 600; }
+.pd-pay__paid { padding: 12px 14px; border-radius: 12px; background: #E8F5EC; color: #1D5B33; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.pd-section-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); margin: 0; }
+.pd-payments { margin: 0; padding: 0; list-style: none; }
+.pd-payment { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #ECEBE7; }
+.pd-payment:first-child { border-top: 0; }
+.pd-payment__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-payment__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pd-payment--reversed .pd-payment__value { text-decoration: line-through; color: #8A9096; }
+.pd-payment__side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 13px; color: var(--color-text-muted); text-align: right; }
+
+/* ---------- Janelas ---------- */
+.pd-lead { margin: 0; color: #3F454B; }
+.pd-fieldset { margin: 0; padding: 0; border: 0; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.pd-fieldset > legend { padding: 0; margin-bottom: 8px; }
+.pd-question { font-weight: 700; font-size: 16px; padding: 0; margin-bottom: 12px; }
+.pd-box { padding: 16px; border: 1px solid #DCDDDF; border-radius: 12px; display: flex; flex-direction: column; gap: 12px; }
+.pd-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pd-choice { position: relative; padding: 14px 14px 14px 44px; border: 1px solid #C9CCD0; border-radius: 12px; background: #FFFFFF; cursor: pointer; }
+.pd-choice input { position: absolute; left: 14px; top: 16px; width: 20px; height: 20px; margin: 0; accent-color: var(--color-accent); cursor: pointer; }
+.pd-choice > span { display: flex; flex-direction: column; gap: 2px; }
+.pd-choice strong { font-size: 15px; }
+.pd-choice span span { font-size: 13px; color: var(--color-text-muted); }
+.pd-choice:has(input:checked) { border: 2px solid var(--color-accent); padding: 13px 13px 13px 43px; background: #FFFCFA; }
+.pd-choice:has(input:checked) input { left: 13px; top: 15px; }
+.pd-choice:has(input:focus-visible) { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
+.pd-warn { margin: 0; padding: 12px 14px; border-radius: 10px; background: #FDECEA; color: #7A1A1A; font-size: 14px; line-height: 1.45; }
+.pd-grid-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.pd-w-date { max-width: 260px; }
+.pd-self-start { align-self: flex-start; margin-top: -4px; }
+.pd-money { position: relative; }
+.pd-money__prefix { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--color-text-muted); pointer-events: none; }
+.pd-money__input { padding-left: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+.pd-sum { padding: 14px 16px; border-radius: 12px; background: #F7F6F3; display: flex; flex-direction: column; gap: 8px; font-size: 15px; font-variant-numeric: tabular-nums; }
+.pd-sum--one { padding: 12px 14px; }
+.pd-sum__row { display: flex; justify-content: space-between; gap: 12px; color: #3F454B; }
+.pd-sum__row strong { color: var(--color-ink); }
+.pd-sum__final { display: flex; justify-content: space-between; align-items: baseline; padding-top: 8px; border-top: 1px solid #DCDDDF; }
+.pd-sum__final span { font-weight: 600; }
+.pd-sum__final strong { font-family: var(--font-display); font-weight: 800; font-size: 22px; }
+
+/* ---------- Financeiro ---------- */
+.pd-tiles { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.pd-tile { background: #F7F6F3; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.pd-tile--warn { background: #FDECEA; }
+.pd-tile__label { font-size: 14px; color: var(--color-text-muted); font-weight: 500; display: flex; align-items: center; gap: 6px; }
+.pd-tile--warn .pd-tile__label { color: #9B1C1C; font-weight: 600; }
+.pd-tile__value { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.pd-tile--warn .pd-tile__value { color: #9B1C1C; }
+.pd-tile__hint { font-size: 13px; color: var(--color-text-muted); }
+.pd-tabs { display: flex; gap: 4px; border-bottom: 1px solid #DCDDDF; }
+.pd-tab { height: 48px; padding: 0 16px; border: 0; background: transparent; font-family: var(--font-body); font-size: 15px; font-weight: 500; color: var(--color-text-muted); cursor: pointer; }
+.pd-tab[aria-selected='true'] { color: var(--color-ink); font-weight: 700; box-shadow: inset 0 -3px 0 var(--color-accent); }
+.pd-tab:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: -3px; }
+.pd-rec { margin: 0; padding: 0; list-style: none; }
+.pd-rec__row { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 150px auto; gap: 16px; align-items: center; padding: 16px 0; border-top: 1px solid #ECEBE7; }
+.pd-rec__row:first-child { border-top: 0; }
+.pd-rec__who { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pd-rec__name { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pd-rec__name a { font-weight: 700; color: var(--color-ink); text-decoration: none; }
+.pd-rec__name a:hover { text-decoration: underline; }
+.pd-rec__meta { font-size: 14px; color: var(--color-text-muted); }
+.pd-rec__money { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.pd-rec__left { display: flex; flex-direction: column; align-items: flex-end; }
+.pd-rec__left span { font-size: 12px; color: var(--color-text-muted); }
+.pd-rec__left strong { font-size: 18px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pd-rec__actions { display: flex; gap: 8px; justify-content: flex-end; }
+.pd-rec__actions .btn { height: 40px; padding: 0 14px; font-size: 14px; }
+.pd-methods { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; color: #3F454B; }
+
+/* ---------- Detalhe do pedido ---------- */
+.pd-hero-link { color: #E9A06E; font-weight: 600; }
+.pd-hero-link:hover { color: #FFFFFF; }
+.pd-step-panel { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #F0EFEC; flex-wrap: wrap; }
+.pd-step-panel--in_production { background: #EEF3FA; }
+.pd-step-panel--ready { background: #E3F2F1; }
+.pd-step-panel.is-late { background: #FDF1EC; }
+.pd-late-text { color: #8A3A10; font-weight: 700; }
+.pd-textlink { min-height: 44px; padding: 0; border: 0; background: none; font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--color-text-muted); text-decoration: underline; cursor: pointer; }
+.pd-textlink--accent { color: var(--color-accent); }
+.pd-textlink--small { min-height: 32px; font-size: 13px; }
+.pd-textlink:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
+.pd-items-total { display: flex; justify-content: flex-end; gap: 8px 24px; flex-wrap: wrap; padding-top: 8px; color: #3F454B; font-variant-numeric: tabular-nums; }
+.pd-items-total strong { color: var(--color-ink); }
+.pd-customer__name { font-weight: 600; color: var(--color-ink); text-decoration: none; }
+.pd-customer__name:hover { color: var(--color-accent); text-decoration: underline; }
+.pd-btn-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+.oc-event__icon.pd-ev--payment, .oc-event__icon.pd-ev--delivered { background: #E8F5EC; color: #1D5B33; }
+.oc-event__icon.pd-ev--status_changed { background: #E6EEF8; color: #1F4E85; }
+.oc-event__icon.pd-ev--collection, .oc-event__icon.pd-ev--payment_reversed { background: #FDECEA; color: #9B1C1C; }
+.oc-event__icon.pd-ev--due_date_changed { background: #FFF3E6; color: #7A3E06; }
+.pd-pay { gap: 12px; }
+.pd-pay--overdue { border-color: #F0B9B3; }
+.pd-plus { color: #1D5B33; font-weight: 600; }
+.pd-progress > span { display: block; height: 100%; background: #1D5B33; border-radius: 5px; }
+.pd-overdue-label { color: #9B1C1C; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; }
+.pd-paid-ok { padding: 12px 14px; border-radius: 12px; background: #E8F5EC; color: #1D5B33; font-weight: 600; }
+.pd-pay__list { display: flex; flex-direction: column; gap: 4px; padding-top: 4px; }
+.pd-overline { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-text-muted); }
+.pd-payments > li { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #ECEBE7; }
+.pd-payments > li:first-child { border-top: 0; }
+.pd-payments__main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.pd-payments__value { font-weight: 600; font-variant-numeric: tabular-nums; }
+.pd-payments > li.is-reversed .pd-payments__value { text-decoration: line-through; color: #8A9096; }
+.pd-reversed { color: #9B1C1C; }
+.pd-payments__side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1023px) {
+  .pd-rec__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .pd-rec__money { display: none; }
+  .pd-rec__actions { grid-column: 1 / -1; justify-content: flex-start; }
+}
+
+/* ---------- Celular ---------- */
+@media (max-width: 767px) {
+  /* No celular, quanto falta receber vem logo depois do andamento */
+  .pd-layout { display: flex; flex-direction: column; }
+  .pd-layout .oc-layout__main { display: contents; }
+  .pd-layout .oc-layout__main > :first-child { order: 0; }
+  .pd-layout .oc-aside { order: 1; }
+  .pd-layout .oc-layout__main > :nth-child(n+2) { order: 2; }
+  .pd-filters { grid-template-columns: 1fr; gap: 10px; }
+  .pd-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; padding-right: 14px; }
+  .pd-table .pd-table__num { grid-column: 1; }
+  .pd-table .pd-table__rest { grid-column: 2; grid-row: 1; text-align: right; }
+  .pd-table__rest-label { display: inline; }
+  .pd-table .pd-table__customer { grid-column: 1 / -1; font-size: 15px; }
+  .pd-table .pd-table__due { grid-column: 1 / -1; }
+  /* andamento e pagamento lado a lado, na mesma linha */
+  .pd-table .pd-table__status { grid-column: 1; }
+  .pd-table .pd-table__pay { grid-column: 2; text-align: right; }
+  /* pedido pago: no cartão o "—" solto confunde (o selo "Pago" já diz tudo) */
+  .pd-table .pd-table__rest .cl-muted { display: none; }
+  .pd-table .pd-table__total { display: none; }
+  .pd-tiles { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pd-tiles > :first-child { grid-column: 1 / -1; }
+  .pd-tile { padding: 16px; }
+  .pd-tile__value { font-size: 24px; }
+  .pd-choices, .pd-grid-2 { grid-template-columns: 1fr; }
+  .pd-step-panel { padding: 16px; }
+  .pd-step-panel .btn { width: 100%; }
+  .pd-rec__actions .btn { flex: 1; }
+  .pd-totals { justify-content: flex-start; flex-direction: column; }
+}

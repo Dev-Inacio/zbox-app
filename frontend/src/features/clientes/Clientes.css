@@ -654,3 +654,9 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
   .cl-history__item { grid-template-columns: 20px minmax(0, 1fr); }
   .cl-history__when { grid-column: 2; }
 }
+
+/* Aba "Pagamentos" do detalhe do cliente */
+.cl-pay-list { margin: 0; padding: 0; list-style: none; }
+.cl-pay-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid #ECEBE7; font-variant-numeric: tabular-nums; }
+.cl-pay-list li:first-child { border-top: 0; }
+.cl-pay-list a { font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; }

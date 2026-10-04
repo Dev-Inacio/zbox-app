@@ -1,5 +1,6 @@
 import mascote from '../../assets/zbox-mascote.webp'
-import { COMPANY } from '../../config/company'
+import { companyContactLine } from '../empresa/format'
+import type { Company } from '../empresa/types'
 import { formatDate, maskPhone } from '../clientes/format'
 import { formatAreaM2, formatMeters, formatMoney, formatPercent } from './money'
 import { PieceDrawing } from './PieceDrawing'
@@ -11,21 +12,15 @@ import './QuoteDocument.css'
 // Os valores vêm prontos do back (subtotal de cada item, desconto, total). Aqui só mostramos.
 
 // `paper`: força o layout A4 mesmo numa tela de celular (usado para gerar o arquivo PDF)
-export function QuoteDocument({ quote, paper = false }: { quote: Quote; paper?: boolean }) {
+// `company`: dados da empresa do Perfil (HU26), vindos de GET /api/company
+export function QuoteDocument({ quote, company, paper = false }: { quote: Quote; company: Company; paper?: boolean }) {
   const contact = [quote.customer.whatsapp ? maskPhone(quote.customer.whatsapp) : quote.customer.phone ? maskPhone(quote.customer.phone) : null, quote.customer.addressLine].filter(Boolean).join(' · ')
 
   return (
     <article className={paper ? 'qd qd--paper' : 'qd'} aria-label={`Orçamento ${quote.number}`}>
       <div className="qd__frame">
         <header className="qd__header">
-          <div className="qd__brand">
-            <img src={mascote} alt="" className="qd__mascot" />
-            <div className="qd__brand-text">
-              <span className="qd__name">{COMPANY.name}</span>
-              <span className="qd__tagline">{COMPANY.tagline}</span>
-              <span className="qd__contact">{[COMPANY.whatsapp, COMPANY.address, COMPANY.cityState].join(' · ')}</span>
-            </div>
-          </div>
+          <CompanyBrand company={company} />
           <div className="qd__docbox">
             <div className="qd__doctitle">ORÇAMENTO</div>
             <div className="qd__docfield"><span className="qd__label">Número</span><span className="qd__mono">{quote.number}-v{quote.version}</span></div>
@@ -91,4 +86,19 @@ export function QuoteDocument({ quote, paper = false }: { quote: Quote; paper?: 
 // O hífen "inseparável" (U+2011) é desenhado colado.
 function noBreakHyphen(text: string): string {
   return text.replace(/-/g, '\u2011')
+}
+
+// Marca + dados da empresa no topo do orçamento. Também aparece como prévia no Perfil.
+export function CompanyBrand({ company }: { company: Company }) {
+  const contact = companyContactLine(company)
+  return (
+    <div className="qd__brand">
+      <img src={mascote} alt="" className="qd__mascot" />
+      <div className="qd__brand-text">
+        <span className="qd__name">{company.name}</span>
+        {company.tagline && <span className="qd__tagline">{company.tagline}</span>}
+        {contact && <span className="qd__contact" data-testid="contato-empresa">{contact}</span>}
+      </div>
+    </div>
+  )
 }

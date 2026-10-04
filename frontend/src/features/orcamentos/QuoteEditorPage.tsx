@@ -321,7 +321,7 @@ function Editor({ quote }: { quote: Quote }) {
                       <span className="oc-item__num">{index + 1}</span>
                       <div className="oc-item__desc">
                         <label htmlFor={`${item.key}-description`} className="sr-only">Descrição do item {index + 1}</label>
-                        <input
+                        <input autoComplete="off"
                           id={`${item.key}-description`}
                           className="cl-input oc-input-strong"
                           placeholder="Descreva o item. Ex.: Box de vidro temperado 8 mm"
@@ -352,7 +352,7 @@ function Editor({ quote }: { quote: Quote }) {
                       {/* Sempre m² (única opção) */}
                       <div className="cl-field">
                         <label htmlFor={`${item.key}-unit`} className="oc-label">Unid.</label>
-                        <select id={`${item.key}-unit`} className="cl-input oc-input-sm" value={AREA_OPTION} onChange={() => {}} data-testid="item-unidade">
+                        <select autoComplete="off" id={`${item.key}-unit`} className="cl-input oc-input-sm" value={AREA_OPTION} onChange={() => {}} data-testid="item-unidade">
                           <option value={AREA_OPTION}>m²</option>
                         </select>
                       </div>
@@ -386,7 +386,7 @@ function Editor({ quote }: { quote: Quote }) {
               <h2 id="t-cond" className="cl-card__title">Condições</h2>
               <div className="cl-field">
                 <label htmlFor="pagamento" className="cl-field__label">Condições de pagamento</label>
-                <input id="pagamento" className="cl-input" value={form.paymentTerms} maxLength={TERMS_MAX} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} placeholder="Ex.: 50% de entrada e 50% na entrega" />
+                <input autoComplete="off" id="pagamento" className="cl-input" value={form.paymentTerms} maxLength={TERMS_MAX} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} placeholder="Ex.: 50% de entrada e 50% na entrega" />
                 <div className="oc-pills">
                   {PAYMENT_SHORTCUTS.map((s) => (
                     <button key={s} type="button" className="oc-pill" aria-pressed={form.paymentTerms === s} onClick={() => setForm((f) => ({ ...f, paymentTerms: s }))}>{s}</button>
@@ -395,7 +395,7 @@ function Editor({ quote }: { quote: Quote }) {
               </div>
               <div className="cl-field">
                 <label htmlFor="observacoes" className="cl-field__label">Observações (aparecem no PDF)</label>
-                <textarea id="observacoes" className="cl-input cl-textarea" rows={3} maxLength={NOTES_MAX} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Ex.: Prazo de fabricação de 15 dias úteis após a aprovação." aria-describedby="obs-contador" />
+                <textarea autoComplete="off" id="observacoes" className="cl-input cl-textarea" rows={3} maxLength={NOTES_MAX} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Ex.: Prazo de fabricação de 15 dias úteis após a aprovação." aria-describedby="obs-contador" />
                 <p id="obs-contador" className="cl-counter">{form.notes.length}/{NOTES_MAX}</p>
               </div>
             </section>
@@ -411,14 +411,14 @@ function Editor({ quote }: { quote: Quote }) {
                 <div className="oc-seg oc-seg--small" role="radiogroup" aria-labelledby="desconto-label">
                   {(['PERCENT', 'AMOUNT'] as const).map((t) => (
                     <label key={t} className="oc-seg__opt">
-                      <input type="radio" name="discount-type" value={t} checked={form.discountType === t}
+                      <input autoComplete="off" type="radio" name="discount-type" value={t} checked={form.discountType === t}
                         onChange={() => { setForm((f) => ({ ...f, discountType: t, discountValue: '' })); setErrors((e) => ({ ...e, discount: '' })) }} />
                       {t === 'PERCENT' ? '%' : 'R$'}
                     </label>
                   ))}
                 </div>
                 <label htmlFor="desconto-valor" className="sr-only">{form.discountType === 'PERCENT' ? 'Desconto em porcentagem' : 'Desconto em reais'}</label>
-                <input
+                <input autoComplete="off"
                   id="desconto-valor"
                   className="cl-input oc-input-num"
                   inputMode={form.discountType === 'PERCENT' ? 'decimal' : 'numeric'}
@@ -478,7 +478,7 @@ function NumField({ id, label, value, onChange, inputMode, error, placeholder, p
       <label htmlFor={id} className="oc-label">{label}</label>
       <div className={prefix ? 'oc-prefixed' : undefined}>
         {prefix && <span className="oc-prefixed__text" aria-hidden="true">{prefix}</span>}
-        <input
+        <input autoComplete="off"
           id={id}
           className="cl-input oc-input-num"
           inputMode={inputMode}

@@ -14,6 +14,9 @@ import { QuoteEditorPage } from '../features/orcamentos/QuoteEditorPage'
 import { QuoteReviewPage } from '../features/orcamentos/QuoteReviewPage'
 import { QuoteDetailPage } from '../features/orcamentos/QuoteDetailPage'
 import { QuotePrintPage } from '../features/orcamentos/QuotePrintPage'
+import { OrdersListPage } from '../features/pedidos/OrdersListPage'
+import { OrderDetailPage } from '../features/pedidos/OrderDetailPage'
+import { FinancialPage } from '../features/financeiro/FinancialPage'
 
 // Mapa de rotas do ZBOX.
 // RN01: tudo exige sessão, menos /login.
@@ -36,6 +39,9 @@ export function AppRouter() {
           <Route path="/orcamentos/:id" element={<QuoteDetailPage />} />
           <Route path="/orcamentos/:id/editar" element={<QuoteEditorPage />} />
           <Route path="/orcamentos/:id/revisar" element={<QuoteReviewPage />} />
+          <Route path="/pedidos" element={<OrdersListPage />} />
+          <Route path="/pedidos/:id" element={<OrderDetailPage />} />
+          <Route path="/financeiro" element={<FinancialPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
         </Route>
         {/* Impressão/PDF: protegida, mas sem o menu (só o documento) */}

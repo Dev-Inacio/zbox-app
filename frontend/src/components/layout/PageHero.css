@@ -78,6 +78,11 @@
   padding: 0 var(--page-gutter) var(--space-6);
 }
 
+/* Cards um embaixo do outro, direto na página (ex.: Financeiro): espaço entre eles */
+.page-body > .cl-card + .cl-card {
+  margin-top: var(--space-4);
+}
+
 @media (max-width: 767px) {
   .page-hero__inner {
     padding: 8px var(--page-gutter) 72px;

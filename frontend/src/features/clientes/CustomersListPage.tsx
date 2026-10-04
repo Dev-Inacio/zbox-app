@@ -152,7 +152,7 @@ export function CustomersListPage() {
 
             <div className="cl-field">
               <label htmlFor="filtro-status" className="cl-field__label">Status</label>
-              <select
+              <select autoComplete="off"
                 id="filtro-status"
                 className="cl-input"
                 value={status}
@@ -164,7 +164,7 @@ export function CustomersListPage() {
 
             <div className="cl-field">
               <label htmlFor="filtro-tipo" className="cl-field__label">Tipo</label>
-              <select
+              <select autoComplete="off"
                 id="filtro-tipo"
                 className="cl-input"
                 value={type}

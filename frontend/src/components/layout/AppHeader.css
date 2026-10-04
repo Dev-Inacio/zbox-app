@@ -1,5 +1,5 @@
 /* HU03 · Opção A: header grafite, logo à esquerda, menu à direita.
-   Abaixo de 768px vira menu hambúrguer. */
+   Abaixo de 1100px vira menu hambúrguer (são 6 itens + avatar + Sair). */
 
 .app-header {
   position: sticky;
@@ -114,8 +114,8 @@
   cursor: pointer;
 }
 
-/* ---------- Celular ---------- */
-@media (max-width: 767px) {
+/* ---------- Celular e tablet: com 6 itens, o menu só cabe a partir de 1100px ---------- */
+@media (max-width: 1099px) {
   .app-header__inner { height: 60px; }
 
   .app-header__burger { display: flex; }

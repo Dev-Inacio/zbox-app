@@ -18,6 +18,14 @@ import { canChangeCustomerStatus } from './permissions'
 import { listQuotes } from '../orcamentos/quotesApi'
 import { QuoteTable } from '../orcamentos/QuotesListPage'
 import type { QuoteSummary } from '../orcamentos/types'
+import { formatMoney } from '../orcamentos/money'
+import { listOrders } from '../pedidos/ordersApi'
+import { OrderTable } from '../pedidos/OrdersListPage'
+import type { OrderSummary } from '../pedidos/types'
+import { formatDay } from '../pedidos/dates'
+import { METHOD_LABEL } from '../pedidos/labels'
+import { listPaymentsByCustomer } from '../financeiro/financialApi'
+import type { ReceivedPayment } from '../financeiro/financialApi'
 import type { Page } from './types'
 import type { Customer, CustomerHistoryItem } from './types'
 import '../../components/ui/ButtonVariants.css'
@@ -46,6 +54,12 @@ function CustomerDetail({ id }: { id: number }) {
   const history = useRequest(`${id}#${historyAttempt}`, fetchHistory)
   const fetchQuotes = useCallback(() => listQuotes({ search: '', status: 'ALL', period: 'ALL', customerId: id, page: 0, size: 5 }), [id])
   const quotes = useRequest(`orcamentos-${id}`, fetchQuotes)
+  // Pedidos do cliente: até 50 para somar "A receber" (no back real, um campo no resumo do cliente resolve isso)
+  const fetchOrders = useCallback(() => listOrders({ search: '', status: 'ALL', payment: 'ALL', customerId: id, page: 0, size: 50 }), [id])
+  const orders = useRequest(`pedidos-${id}`, fetchOrders)
+  const fetchPayments = useCallback(() => listPaymentsByCustomer(id), [id])
+  const payments = useRequest(`pagamentos-${id}`, fetchPayments)
+  const receivable = orders.data ? orders.data.content.filter((o) => o.status !== 'CANCELED').reduce((sum, o) => sum + o.remainingCents, 0) : null
 
   const canChangeStatus = canChangeCustomerStatus(user?.role)
 
@@ -161,16 +175,15 @@ function CustomerDetail({ id }: { id: number }) {
             <section className="cl-card cl-card--elevated" aria-labelledby="titulo-resumo">
               <div className="cl-card__header">
                 <h2 id="titulo-resumo" className="cl-card__title">Resumo</h2>
-                <span className="cl-card__badge">Pedidos na Fase 4</span>
               </div>
               <ul className="cl-summary">
                 <li><span className="cl-summary__label">Orçamentos</span><span className="cl-summary__value">{quotes.data ? quotes.data.totalElements : '–'}</span></li>
-                <li><span className="cl-summary__label">Pedidos</span><span className="cl-summary__value">0</span></li>
-                <li><span className="cl-summary__label">A receber</span><span className="cl-summary__value">R$ 0</span></li>
+                <li><span className="cl-summary__label">Pedidos</span><span className="cl-summary__value">{orders.data ? orders.data.totalElements : '–'}</span></li>
+                <li><span className="cl-summary__label">A receber</span><span className="cl-summary__value">{receivable === null ? '–' : formatMoney(receivable)}</span></li>
               </ul>
             </section>
 
-            <MovementTabs quotes={quotes} newQuoteHref={inactive ? null : `/orcamentos/novo?cliente=${c.id}`} />
+            <MovementTabs quotes={quotes} orders={orders} payments={payments} newQuoteHref={inactive ? null : `/orcamentos/novo?cliente=${c.id}`} />
 
             <section className="cl-card" aria-labelledby="titulo-historico">
               <div className="cl-card__header">
@@ -260,17 +273,19 @@ function AddressBlock({ customer }: { customer: Customer }) {
 }
 
 // ---------- Abas: Orçamentos / Pedidos / Pagamentos ----------
-// Orçamentos já funciona (Fase 3). Pedidos e Pagamentos ficam vazios até as Fases 4 e 5. As setas ← → trocam de aba (padrão de acessibilidade de tabs).
+// As setas ← → trocam de aba (padrão de acessibilidade de tabs).
 
 const TABS = [
-  { id: 'orcamentos', label: 'Orçamentos', empty: 'Nenhum orçamento para este cliente.', phase: '' },
-  { id: 'pedidos', label: 'Pedidos', empty: 'Nenhum pedido para este cliente.', phase: 'Fase 4' },
-  { id: 'pagamentos', label: 'Pagamentos', empty: 'Nenhum pagamento para este cliente.', phase: 'Fase 5' },
-]
+  { id: 'orcamentos', label: 'Orçamentos', empty: 'Nenhum orçamento para este cliente.' },
+  { id: 'pedidos', label: 'Pedidos', empty: 'Nenhum pedido para este cliente.' },
+  { id: 'pagamentos', label: 'Pagamentos', empty: 'Nenhum pagamento para este cliente.' },
+] as const
 
-type QuotesState = { loading: boolean; data?: Page<QuoteSummary>; error?: unknown }
+type Loadable<T> = { loading: boolean; data?: T; error?: unknown }
 
-function MovementTabs({ quotes, newQuoteHref }: { quotes: QuotesState; newQuoteHref: string | null }) {
+function MovementTabs({ quotes, orders, payments, newQuoteHref }: {
+  quotes: Loadable<Page<QuoteSummary>>; orders: Loadable<Page<OrderSummary>>; payments: Loadable<ReceivedPayment[]>; newQuoteHref: string | null
+}) {
   const [active, setActive] = useState(0)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -285,6 +300,11 @@ function MovementTabs({ quotes, newQuoteHref }: { quotes: QuotesState; newQuoteH
   }
 
   const tab = TABS[active]
+  const loading = tab.id === 'orcamentos' ? quotes.loading : tab.id === 'pedidos' ? orders.loading : payments.loading
+  const hasData =
+    tab.id === 'orcamentos' ? Boolean(quotes.data?.content.length)
+      : tab.id === 'pedidos' ? Boolean(orders.data?.content.length)
+        : Boolean(payments.data?.length)
 
   return (
     <section className="cl-card" aria-labelledby="titulo-movimentacao">
@@ -312,11 +332,26 @@ function MovementTabs({ quotes, newQuoteHref }: { quotes: QuotesState; newQuoteH
           </button>
         ))}
       </div>
-      {tab.id === 'orcamentos' && quotes.data && quotes.data.content.length > 0 ? (
+      {hasData ? (
         <div role="tabpanel" id={`painel-${tab.id}`} aria-labelledby={`aba-${tab.id}`}>
-          <QuoteTable items={quotes.data.content} showCustomer={false} />
-          {quotes.data.totalElements > quotes.data.content.length && (
-            <p className="cl-muted">Mostrando os {quotes.data.content.length} mais recentes de {quotes.data.totalElements}.</p>
+          {tab.id === 'orcamentos' && quotes.data && (
+            <>
+              <QuoteTable items={quotes.data.content} showCustomer={false} />
+              {quotes.data.totalElements > quotes.data.content.length && (
+                <p className="cl-muted">Mostrando os {quotes.data.content.length} mais recentes de {quotes.data.totalElements}.</p>
+              )}
+            </>
+          )}
+          {tab.id === 'pedidos' && orders.data && <OrderTable items={orders.data.content.slice(0, 5)} showCustomer={false} />}
+          {tab.id === 'pagamentos' && payments.data && (
+            <ul className="cl-pay-list">
+              {payments.data.slice(0, 10).map((p) => (
+                <li key={p.id}>
+                  <span><strong>{formatMoney(p.amountCents)}</strong> <span className="cl-muted">· {METHOD_LABEL[p.method]} · {formatDay(p.paidAt)}</span></span>
+                  <Link to={`/pedidos/${p.orderId}`}>Pedido #{p.orderNumber}</Link>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
       ) : (
@@ -327,16 +362,14 @@ function MovementTabs({ quotes, newQuoteHref }: { quotes: QuotesState; newQuoteH
               <path d="M14 3v6h6" />
             </svg>
           </span>
-          {tab.id === 'orcamentos' && quotes.loading ? (
-            <p className="cl-state__text" role="status">Carregando orçamentos…</p>
+          {loading ? (
+            <p className="cl-state__text" role="status">Carregando…</p>
           ) : (
             <>
               <p className="cl-state__title">{tab.empty}</p>
-              {tab.phase ? (
-                <p className="cl-state__text">Aparece aqui quando a {tab.phase} estiver pronta.</p>
-              ) : newQuoteHref ? (
-                <Link to={newQuoteHref} className="cl-cta">Criar orçamento</Link>
-              ) : null}
+              {tab.id === 'orcamentos' && newQuoteHref && <Link to={newQuoteHref} className="cl-cta">Criar orçamento</Link>}
+              {tab.id === 'pedidos' && <p className="cl-state__text">Pedidos nascem de orçamentos aprovados.</p>}
+              {tab.id === 'pagamentos' && <p className="cl-state__text">Pagamentos são registrados nos pedidos.</p>}
             </>
           )}
         </div>

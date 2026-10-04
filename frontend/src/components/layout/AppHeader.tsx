@@ -9,6 +9,8 @@ const ITEMS = [
   { path: '/inicio', label: 'Início' },
   { path: '/clientes', label: 'Clientes' },
   { path: '/orcamentos', label: 'Orçamentos' },
+  { path: '/pedidos', label: 'Pedidos' },
+  { path: '/financeiro', label: 'Financeiro' },
   { path: '/perfil', label: 'Perfil' },
 ]
 

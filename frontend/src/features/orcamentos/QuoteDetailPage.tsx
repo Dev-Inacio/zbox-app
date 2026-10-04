@@ -17,6 +17,7 @@ import {
 } from './quotesApi'
 import { canShareFiles, canSharePdf, downloadFile, generateQuotePdf } from './quotePdf'
 import { QuoteStatusBadge } from './QuoteStatusBadge'
+import { ConvertToOrderDialog } from '../pedidos/OrderDialogs'
 import type { ApprovalMethod, Quote, QuoteEvent, RejectionReason } from './types'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
@@ -25,7 +26,7 @@ import './Orcamentos.css'
 // HU16 (enviar), HU17 (nova versão), HU18 (aprovar/recusar/cancelar).
 // Regra de ouro: quem decide se a ação vale é o back (transições de status). A tela só mostra o que faz sentido.
 
-type DialogKind = 'whatsapp' | 'approve' | 'reject' | 'cancel' | 'version' | 'draft' | null
+type DialogKind = 'whatsapp' | 'approve' | 'reject' | 'cancel' | 'version' | 'draft' | 'convert' | null
 
 export function QuoteDetailPage() {
   const { id } = useParams()
@@ -165,6 +166,7 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
               onReject={() => open('reject')}
               onBackToDraft={() => open('draft')}
               onNewVersion={() => open('version')}
+              onConvert={() => open('convert')}
             />
           </section>
 
@@ -289,6 +291,11 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
         {dialogError && <Alert variant="error">{dialogError}</Alert>}
       </ConfirmDialog>
 
+      {dialog === 'convert' && (
+        <ConvertToOrderDialog quote={quote} onCancel={() => setDialog(null)}
+          onDone={(order) => navigate(`/pedidos/${order.id}`, { state: { flash: `Pedido #${order.number} criado.` } })} />
+      )}
+
       <Toast message={toast} onClose={clearToast} />
     </>
   )
@@ -339,9 +346,10 @@ type PanelProps = {
   onReject: () => void
   onBackToDraft: () => void
   onNewVersion: () => void
+  onConvert: () => void
 }
 
-function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onApprove, onReject, onBackToDraft, onNewVersion }: PanelProps) {
+function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onApprove, onReject, onBackToDraft, onNewVersion, onConvert }: PanelProps) {
   if (!isLatest || quote.status === 'SUPERSEDED') {
     return <p className="cl-muted">Versão {quote.version} · {STATUS_LABEL[quote.status]}. Só para consulta.</p>
   }
@@ -385,7 +393,11 @@ function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onA
             <strong>Aprovado{quote.approvalMethod ? ` ${APPROVAL_LABEL[quote.approvalMethod].charAt(0).toLowerCase()}${APPROVAL_LABEL[quote.approvalMethod].slice(1)}` : ''}</strong>
             <span>Registrado em {formatDateTime(quote.decidedAt ?? quote.updatedAt)}. Aprovar não registra pagamento.</span>
           </div>
-          <Button disabled title="Disponível na Fase 4 (Pedidos)">Converter em pedido</Button>
+          {quote.order ? (
+            <Link to={`/pedidos/${quote.order.id}`} className="btn btn--secondary oc-btn-link" data-testid="ver-pedido">Ver pedido #{quote.order.number}</Link>
+          ) : (
+            <Button onClick={onConvert} data-testid="transformar-em-pedido">Transformar em pedido</Button>
+          )}
         </div>
       )
     case 'REJECTED':
@@ -496,14 +508,14 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
           <>
             <label className="cl-field">
               <span className="cl-field__label">WhatsApp</span>
-              <input className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" aria-invalid={phone && phoneInvalid ? true : undefined} />
+              <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" aria-invalid={phone && phoneInvalid ? true : undefined} />
             </label>
             {!quote.customer.whatsapp && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para este envio.</p>}
           </>
         )}
         <label className="cl-field">
           <span className="cl-field__label">Mensagem (pode editar)</span>
-          <textarea className="cl-input cl-textarea" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
+          <textarea autoComplete="off" className="cl-input cl-textarea" rows={4} value={message} onChange={(e) => setMessage(e.target.value)} />
         </label>
 
         <div className={`oc-attach${pdf.error ? ' oc-attach--bad' : ''}`} role="status" data-testid="anexo-pdf">
@@ -551,7 +563,7 @@ function ApproveDialog({ open, quote, busy, error, onCancel, onConfirm }: {
         <legend className="cl-field__label">Como o cliente aprovou?</legend>
         {(Object.keys(APPROVAL_LABEL) as ApprovalMethod[]).map((m) => (
           <label key={m} className="oc-radio">
-            <input type="radio" name="approval" checked={method === m} onChange={() => setMethod(m)} />
+            <input autoComplete="off" type="radio" name="approval" checked={method === m} onChange={() => setMethod(m)} />
             {APPROVAL_LABEL[m]}
           </label>
         ))}
@@ -573,7 +585,7 @@ function RejectDialog({ open, busy, error, onCancel, onConfirm }: {
       <div className="oc-pills" role="radiogroup" aria-label="Motivo da recusa">
         {(Object.keys(REJECTION_LABEL) as RejectionReason[]).map((r) => (
           <label key={r} className="oc-pill oc-pill--radio">
-            <input type="radio" name="reject-reason" checked={reason === r} onChange={() => setReason(r)} />
+            <input autoComplete="off" type="radio" name="reject-reason" checked={reason === r} onChange={() => setReason(r)} />
             {REJECTION_LABEL[r]}
           </label>
         ))}
@@ -581,7 +593,7 @@ function RejectDialog({ open, busy, error, onCancel, onConfirm }: {
       {!reason && <p className="oc-small cl-muted">Escolha o motivo da recusa.</p>}
       <label className="cl-field oc-dialog-gap">
         <span className="cl-field__label">Detalhe (opcional)</span>
-        <textarea className="cl-input cl-textarea" rows={3} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: Achou caro, pediu para pensar." />
+        <textarea autoComplete="off" className="cl-input cl-textarea" rows={3} maxLength={300} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: Achou caro, pediu para pensar." />
       </label>
       <p className="oc-small cl-muted">Se o cliente quiser outra proposta, crie uma nova versão depois.</p>
       {error && <Alert variant="error">{error}</Alert>}
@@ -600,7 +612,7 @@ function TextReasonDialog({ open, busy, error, onCancel, onConfirm, title, label
       <p>{help}</p>
       <label className="cl-field oc-dialog-gap">
         <span className="cl-field__label">{label}</span>
-        <textarea className="cl-input cl-textarea" rows={3} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
+        <textarea autoComplete="off" className="cl-input cl-textarea" rows={3} maxLength={300} value={text} onChange={(e) => setText(e.target.value)} placeholder={placeholder} />
       </label>
       {error && <Alert variant="error">{error}</Alert>}
     </ConfirmDialog>
@@ -623,6 +635,7 @@ function eventText(ev: QuoteEvent): string {
     }
     case 'CANCELED': return `Cancelado${ev.detail ? ` · ${ev.detail}` : ''}`
     case 'NEW_VERSION': return ev.detail?.startsWith('v') ? `Substituído pela ${ev.detail}` : `Nova versão criada${ev.detail ? ` · ${ev.detail}` : ''}`
+    case 'CONVERTED': return `Virou o pedido #${ev.detail ?? ''}`
   }
 }
 
@@ -638,6 +651,7 @@ function eventIcon(ev: QuoteEvent) {
     BACK_TO_DRAFT: 'M9 14l-5-5 5-5M4 9h11a5 5 0 0 1 0 10h-3',
     NEW_VERSION: 'M8 8h12v12H8zM16 8V4H4v12h4',
     DISPATCHED: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6',
+    CONVERTED: 'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7',
   }
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={paths[ev.type]} /></svg>
 }
