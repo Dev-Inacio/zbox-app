@@ -1,0 +1,109 @@
+.section-card {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  padding: 28px;
+  background: var(--color-surface);
+  border: 1px solid #DCDDDF;
+  border-radius: 24px;
+}
+
+.section-card--elevated {
+  box-shadow: 0 12px 32px rgba(27, 31, 35, 0.08);
+}
+
+.section-card__header {
+  display: flex;
+  flex-wrap: wrap; /* em tela muito estreita, o selo/link desce em vez de apertar o título */
+  align-items: center;
+  gap: 12px;
+}
+
+.section-card__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.section-card__badge {
+  margin-left: auto;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #F0EFEC;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.section-card__action {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.section-card__action a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.section-card__action a:hover {
+  color: var(--color-accent-hover);
+  text-decoration: underline;
+}
+
+.section-card__action a:focus-visible {
+  outline: 3px solid var(--color-accent-soft);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Corpo com altura mínima: a tela não "pula" entre os estados */
+.section-card__body {
+  min-height: 140px;
+}
+
+.section-card__message {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+.section-card__error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* Skeleton: barras cinzas pulsando no lugar do conteúdo */
+.section-card__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.section-card__skeleton span {
+  height: 18px;
+  border-radius: 6px;
+  background: #E6E5E1;
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+
+.section-card__skeleton span:nth-child(2) { width: 80%; }
+.section-card__skeleton span:nth-child(3) { width: 60%; }
+
+@keyframes skeleton-pulse {
+  50% { opacity: 0.45; }
+}
+
+/* Quem prefere menos movimento (configuração do sistema) não vê a animação */
+@media (prefers-reduced-motion: reduce) {
+  .section-card__skeleton span { animation: none; }
+}
+
+@media (max-width: 767px) {
+  .section-card { padding: 20px; border-radius: 20px; gap: 16px; }
+  .section-card__title { font-size: 18px; }
+}

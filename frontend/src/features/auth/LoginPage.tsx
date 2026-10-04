@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
-import type { FormEvent } from 'react'
+import type { CSSProperties, FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Alert } from '../../components/ui/Alert'
+import { Logo } from '../../components/ui/Logo'
 import { login } from './authApi'
 import { ApiError } from './types'
 import type { AuthUser } from './types'
@@ -19,9 +20,10 @@ type FormMessage = { variant: 'error' | 'warning' | 'info'; text: string } | nul
 
 type LoginPageProps = {
   onSuccess: (user: AuthUser) => void
+  notice?: string // aviso vindo de fora, ex.: "Você saiu da sua conta." (HU06)
 }
 
-export function LoginPage({ onSuccess }: LoginPageProps) {
+export function LoginPage({ onSuccess, notice }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
@@ -73,15 +75,12 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
   return (
     <div className="login">
       <aside className="login__brand">
-        <div className="login__frame" aria-hidden="true">
-          <span /><span /><span /><span className="is-accent" /><span /><span />
-        </div>
+        {/* Esquadria animada no fundo (só decoração) */}
+        <WindowFrame />
         <div className="login__logo">
-          <span className="login__logo-mark" aria-hidden="true"><span /></span>
-          <span className="login__logo-text">ZBOX</span>
+          <Logo size="lg" />
         </div>
-        <div className="login__pitch">
-          <p className="login__eyebrow">Serralheria e esquadrias</p>
+        <div className="login__pitch login__rise">
           <h2 className="login__headline">Do orçamento à entrega, tudo no mesmo lugar.</h2>
           <p className="login__lead">
             Clientes, orçamentos, pedidos e financeiro da empresa organizados para decidir rápido.
@@ -97,6 +96,8 @@ export function LoginPage({ onSuccess }: LoginPageProps) {
             <h1 className="login__title">Entrar</h1>
             <p className="login__subtitle">Acesse com seu e-mail e senha.</p>
           </div>
+
+          {notice && !formMessage && <Alert variant="success">{notice}</Alert>}
 
           <Input
             ref={emailRef}
@@ -155,4 +156,76 @@ function toFormMessage(error: unknown): FormMessage {
   }
   // fetch lança TypeError quando não consegue falar com o servidor
   return { variant: 'info', text: 'Não foi possível conectar. Verifique sua internet e tente novamente.' }
+}
+
+// ---------- Esquadria animada (decoração do painel escuro) ----------
+// 1. o contorno e os vidros são "desenhados" na tela, como se a esquadria fosse montada
+// 2. dois pontos de solda soltam faíscas de tempos em tempos
+// 3. um reflexo de luz passa pelo vidro
+// 4. depois de montada, ela flutua devagar
+const PANES = [
+  { x: 15, y: 15 },
+  { x: 217, y: 15 },
+  { x: 15, y: 196.33 },
+  { x: 217, y: 196.33, accent: true }, // o vidro com a linha laranja
+  { x: 15, y: 377.67 },
+  { x: 217, y: 377.67 },
+]
+
+const SPARKS_A = [[-18, -14], [16, -20], [22, 6], [-12, 18], [6, 24], [-24, 2], [12, -26]]
+const SPARKS_B = [[-16, -12], [14, -18], [18, 8], [-10, 16], [-20, -2]]
+
+function WindowFrame() {
+  return (
+    <svg className="login__frame" viewBox="0 0 420 560" aria-hidden="true">
+      <defs>
+        <clipPath id="login-frame-clip">
+          <rect x="0" y="0" width="420" height="560" />
+        </clipPath>
+      </defs>
+
+      <rect className="frame__outline" x="1" y="1" width="418" height="558" pathLength={1} />
+
+      {PANES.map((pane, i) => (
+        <rect
+          key={i}
+          className={`frame__pane${pane.accent ? ' frame__pane--accent' : ''}`}
+          x={pane.x}
+          y={pane.y}
+          width="188"
+          height="167.33"
+          pathLength={1}
+          style={{ animationDelay: `${0.5 + i * 0.12}s` }}
+        />
+      ))}
+
+      <g clipPath="url(#login-frame-clip)">
+        <rect className="frame__glass" x="-200" y="-100" width="120" height="760" />
+      </g>
+
+      <circle className="frame__weld" cx="217" cy="196.33" r="3" />
+      {SPARKS_A.map(([dx, dy], i) => (
+        <circle
+          key={`a${i}`}
+          className="frame__spark"
+          cx="217"
+          cy="196.33"
+          r="1.6"
+          style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties}
+        />
+      ))}
+
+      <circle className="frame__weld frame__weld--b" cx="203" cy="377.67" r="2.6" />
+      {SPARKS_B.map(([dx, dy], i) => (
+        <circle
+          key={`b${i}`}
+          className="frame__spark frame__spark--b"
+          cx="203"
+          cy="377.67"
+          r="1.4"
+          style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties}
+        />
+      ))}
+    </svg>
+  )
 }

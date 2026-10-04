@@ -2,7 +2,7 @@
    Os componentes usam var(--nome) e nunca valores soltos. */
 :root {
   /* Cores: nomeadas pelo papel, não pela aparência */
-  --color-ink: #1B1F23;            /* texto principal e painel da marca */
+  --color-ink: #1B1F23;            /* texto principal e fundo grafite */
   --color-bg: #F4F3F0;             /* fundo da página */
   --color-surface: #FFFFFF;        /* fundo de campos e cards */
   --color-text-muted: #5A6067;     /* textos secundários */
@@ -28,4 +28,8 @@
   /* Formas e medidas */
   --radius: 8px;
   --control-height: 48px;
+
+  /* Largura da página */
+  --page-max: 1600px;                     /* largura máxima do conteúdo */
+  --page-gutter: clamp(16px, 4vw, 56px);  /* margem lateral: 16px no celular, até 56px na tela grande */
 }

@@ -24,68 +24,131 @@
   color: var(--color-bg);
 }
 
-/* Desenho de esquadria (só decoração) */
+/* ---------- Entrada do painel ---------- */
+/* O logo entra subindo e o texto da marca vem logo depois */
+.login__logo {
+  position: relative;
+  animation: rise-in 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.login__rise {
+  animation: rise-in 1s cubic-bezier(0.2, 0.7, 0.2, 1) 0.35s both;
+}
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Esquadria animada (só decoração) ---------- */
 .login__frame {
   position: absolute;
   right: -80px;
-  top: 120px;
+  top: 200px;
   width: 420px;
   height: 560px;
-  box-sizing: border-box;
-  padding: 14px;
-  border: 2px solid #3A4048;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-template-rows: repeat(3, minmax(0, 1fr));
-  gap: 14px;
+  overflow: visible;
+  /* depois de montada, flutua devagar */
+  animation: frame-float 10s ease-in-out 1.8s infinite;
 }
 
-.login__frame span { border: 1px solid #2E343B; }
-.login__frame span.is-accent { border-color: var(--color-accent); }
+/* "Desenhar" uma linha: o traço começa escondido (dashoffset 1) e vai até 0.
+   pathLength={1} no SVG deixa o tamanho de toda linha igual a 1, seja qual for. */
+.frame__outline,
+.frame__pane {
+  fill: none;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+}
 
-.login__logo,
+.frame__outline {
+  stroke: #3A4048;
+  stroke-width: 2;
+  animation: draw-line 1.2s cubic-bezier(0.6, 0.1, 0.2, 1) 0.2s forwards;
+}
+
+.frame__pane {
+  stroke: #2E343B;
+  stroke-width: 1;
+  animation: draw-line 0.9s cubic-bezier(0.6, 0.1, 0.2, 1) forwards;
+}
+
+.frame__pane--accent { stroke: var(--color-accent); }
+
+/* Reflexo de luz passando pelo vidro */
+.frame__glass {
+  fill: rgba(255, 255, 255, 0.06);
+  transform: skewX(-15deg);
+  animation: glass-shine 7s ease-in-out 2.5s infinite;
+}
+
+/* Ponto de solda que acende... */
+.frame__weld {
+  fill: #E07B3C;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px #E07B3C);
+  animation: weld 4s ease-out 2s infinite;
+}
+
+/* ...e as faíscas que voam dele (cada uma para uma direção: --dx, --dy) */
+.frame__spark {
+  fill: #E9A06E;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: spark 4s ease-out 2s infinite;
+}
+
+.frame__weld--b,
+.frame__spark--b { animation-delay: 4s; }
+
+@keyframes draw-line {
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes frame-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(-1deg); }
+}
+
+@keyframes glass-shine {
+  0%, 55% { transform: translateX(0) skewX(-15deg); }
+  100% { transform: translateX(780px) skewX(-15deg); }
+}
+
+@keyframes weld {
+  0% { opacity: 0; r: 1px; }
+  4% { opacity: 1; r: 4px; }
+  18% { opacity: 0.6; r: 2.5px; }
+  30%, 100% { opacity: 0; r: 1px; }
+}
+
+@keyframes spark {
+  0% { opacity: 0; transform: translate(0, 0); }
+  3% { opacity: 1; }
+  22%, 100% { opacity: 0; transform: translate(var(--dx), var(--dy)); }
+}
+
+/* Acessibilidade: quem ativou "reduzir movimento" vê a esquadria pronta e parada */
+@media (prefers-reduced-motion: reduce) {
+  .login__frame,
+  .frame__outline,
+  .frame__pane,
+  .frame__glass,
+  .login__logo,
+  .login__rise { animation: none; }
+
+  .frame__outline,
+  .frame__pane { stroke-dashoffset: 0; }
+
+  .frame__weld,
+  .frame__spark { display: none; }
+}
+
 .login__pitch,
 .login__copy { position: relative; }
 
-.login__logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.login__logo-mark {
-  width: 40px;
-  height: 40px;
-  box-sizing: border-box;
-  border: 3px solid var(--color-bg);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.login__logo-mark span {
-  width: 14px;
-  height: 14px;
-  background: #E07B3C;
-}
-
-.login__logo-text {
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 28px;
-  letter-spacing: 0.08em;
-}
-
 .login__pitch { max-width: 380px; }
-
-.login__eyebrow {
-  margin: 0 0 var(--space-2);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: #E9A06E;
-}
 
 .login__headline {
   margin: 0 0 var(--space-2);
@@ -162,7 +225,6 @@
   }
 
   .login__frame,
-  .login__eyebrow,
   .login__lead,
   .login__copy { display: none; }
 
@@ -173,9 +235,6 @@
     font-weight: 400;
     color: #B9BEC4;
   }
-
-  .login__logo-mark { width: 32px; height: 32px; }
-  .login__logo-text { font-size: 22px; }
 
   .login__main { align-items: flex-start; }
 
