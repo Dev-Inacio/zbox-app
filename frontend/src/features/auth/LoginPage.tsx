@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import type { CSSProperties, FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
@@ -6,8 +7,8 @@ import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Alert } from '../../components/ui/Alert'
 import { Logo } from '../../components/ui/Logo'
 import { login } from './authApi'
+import { useAuth } from './useAuth'
 import { ApiError } from './types'
-import type { AuthUser } from './types'
 import { validateEmail, validateLogin, validatePassword } from './validation'
 import type { LoginFieldErrors } from './validation'
 import './LoginPage.css'
@@ -18,12 +19,12 @@ type Status = 'idle' | 'submitting'
 // A mensagem geral do formulário (acima do botão), quando houver
 type FormMessage = { variant: 'error' | 'warning' | 'info'; text: string } | null
 
-type LoginPageProps = {
-  onSuccess: (user: AuthUser) => void
-  notice?: string // aviso vindo de fora, ex.: "Você saiu da sua conta." (HU06)
-}
+export function LoginPage() {
+  const { signIn, notice } = useAuth()
+  const navigate = useNavigate()
+  // Se veio de uma tela protegida (ex.: /clientes/12), volta para ela depois de entrar
+  const from = (useLocation().state as { from?: string } | null)?.from ?? '/inicio'
 
-export function LoginPage({ onSuccess, notice }: LoginPageProps) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
@@ -60,7 +61,8 @@ export function LoginPage({ onSuccess, notice }: LoginPageProps) {
 
     try {
       const response = await login({ email: email.trim(), password })
-      onSuccess(response.user)
+      signIn(response)
+      navigate(from, { replace: true })
     } catch (error) {
       setFormMessage(toFormMessage(error))
       if (error instanceof ApiError && error.code === 'INVALID_CREDENTIALS') {
