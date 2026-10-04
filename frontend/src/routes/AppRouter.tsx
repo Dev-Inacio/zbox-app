@@ -8,6 +8,12 @@ import { ProfilePage } from '../features/profile/ProfilePage'
 import { CustomersListPage } from '../features/clientes/CustomersListPage'
 import { CustomerFormPage } from '../features/clientes/CustomerFormPage'
 import { CustomerDetailPage } from '../features/clientes/CustomerDetailPage'
+import { QuotesListPage } from '../features/orcamentos/QuotesListPage'
+import { NewQuotePage } from '../features/orcamentos/NewQuotePage'
+import { QuoteEditorPage } from '../features/orcamentos/QuoteEditorPage'
+import { QuoteReviewPage } from '../features/orcamentos/QuoteReviewPage'
+import { QuoteDetailPage } from '../features/orcamentos/QuoteDetailPage'
+import { QuotePrintPage } from '../features/orcamentos/QuotePrintPage'
 
 // Mapa de rotas do ZBOX.
 // RN01: tudo exige sessão, menos /login.
@@ -25,8 +31,15 @@ export function AppRouter() {
           <Route path="/clientes/novo" element={<CustomerFormPage />} />
           <Route path="/clientes/:id" element={<CustomerDetailPage />} />
           <Route path="/clientes/:id/editar" element={<CustomerFormPage />} />
+          <Route path="/orcamentos" element={<QuotesListPage />} />
+          <Route path="/orcamentos/novo" element={<NewQuotePage />} />
+          <Route path="/orcamentos/:id" element={<QuoteDetailPage />} />
+          <Route path="/orcamentos/:id/editar" element={<QuoteEditorPage />} />
+          <Route path="/orcamentos/:id/revisar" element={<QuoteReviewPage />} />
           <Route path="/perfil" element={<ProfilePage />} />
         </Route>
+        {/* Impressão/PDF: protegida, mas sem o menu (só o documento) */}
+        <Route path="/orcamentos/:id/imprimir" element={<QuotePrintPage />} />
       </Route>
 
       {/* Qualquer outro endereço vai para o início (que pede login se precisar) */}

@@ -1,0 +1,108 @@
+/* Orçamento em papel (A4). Cores fixas de propósito: é um documento impresso. */
+
+.qd {
+  width: 100%;
+  max-width: 794px;
+  margin: 0 auto;
+  background: #FFFFFF;
+  color: #1B1F23;
+  font-family: var(--font-body);
+  font-size: 12.5px;
+}
+
+.qd__frame {
+  border: 1.5px solid #1B1F23;
+  display: flex;
+  flex-direction: column;
+}
+
+.qd__mono { font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-weight: 500; }
+.qd__muted { color: #5A6067; }
+.qd__accent { color: #A8420D; }
+.qd__strong { font-weight: 700; }
+.qd__right { text-align: right; }
+
+.qd__label {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5A6067;
+}
+.qd__label--accent { color: #A8420D; margin-bottom: 3px; }
+.qd__label--light { color: #E9A06E; }
+
+/* Cabeçalho: marca | caixa do documento */
+.qd__header { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-bottom: 1.5px solid #1B1F23; }
+.qd__brand { padding: 20px 24px; display: flex; align-items: center; gap: 12px; min-width: 0; }
+.qd__mascot { height: 58px; width: auto; }
+.qd__brand-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qd__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: #2A2F34;
+  text-shadow: 1px 1px 0 #C2592A, 2px 2px 0 #7E3415;
+}
+.qd__tagline { font-size: 8.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: #5A6067; }
+.qd__contact { font-size: 10.5px; color: #5A6067; margin-top: 4px; }
+
+.qd__docbox { display: grid; grid-template-columns: auto auto; border-left: 1.5px solid #1B1F23; }
+.qd__doctitle { grid-column: 1 / -1; padding: 10px 18px; background: #1B1F23; color: #FFFFFF; font-family: var(--font-display); font-weight: 800; font-size: 15px; letter-spacing: 0.2em; text-align: center; }
+.qd__docfield { padding: 10px 18px; display: flex; flex-direction: column; gap: 2px; font-size: 15px; }
+.qd__docfield + .qd__docfield { border-left: 1px solid #C9CCD0; }
+
+.qd__customer { padding: 14px 24px; border-bottom: 1px solid #C9CCD0; display: grid; grid-template-columns: 70px 1fr; gap: 12px; align-items: baseline; }
+.qd__customer-name { font-family: var(--font-display); font-weight: 700; font-size: 16px; }
+
+/* Itens */
+.qd__items { flex: 1; padding: 0 24px 16px; }
+.qd__row {
+  display: grid;
+  grid-template-columns: 30px 96px minmax(0, 1fr) 110px;
+  gap: 14px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #DCDDDF;
+  font-variant-numeric: tabular-nums;
+  break-inside: avoid;
+}
+.qd__row--head { padding: 12px 0 8px; border-bottom: 1.5px solid #1B1F23; font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: #5A6067; }
+.qd__drawing { width: 96px; height: 78px; }
+.qd__desc { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.qd__desc-title { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.qd__desc .qd__mono { font-size: 11px; }
+.qd__row .qd__strong { font-size: 13.5px; }
+
+/* Rodapé: condições | totais */
+.qd__footer { display: grid; grid-template-columns: minmax(0, 1fr) 300px; border-top: 1.5px solid #1B1F23; break-inside: avoid; }
+.qd__terms { padding: 16px 24px; display: flex; flex-direction: column; gap: 12px; border-right: 1.5px solid #1B1F23; }
+.qd__notes { white-space: pre-line; overflow-wrap: anywhere; line-height: 1.5; }
+.qd__totals { display: flex; flex-direction: column; font-variant-numeric: tabular-nums; }
+.qd__total-row { padding: 10px 20px; display: flex; justify-content: space-between; border-bottom: 1px solid #C9CCD0; color: #3F454B; }
+.qd__final { flex: 1; padding: 14px 20px; background: #1B1F23; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.qd__final-value { font-family: var(--font-display); font-weight: 800; font-size: 24px; white-space: nowrap; }
+
+/* Celular: o documento continua legível (empilha o que for largo) */
+@media (max-width: 640px) {
+  .qd:not(.qd--paper) .qd__header, .qd:not(.qd--paper) .qd__footer { grid-template-columns: 1fr; }
+  .qd:not(.qd--paper) .qd__docbox { border-left: 0; border-top: 1.5px solid #1B1F23; }
+  .qd:not(.qd--paper) .qd__terms { border-right: 0; border-bottom: 1.5px solid #1B1F23; }
+  .qd:not(.qd--paper) .qd__row { grid-template-columns: 24px minmax(0, 1fr) auto; }
+  .qd:not(.qd--paper) .qd__row--head span:nth-child(2), .qd:not(.qd--paper) .qd__drawing { display: none; }
+  .qd:not(.qd--paper) .qd__customer { grid-template-columns: 1fr; gap: 4px; }
+}
+
+/* Arquivo PDF: folha A4 inteira (a caixa do valor final vai até o pé da página) */
+.qd--paper { width: 794px; max-width: none; min-height: 1150px; display: flex; } /* 277 mm de altura útil na escala da folha */
+.qd--paper .qd__frame { flex: 1; }
+/* No arquivo PDF, quebrar palavra no meio confunde a "foto" da página (aparecia "maxim- ar") */
+.qd--paper .qd__desc-title, .qd--paper .qd__notes { overflow-wrap: break-word; }
+
+/* Impressão: cores de fundo saem no papel */
+@media print {
+  .qd { max-width: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

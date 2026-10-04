@@ -4,7 +4,7 @@
 export type Role = 'ADMIN' | 'MANAGER' | 'EMPLOYEE'
 
 export type LoginRequest = {
-  email: string
+  email: string    // leva o USUÁRIO digitado: o back (LoginRequest.java) lê o login neste campo
   password: string
 }
 

@@ -1,0 +1,40 @@
+/* Paginação */
+.pg {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.pg__info { font-size: 14px; color: var(--color-text-muted); }
+
+.pg__buttons { display: flex; align-items: center; gap: 6px; }
+
+.pg-btn {
+  min-width: 44px;
+  height: 44px;
+  padding: 0 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.pg-btn--number { border-color: transparent; background: transparent; }
+.pg-btn:hover:not(:disabled) { background: #F0EFEC; }
+.pg-btn[aria-current='page'] { background: var(--color-ink); border-color: var(--color-ink); color: #FFFFFF; font-weight: 600; }
+.pg-btn:disabled { color: #A3A8AE; border-color: #DCDDDF; cursor: not-allowed; }
+
+.pg-btn:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
+
+@media (max-width: 767px) {
+  .pg { justify-content: center; }
+  .pg__info { width: 100%; text-align: center; }
+}
