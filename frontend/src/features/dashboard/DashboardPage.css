@@ -57,7 +57,10 @@
   font-weight: 600;
   cursor: pointer;
   white-space: nowrap;
+  text-decoration: none;
 }
+
+.dash-hero__cta:hover { background: var(--color-accent-hover); }
 
 .dash-hero__cta:disabled {
   opacity: 0.6;

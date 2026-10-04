@@ -108,6 +108,11 @@ function validateOnServer(request: CustomerRequest) {
   }
 }
 
+// Só para o mock de Orçamentos pegar os dados do cliente (no back real é um JOIN).
+export function mockFindCustomer(id: number): Customer | undefined {
+  return customers.find((c) => c.id === id)
+}
+
 // ---------- Endpoints ----------
 
 // GET /api/customers?search=&status=ACTIVE&type=&page=0&size=20

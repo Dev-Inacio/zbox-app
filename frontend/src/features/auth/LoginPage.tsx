@@ -9,7 +9,7 @@ import { Logo } from '../../components/ui/Logo'
 import { login } from './authApi'
 import { useAuth } from './useAuth'
 import { ApiError } from './types'
-import { validateEmail, validateLogin, validatePassword } from './validation'
+import { validateLogin, validatePassword, validateUsername } from './validation'
 import type { LoginFieldErrors } from './validation'
 import './LoginPage.css'
 
@@ -25,21 +25,21 @@ export function LoginPage() {
   // Se veio de uma tela protegida (ex.: /clientes/12), volta para ela depois de entrar
   const from = (useLocation().state as { from?: string } | null)?.from ?? '/inicio'
 
-  const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [fieldErrors, setFieldErrors] = useState<LoginFieldErrors>({})
   const [status, setStatus] = useState<Status>('idle')
   const [formMessage, setFormMessage] = useState<FormMessage>(null)
 
-  const emailRef = useRef<HTMLInputElement>(null)
+  const usernameRef = useRef<HTMLInputElement>(null)
   const passwordRef = useRef<HTMLInputElement>(null)
 
   const submitting = status === 'submitting'
 
   // HU02 RN03: o erro some assim que o usuário corrige (só revalida campos que já mostraram erro)
-  function handleEmailChange(value: string) {
-    setEmail(value)
-    if (fieldErrors.email) setFieldErrors((e) => ({ ...e, email: validateEmail(value) }))
+  function handleUsernameChange(value: string) {
+    setUsername(value)
+    if (fieldErrors.username) setFieldErrors((e) => ({ ...e, username: validateUsername(value) }))
   }
 
   function handlePasswordChange(value: string) {
@@ -51,22 +51,22 @@ export function LoginPage() {
     event.preventDefault() // impede o navegador de recarregar a página
 
     // HU02: valida tudo; se houver erro, foca o primeiro e NÃO chama a API
-    const errors = validateLogin(email, password)
+    const errors = validateLogin(username, password)
     setFieldErrors(errors)
-    if (errors.email) return emailRef.current?.focus()
+    if (errors.username) return usernameRef.current?.focus()
     if (errors.password) return passwordRef.current?.focus()
 
     setFormMessage(null)
     setStatus('submitting')
 
     try {
-      const response = await login({ email: email.trim(), password })
+      const response = await login({ email: username.trim(), password }) // o back lê o usuário no campo "email"
       signIn(response)
       navigate(from, { replace: true })
     } catch (error) {
       setFormMessage(toFormMessage(error))
       if (error instanceof ApiError && error.code === 'INVALID_CREDENTIALS') {
-        setPassword('') // HU01: limpa a senha e mantém o e-mail
+        setPassword('') // HU01: limpa a senha e mantém o usuário
         passwordRef.current?.focus()
       }
     } finally {
@@ -96,24 +96,26 @@ export function LoginPage() {
         <form className="login__form" onSubmit={handleSubmit} noValidate>
           <div className="login__heading">
             <h1 className="login__title">Entrar</h1>
-            <p className="login__subtitle">Acesse com seu e-mail e senha.</p>
+            <p className="login__subtitle">Acesse com seu usuário e senha.</p>
           </div>
 
           {notice && !formMessage && <Alert variant="success">{notice}</Alert>}
 
           <Input
-            ref={emailRef}
-            label="E-mail"
-            type="email"
-            name="email"
+            ref={usernameRef}
+            label="Usuário"
+            type="text"
+            name="username"
             autoComplete="username"
-            placeholder="seu@email.com.br"
+            autoCapitalize="none" // o celular não põe a 1ª letra maiúscula no usuário
+            spellCheck={false}
+            placeholder="Seu usuário"
             autoFocus
-            value={email}
-            error={fieldErrors.email}
+            value={username}
+            error={fieldErrors.username}
             disabled={submitting}
-            onChange={(e) => handleEmailChange(e.target.value)}
-            onBlur={() => setFieldErrors((e) => ({ ...e, email: validateEmail(email) }))}
+            onChange={(e) => handleUsernameChange(e.target.value)}
+            onBlur={() => setFieldErrors((e) => ({ ...e, username: validateUsername(username) }))}
           />
 
           <PasswordInput
@@ -147,7 +149,7 @@ function toFormMessage(error: unknown): FormMessage {
   if (error instanceof ApiError) {
     switch (error.code) {
       case 'INVALID_CREDENTIALS':
-        return { variant: 'error', text: 'E-mail ou senha inválidos.' }
+        return { variant: 'error', text: 'Usuário ou senha inválidos.' }
       case 'ACCOUNT_LOCKED':
         return { variant: 'warning', text: 'Muitas tentativas. Tente novamente em 15 minutos.' }
       case 'TOO_MANY_REQUESTS':

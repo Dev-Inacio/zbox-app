@@ -18,13 +18,14 @@ type ConfirmDialogProps = {
   variant?: 'primary' | 'danger'
   loading?: boolean
   loadingText?: string
+  confirmDisabled?: boolean // ex.: enquanto falta escolher o motivo
   onConfirm: () => void
   onCancel: () => void
 }
 
 export function ConfirmDialog({
   open, title, children, confirmLabel, cancelLabel = 'Cancelar',
-  variant = 'primary', loading = false, loadingText, onConfirm, onCancel,
+  variant = 'primary', loading = false, loadingText, confirmDisabled = false, onConfirm, onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
   const titleId = useId()
@@ -57,6 +58,7 @@ export function ConfirmDialog({
         <Button
           className={variant === 'danger' ? 'btn--danger' : ''}
           onClick={onConfirm}
+          disabled={confirmDisabled}
           loading={loading}
           loadingText={loadingText}
         >

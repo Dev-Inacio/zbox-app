@@ -8,6 +8,7 @@ import './AppHeader.css'
 const ITEMS = [
   { path: '/inicio', label: 'Início' },
   { path: '/clientes', label: 'Clientes' },
+  { path: '/orcamentos', label: 'Orçamentos' },
   { path: '/perfil', label: 'Perfil' },
 ]
 

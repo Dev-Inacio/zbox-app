@@ -1,18 +1,15 @@
 // Regras da HU02. O front valida para ajudar o usuário; o back valida de novo e decide.
 
 export type LoginFieldErrors = {
-  email?: string
+  username?: string
   password?: string
 }
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-export function validateEmail(value: string): string | undefined {
-  const email = value.trim()
-  if (email === '') return 'Informe seu e-mail.'
-  if (email.length > 254 || !EMAIL_PATTERN.test(email)) {
-    return 'Digite um e-mail válido. Ex.: nome@empresa.com'
-  }
+// O login é por usuário (texto livre, como está no cadastro do back), não precisa ter formato de e-mail
+export function validateUsername(value: string): string | undefined {
+  const username = value.trim()
+  if (username === '') return 'Informe seu usuário.'
+  if (username.length > 254) return 'O usuário pode ter no máximo 254 caracteres.'
   return undefined
 }
 
@@ -22,11 +19,11 @@ export function validatePassword(value: string): string | undefined {
   return undefined
 }
 
-export function validateLogin(email: string, password: string): LoginFieldErrors {
+export function validateLogin(username: string, password: string): LoginFieldErrors {
   const errors: LoginFieldErrors = {}
-  const emailError = validateEmail(email)
+  const usernameError = validateUsername(username)
   const passwordError = validatePassword(password)
-  if (emailError) errors.email = emailError
+  if (usernameError) errors.username = usernameError
   if (passwordError) errors.password = passwordError
   return errors
 }

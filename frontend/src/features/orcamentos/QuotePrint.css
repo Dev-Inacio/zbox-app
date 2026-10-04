@@ -1,0 +1,30 @@
+.qp { min-height: 100vh; background: #E9E8E4; }
+
+.qp__toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 12px var(--page-gutter);
+  background: var(--color-ink);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.qp__back { color: #E9A06E; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+
+.qp__page { padding: 32px var(--page-gutter); }
+.qp__page .qd { box-shadow: 0 12px 32px rgba(27, 31, 35, 0.12); min-height: 1123px; display: flex; }
+.qp__page .qd__frame { flex: 1; }
+.qp__msg { text-align: center; color: var(--color-text-muted); }
+
+/* No papel: só o documento, A4, sem a barra e sem fundo cinza */
+@page { size: A4; margin: 10mm; }
+
+@media print {
+  .qp { background: #FFFFFF; min-height: 0; }
+  .qp__toolbar { display: none; }
+  .qp__page { padding: 0; }
+  .qp__page .qd { box-shadow: none; min-height: calc(297mm - 20mm); }
+}

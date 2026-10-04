@@ -15,6 +15,10 @@ import { CardSkeleton, CustomerLoadError } from './CustomerLoadStates'
 import { activateCustomer, deactivateCustomer, getCustomer, getCustomerHistory } from './customersApi'
 import { formatDate, formatDateTime, maskCep, maskPhone, typeLabel, whatsappLink } from './format'
 import { canChangeCustomerStatus } from './permissions'
+import { listQuotes } from '../orcamentos/quotesApi'
+import { QuoteTable } from '../orcamentos/QuotesListPage'
+import type { QuoteSummary } from '../orcamentos/types'
+import type { Page } from './types'
 import type { Customer, CustomerHistoryItem } from './types'
 import '../../components/ui/ButtonVariants.css'
 import './Clientes.css'
@@ -40,6 +44,8 @@ function CustomerDetail({ id }: { id: number }) {
   const fetchHistory = useCallback(() => getCustomerHistory(id), [id])
   const customer = useRequest(`${id}#${attempt}`, fetchCustomer)
   const history = useRequest(`${id}#${historyAttempt}`, fetchHistory)
+  const fetchQuotes = useCallback(() => listQuotes({ search: '', status: 'ALL', period: 'ALL', customerId: id, page: 0, size: 5 }), [id])
+  const quotes = useRequest(`orcamentos-${id}`, fetchQuotes)
 
   const canChangeStatus = canChangeCustomerStatus(user?.role)
 
@@ -114,13 +120,17 @@ function CustomerDetail({ id }: { id: number }) {
               </svg>
               Editar
             </Link>
-            <button type="button" className="cl-cta" disabled title="Disponível na Fase 3 (Orçamentos)">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
-                <path d="M12 5v14" />
-                <path d="M5 12h14" />
-              </svg>
-              Novo orçamento
-            </button>
+            {inactive ? (
+              <button type="button" className="cl-cta" disabled title="Cliente desativado não recebe orçamento">Novo orçamento</button>
+            ) : (
+              <Link to={`/orcamentos/novo?cliente=${c.id}`} className="cl-cta" data-testid="cliente-novo-orcamento">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14" />
+                  <path d="M5 12h14" />
+                </svg>
+                Novo orçamento
+              </Link>
+            )}
           </>
         }
       />
@@ -151,16 +161,16 @@ function CustomerDetail({ id }: { id: number }) {
             <section className="cl-card cl-card--elevated" aria-labelledby="titulo-resumo">
               <div className="cl-card__header">
                 <h2 id="titulo-resumo" className="cl-card__title">Resumo</h2>
-                <span className="cl-card__badge">Disponível na Fase 3</span>
+                <span className="cl-card__badge">Pedidos na Fase 4</span>
               </div>
               <ul className="cl-summary">
-                <li><span className="cl-summary__label">Orçamentos</span><span className="cl-summary__value">0</span></li>
+                <li><span className="cl-summary__label">Orçamentos</span><span className="cl-summary__value">{quotes.data ? quotes.data.totalElements : '–'}</span></li>
                 <li><span className="cl-summary__label">Pedidos</span><span className="cl-summary__value">0</span></li>
                 <li><span className="cl-summary__label">A receber</span><span className="cl-summary__value">R$ 0</span></li>
               </ul>
             </section>
 
-            <MovementTabs />
+            <MovementTabs quotes={quotes} newQuoteHref={inactive ? null : `/orcamentos/novo?cliente=${c.id}`} />
 
             <section className="cl-card" aria-labelledby="titulo-historico">
               <div className="cl-card__header">
@@ -250,15 +260,17 @@ function AddressBlock({ customer }: { customer: Customer }) {
 }
 
 // ---------- Abas: Orçamentos / Pedidos / Pagamentos ----------
-// Vazias até as Fases 3, 4 e 5. As setas ← → trocam de aba (padrão de acessibilidade de tabs).
+// Orçamentos já funciona (Fase 3). Pedidos e Pagamentos ficam vazios até as Fases 4 e 5. As setas ← → trocam de aba (padrão de acessibilidade de tabs).
 
 const TABS = [
-  { id: 'orcamentos', label: 'Orçamentos', empty: 'Nenhum orçamento para este cliente.', phase: 'Fase 3' },
+  { id: 'orcamentos', label: 'Orçamentos', empty: 'Nenhum orçamento para este cliente.', phase: '' },
   { id: 'pedidos', label: 'Pedidos', empty: 'Nenhum pedido para este cliente.', phase: 'Fase 4' },
   { id: 'pagamentos', label: 'Pagamentos', empty: 'Nenhum pagamento para este cliente.', phase: 'Fase 5' },
 ]
 
-function MovementTabs() {
+type QuotesState = { loading: boolean; data?: Page<QuoteSummary>; error?: unknown }
+
+function MovementTabs({ quotes, newQuoteHref }: { quotes: QuotesState; newQuoteHref: string | null }) {
   const [active, setActive] = useState(0)
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 
@@ -300,16 +312,35 @@ function MovementTabs() {
           </button>
         ))}
       </div>
-      <div className="cl-state cl-state--compact" role="tabpanel" id={`painel-${tab.id}`} aria-labelledby={`aba-${tab.id}`}>
-        <span className="cl-state__icon" aria-hidden="true">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
-            <path d="M14 3v6h6" />
-          </svg>
-        </span>
-        <p className="cl-state__title">{tab.empty}</p>
-        <p className="cl-state__text">Aparece aqui quando a {tab.phase} estiver pronta.</p>
-      </div>
+      {tab.id === 'orcamentos' && quotes.data && quotes.data.content.length > 0 ? (
+        <div role="tabpanel" id={`painel-${tab.id}`} aria-labelledby={`aba-${tab.id}`}>
+          <QuoteTable items={quotes.data.content} showCustomer={false} />
+          {quotes.data.totalElements > quotes.data.content.length && (
+            <p className="cl-muted">Mostrando os {quotes.data.content.length} mais recentes de {quotes.data.totalElements}.</p>
+          )}
+        </div>
+      ) : (
+        <div className="cl-state cl-state--compact" role="tabpanel" id={`painel-${tab.id}`} aria-labelledby={`aba-${tab.id}`}>
+          <span className="cl-state__icon" aria-hidden="true">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" />
+              <path d="M14 3v6h6" />
+            </svg>
+          </span>
+          {tab.id === 'orcamentos' && quotes.loading ? (
+            <p className="cl-state__text" role="status">Carregando orçamentos…</p>
+          ) : (
+            <>
+              <p className="cl-state__title">{tab.empty}</p>
+              {tab.phase ? (
+                <p className="cl-state__text">Aparece aqui quando a {tab.phase} estiver pronta.</p>
+              ) : newQuoteHref ? (
+                <Link to={newQuoteHref} className="cl-cta">Criar orçamento</Link>
+              ) : null}
+            </>
+          )}
+        </div>
+      )}
     </section>
   )
 }

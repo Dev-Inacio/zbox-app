@@ -58,12 +58,14 @@
   white-space: nowrap;
 }
 
-.cl-hero-btn:hover { border-color: #B9BEC4; background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
+/* também usado em <button>: zera o fundo e a fonte padrão do navegador */
+button.cl-hero-btn { background: transparent; font-family: var(--font-body); cursor: pointer; }
+.cl-hero-btn:hover:not(:disabled) { border-color: #B9BEC4; background: rgba(255, 255, 255, 0.06); color: #FFFFFF; }
+.cl-hero-btn:disabled { opacity: 0.55; cursor: progress; }
 
 .cl-cta:focus-visible,
 .cl-hero-btn:focus-visible,
 .cl-icon-link:focus-visible,
-.cl-page-btn:focus-visible,
 .cl-tabs__tab:focus-visible,
 .cl-table__name a:focus-visible {
   outline: 3px solid var(--color-accent-soft);
@@ -273,40 +275,6 @@
 .cl-tag--person { background: #EEF1F4; color: #2F3A46; }
 .cl-tag--company { background: #F3ECE6; color: #6B3A17; }
 .cl-tag--none { background: transparent; color: var(--color-text-muted); }
-
-/* Paginação */
-.cl-pagination {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.cl-pagination__info { font-size: 14px; color: var(--color-text-muted); }
-
-.cl-pagination__buttons { display: flex; align-items: center; gap: 6px; }
-
-.cl-page-btn {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.cl-page-btn--number { border-color: transparent; background: transparent; }
-.cl-page-btn:hover:not(:disabled) { background: #F0EFEC; }
-.cl-page-btn[aria-current='page'] { background: var(--color-ink); border-color: var(--color-ink); color: #FFFFFF; font-weight: 600; }
-.cl-page-btn:disabled { color: #A3A8AE; border-color: #DCDDDF; cursor: not-allowed; }
 
 /* ---------- Estados: vazio, sem resultado, erro ---------- */
 .cl-state {
@@ -665,8 +633,6 @@
   .cl-table__name a::after { content: ''; position: absolute; inset: 0; border-radius: 16px; }
   .cl-table__go { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 
-  .cl-pagination { justify-content: center; }
-  .cl-pagination__info { width: 100%; text-align: center; }
 
   .cl-form__alert { padding: 16px 16px 0; }
   .cl-form__section { padding: 20px 16px; }
