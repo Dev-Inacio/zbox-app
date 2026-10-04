@@ -1,38 +1,26 @@
 import { ApiError } from './types'
-import type { LoginRequest, LoginResponse } from './types'
+import type { ApiErrorBody, LoginRequest, LoginResponse } from './types'
 
-// ⚠️ SIMULAÇÃO (mock), enquanto o back não publica POST /api/auth/login.
-// Responde nos formatos do contrato, para a troca pela API real ser só aqui.
-//
-// E-mails de teste:
-//   thayna@zbox.com.br  + senha "zbox1234" → sucesso
-//   bloqueado@zbox.com.br                  → 423 ACCOUNT_LOCKED
-//   offline@zbox.com.br                    → falha de rede
-//   qualquer outro                         → 401 INVALID_CREDENTIALS
-
-const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
-
+// POST /api/auth/login (endpoint do back).
+// Em desenvolvimento, o Vite repassa /api para o Spring Boot (ver vite.config.ts).
 export async function login(request: LoginRequest): Promise<LoginResponse> {
-  await wait(900) // simula o tempo da rede, para dar para ver o "Entrando…"
+  // Se o servidor estiver fora do ar, o fetch lança TypeError e a tela mostra "Não foi possível conectar"
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  })
 
-  const email = request.email.trim().toLowerCase()
-
-  if (email === 'offline@zbox.com.br') {
-    throw new TypeError('Failed to fetch') // é assim que o fetch avisa falha de rede
+  if (response.ok) {
+    return (await response.json()) as LoginResponse
   }
 
-  if (email === 'bloqueado@zbox.com.br') {
-    throw new ApiError(423, 'ACCOUNT_LOCKED', 'Muitas tentativas. Tente novamente em 15 minutos.')
-  }
-
-  if (email === 'thayna@zbox.com.br' && request.password === 'zbox1234') {
-    return {
-      accessToken: 'mock-access-token',
-      tokenType: 'Bearer',
-      expiresIn: 900,
-      user: { id: 1, name: 'Thayná', email, role: 'ADMIN' },
-    }
-  }
-
-  throw new ApiError(401, 'INVALID_CREDENTIALS', 'E-mail ou senha inválidos.')
+  // Erro no formato padrão do ZBOX: a tela decide a mensagem pelo `code`, nunca pelo texto
+  const body = (await response.json().catch(() => null)) as ApiErrorBody | null
+  throw new ApiError(
+    response.status,
+    body?.code ?? 'UNKNOWN_ERROR',
+    body?.message ?? 'Erro inesperado no servidor.',
+    body?.fieldErrors,
+  )
 }

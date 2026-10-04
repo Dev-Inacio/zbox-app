@@ -1,0 +1,38 @@
+/* Variações do botão. Não mexe no Button.css: só acrescenta.
+   Uso: <Button className="btn--secondary">  |  "btn--danger"  |  "btn--danger-outline"
+   ".btn.btn--x" (2 classes) ganha do ".btn" do Button.css. */
+
+.btn.btn--secondary {
+  background: var(--color-surface);
+  color: var(--color-ink);
+  border: 1px solid var(--color-border);
+}
+
+.btn.btn--secondary:hover:not(:disabled) {
+  background: #F4F3F0;
+  border-color: #A3A8AE;
+}
+
+.btn.btn--danger {
+  background: var(--color-danger);
+  color: #FFFFFF;
+}
+
+.btn.btn--danger:hover:not(:disabled) {
+  background: #8E1B13;
+}
+
+.btn.btn--danger-outline {
+  background: var(--color-surface);
+  color: var(--color-danger);
+  border: 1px solid #E4B4AE;
+}
+
+.btn.btn--danger-outline:hover:not(:disabled) {
+  background: #FDECEA;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--color-accent-soft);
+  outline-offset: 2px;
+}

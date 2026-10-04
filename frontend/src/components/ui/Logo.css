@@ -1,21 +1,40 @@
-/* Logo pensado para fundo grafite (login e header). */
+/* Logo do ZBOX (pensado para fundo grafite: login e header).
+   Os tamanhos ficam em variáveis (--mark, --name, --tag, --gap):
+   cada tamanho/tela só troca as variáveis, e o desenho é o mesmo em todo lugar. */
 
 .logo {
+  /* tamanho md (header) */
+  --mark: 44px;
+  --name: 21px;
+  --tag: 9px;
+  --gap: 10px;
+
   display: inline-flex;
   align-items: center;
-  gap: 10px;
+  gap: var(--gap);
 }
 
+/* tamanho lg (login): clamp(mínimo, ideal, máximo) cresce e diminui junto com a tela */
+.logo--lg {
+  --mark: clamp(56px, 5vw, 72px);
+  --name: clamp(26px, 2.6vw, 34px);
+  --tag: clamp(10px, 0.85vw, 12px);
+  --gap: clamp(10px, 1.1vw, 14px);
+}
+
+/* O próprio boneco, com fundo transparente (sem moldura).
+   --mark é a ALTURA; a largura acompanha a proporção da imagem. */
 .logo__mark {
   flex: none;
-  width: 36px;
-  height: 36px;
+  height: var(--mark);
+  width: auto;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
 }
 
 .logo__text {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: calc(var(--name) * 0.14);
   text-align: left;
 }
 
@@ -25,7 +44,7 @@
 .logo__name {
   font-family: var(--font-display);
   font-weight: 800;
-  font-size: 21px;
+  font-size: var(--name);
   line-height: 1;
   letter-spacing: 0.08em;
   background: linear-gradient(110deg, #8E949A 0%, #C9CED3 30%, #F4F6F8 45%, #FFFFFF 50%, #F4F6F8 55%, #C9CED3 70%, #8E949A 100%);
@@ -39,54 +58,55 @@
   animation: metal-gleam 6s ease-in-out 1s infinite;
 }
 
+/* No tamanho grande, mais uma camada de cobre = mais profundidade */
+.logo--lg .logo__name {
+  filter: drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #7E3415);
+}
+
+.logo__tagline {
+  font-family: var(--font-body);
+  font-size: var(--tag);
+  font-weight: 600;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #B9BEC4;
+}
+
 @keyframes metal-gleam {
   0%, 40% { background-position: 100% 0; }
   100% { background-position: 0% 0; }
 }
 
-.logo__tagline {
-  font-family: var(--font-body);
-  font-size: 9px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #B9BEC4;
+/* No login, o boneco aparece subindo de leve */
+.logo--lg .logo__mark {
+  animation: mark-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1.2) 0.1s both;
 }
 
-/* Tamanho grande (login): mais camadas de cobre = mais profundidade */
-.logo--lg { gap: 14px; }
-.logo--lg .logo__mark { width: 48px; height: 48px; }
-.logo--lg .logo__text { gap: 4px; }
-.logo--lg .logo__name {
-  font-size: 32px;
-  filter: drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #7E3415);
-}
-.logo--lg .logo__tagline { font-size: 11px; letter-spacing: 0.18em; }
-
-/* No login, o cubo "se monta": laterais primeiro, topo de cobre por último */
-.logo--lg .logo__face {
-  opacity: 0;
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: face-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1.2) forwards;
-}
-
-.logo--lg .logo__face--left  { --fx: -6px; --fy: 4px; animation-delay: 0.1s; }
-.logo--lg .logo__face--right { --fx: 6px; --fy: 4px; animation-delay: 0.25s; }
-.logo--lg .logo__face--top   { --fx: 0px; --fy: -8px; animation-delay: 0.45s; }
-
-@keyframes face-in {
-  from { opacity: 0; transform: translate(var(--fx), var(--fy)); }
+@keyframes mark-in {
+  from { opacity: 0; transform: translateY(6px); }
   to { opacity: 1; transform: none; }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .logo__name { animation: none; background-position: 50% 0; }
-  .logo--lg .logo__face { animation: none; opacity: 1; }
+/* ---------- Responsivo ---------- */
+
+/* Celular: o header fica mais baixo (60px), então o logo diminui um pouco */
+@media (max-width: 767px) {
+  .logo:not(.logo--lg) {
+    --mark: 40px;
+    --name: 19px;
+    --tag: 8px;
+    --gap: 8px;
+  }
 }
 
-@media (max-width: 900px) {
-  .logo--lg .logo__mark { width: 40px; height: 40px; }
-  .logo--lg .logo__name { font-size: 26px; }
-  .logo--lg .logo__tagline { font-size: 10px; }
+/* Celular bem estreito: o slogan sai do header para não apertar o menu */
+@media (max-width: 359px) {
+  .logo:not(.logo--lg) .logo__tagline { display: none; }
+}
+
+/* Acessibilidade: "reduzir movimento" = logo pronto e parado */
+@media (prefers-reduced-motion: reduce) {
+  .logo__name { animation: none; background-position: 50% 0; }
+  .logo--lg .logo__mark { animation: none; }
 }

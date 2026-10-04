@@ -1,20 +1,17 @@
 import { SectionCard } from '../../components/ui/SectionCard'
-import type { AuthUser } from '../auth/types'
+import { useAuth } from '../auth/useAuth'
 import { getDestaques, getRecentes } from './dashboardApi'
 import type { ActivityItem, ActivityStatus, StatItem } from './dashboardApi'
 import { useSectionData } from './useSectionData'
 import './DashboardPage.css'
-
-type DashboardPageProps = {
-  user: AuthUser
-}
 
 // "sábado, 4 de outubro" no formato brasileiro
 function todayLabel() {
   return new Intl.DateTimeFormat('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())
 }
 
-export function DashboardPage({ user }: DashboardPageProps) {
+export function DashboardPage() {
+  const { user } = useAuth()
   // As duas seções carregam em paralelo e de forma independente (HU05)
   const destaques = useSectionData(getDestaques)
   const recentes = useSectionData(getRecentes)
@@ -26,7 +23,7 @@ export function DashboardPage({ user }: DashboardPageProps) {
         <div className="dash-hero__inner">
           <div className="dash-hero__text">
             <p className="dash-hero__date">{todayLabel()}</p>
-            <h1 className="dash-hero__title">Olá, {user.name}</h1>
+            <h1 className="dash-hero__title">Olá, {user?.name}</h1>
             <p className="dash-hero__subtitle">Veja como está a empresa hoje.</p>
           </div>
           {/* O fluxo de orçamento é da Fase 3; por enquanto o botão fica desabilitado */}

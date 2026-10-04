@@ -1,20 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Logo } from '../ui/Logo'
+import { useAuth } from '../../features/auth/useAuth'
 import './AppHeader.css'
 
-export type Page = 'inicio' | 'perfil'
-
-type AppHeaderProps = {
-  userName: string
-  current: Page
-  onNavigate: (page: Page) => void
-  onLogout: () => void
-}
-
 // HU03: itens provisórios definidos no Trello (a PO troca os nomes depois)
-const ITEMS: { page: Page; label: string }[] = [
-  { page: 'inicio', label: 'Início' },
-  { page: 'perfil', label: 'Perfil' },
+const ITEMS = [
+  { path: '/inicio', label: 'Início' },
+  { path: '/clientes', label: 'Clientes' },
+  { path: '/perfil', label: 'Perfil' },
 ]
 
 // "Thayná Dias" → "TD"
@@ -27,7 +21,10 @@ function initials(name: string) {
     .join('')
 }
 
-export function AppHeader({ userName, current, onNavigate, onLogout }: AppHeaderProps) {
+export function AppHeader() {
+  const { user, signOut } = useAuth()
+  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const [open, setOpen] = useState(false) // menu hambúrguer aberto? (só no celular)
   const navRef = useRef<HTMLElement>(null)
 
@@ -49,15 +46,22 @@ export function AppHeader({ userName, current, onNavigate, onLogout }: AppHeader
     }
   }, [open])
 
-  function go(page: Page) {
-    onNavigate(page)
+  function go(path: string) {
+    navigate(path)
     setOpen(false)
+  }
+
+  // HU06: sair → login com aviso. (A chamada POST /api/auth/logout entra na integração.)
+  function handleLogout() {
+    setOpen(false)
+    signOut('Você saiu da sua conta.')
+    navigate('/login', { replace: true })
   }
 
   return (
     <header className="app-header">
       <div className="app-header__inner">
-        <button type="button" className="app-header__logo" onClick={() => go('inicio')} aria-label="ZBOX, ir para o início">
+        <button type="button" className="app-header__logo" onClick={() => go('/inicio')} aria-label="ZBOX, ir para o início">
           <Logo />
         </button>
 
@@ -88,21 +92,22 @@ export function AppHeader({ userName, current, onNavigate, onLogout }: AppHeader
 
           <ul id="menu-principal" className={`app-header__menu${open ? ' is-open' : ''}`}>
             {ITEMS.map((item) => (
-              <li key={item.page}>
+              <li key={item.path}>
                 <button
                   type="button"
                   className="app-header__item"
-                  aria-current={current === item.page ? 'page' : undefined}
-                  onClick={() => go(item.page)}
+                  // /clientes/12 também deixa "Clientes" marcado
+                  aria-current={pathname === item.path || pathname.startsWith(`${item.path}/`) ? 'page' : undefined}
+                  onClick={() => go(item.path)}
                 >
                   {item.label}
                 </button>
               </li>
             ))}
             <li className="app-header__divider" aria-hidden="true" />
-            <li className="app-header__avatar" aria-hidden="true">{initials(userName)}</li>
+            <li className="app-header__avatar" aria-hidden="true">{initials(user?.name ?? '')}</li>
             <li>
-              <button type="button" className="app-header__item" onClick={onLogout}>
+              <button type="button" className="app-header__item" onClick={handleLogout}>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                   <path d="M16 17l5-5-5-5" />
