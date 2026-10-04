@@ -1,0 +1,31 @@
+/* Design tokens do ZBOX: a única fonte das cores, fontes e medidas.
+   Os componentes usam var(--nome) e nunca valores soltos. */
+:root {
+  /* Cores: nomeadas pelo papel, não pela aparência */
+  --color-ink: #1B1F23;            /* texto principal e painel da marca */
+  --color-bg: #F4F3F0;             /* fundo da página */
+  --color-surface: #FFFFFF;        /* fundo de campos e cards */
+  --color-text-muted: #5A6067;     /* textos secundários */
+  --color-border: #C9CCD0;         /* bordas de campos */
+  --color-accent: #A8420D;         /* botões e links (ação) */
+  --color-accent-hover: #7C300A;   /* ação ao passar o mouse */
+  --color-accent-soft: #F2B48A;    /* anel de foco */
+  --color-danger: #B42318;         /* erros */
+  --color-on-accent: #FFFFFF;      /* texto em cima do destaque */
+
+  /* Tipografia */
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+
+  /* Espaçamento: escala de 8 */
+  --space-1: 8px;
+  --space-2: 16px;
+  --space-3: 24px;
+  --space-4: 32px;
+  --space-6: 48px;
+  --space-7: 56px;
+
+  /* Formas e medidas */
+  --radius: 8px;
+  --control-height: 48px;
+}
