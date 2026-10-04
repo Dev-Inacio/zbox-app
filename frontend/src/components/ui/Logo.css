@@ -1,0 +1,92 @@
+/* Logo pensado para fundo grafite (login e header). */
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo__mark {
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.logo__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+}
+
+/* "ZBOX" de metal escovado com lateral de cobre:
+   1. o degradê prateado é "recortado" no formato das letras (background-clip: text)
+   2. as sombras de cobre empilhadas criam a profundidade (o 3D) */
+.logo__name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 21px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  background: linear-gradient(110deg, #8E949A 0%, #C9CED3 30%, #F4F6F8 45%, #FFFFFF 50%, #F4F6F8 55%, #C9CED3 70%, #8E949A 100%);
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #7E3415);
+  /* faixa de luz passando pelo metal de tempos em tempos */
+  animation: metal-gleam 6s ease-in-out 1s infinite;
+}
+
+@keyframes metal-gleam {
+  0%, 40% { background-position: 100% 0; }
+  100% { background-position: 0% 0; }
+}
+
+.logo__tagline {
+  font-family: var(--font-body);
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #B9BEC4;
+}
+
+/* Tamanho grande (login): mais camadas de cobre = mais profundidade */
+.logo--lg { gap: 14px; }
+.logo--lg .logo__mark { width: 48px; height: 48px; }
+.logo--lg .logo__text { gap: 4px; }
+.logo--lg .logo__name {
+  font-size: 32px;
+  filter: drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #C2592A) drop-shadow(1px 1px 0 #7E3415);
+}
+.logo--lg .logo__tagline { font-size: 11px; letter-spacing: 0.18em; }
+
+/* No login, o cubo "se monta": laterais primeiro, topo de cobre por último */
+.logo--lg .logo__face {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: face-in 0.6s cubic-bezier(0.2, 0.8, 0.2, 1.2) forwards;
+}
+
+.logo--lg .logo__face--left  { --fx: -6px; --fy: 4px; animation-delay: 0.1s; }
+.logo--lg .logo__face--right { --fx: 6px; --fy: 4px; animation-delay: 0.25s; }
+.logo--lg .logo__face--top   { --fx: 0px; --fy: -8px; animation-delay: 0.45s; }
+
+@keyframes face-in {
+  from { opacity: 0; transform: translate(var(--fx), var(--fy)); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logo__name { animation: none; background-position: 50% 0; }
+  .logo--lg .logo__face { animation: none; opacity: 1; }
+}
+
+@media (max-width: 900px) {
+  .logo--lg .logo__mark { width: 40px; height: 40px; }
+  .logo--lg .logo__name { font-size: 26px; }
+  .logo--lg .logo__tagline { font-size: 10px; }
+}

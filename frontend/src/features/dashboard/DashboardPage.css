@@ -1,0 +1,229 @@
+/* ---------- Faixa grafite (continua o header) ---------- */
+.dash-hero {
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+
+.dash-hero__inner {
+  max-width: var(--page-max);
+  margin: 0 auto;
+  padding: 28px var(--page-gutter) 88px; /* 88px embaixo: espaço para o card "subir" */
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.dash-hero__text {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.dash-hero__date {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #E9A06E;
+}
+
+.dash-hero__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+}
+
+.dash-hero__subtitle {
+  margin: 0;
+  font-size: 16px;
+  color: #B9BEC4;
+}
+
+.dash-hero__cta {
+  height: var(--control-height);
+  padding: 0 22px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-family: var(--font-body);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.dash-hero__cta:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ---------- Conteúdo ---------- */
+.dash {
+  max-width: var(--page-max);
+  margin: -60px auto 0; /* o primeiro card sobe 60px por cima da faixa grafite */
+  padding: 0 var(--page-gutter) var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ---------- Destaques: 4 números ---------- */
+.stat-grid {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.stat {
+  /* O card vira referência de tamanho: o número abaixo cresce/encolhe com a LARGURA DO CARD
+     (unidade cqi = 1% da largura do card), não da tela. Funciona igual em 4, 2 ou 1 coluna. */
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 20px;
+  border-radius: 16px;
+  background: #F7F6F3;
+}
+
+/* flex: 1 empurra número e dica para baixo: os números ficam alinhados
+   na mesma linha mesmo quando um rótulo quebra em duas linhas e o outro não */
+.stat__label {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.stat__value {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 20cqi, 34px); /* mínimo 18px, ideal 20% do card, máximo 34px */
+  font-weight: 700;
+  line-height: 1.05;
+  white-space: nowrap; /* "R$ 18.400" nunca quebra no meio */
+  color: var(--color-ink);
+}
+
+.stat__hint {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* Número que pede ação: fundo e texto laranja (com texto, não só cor) */
+.stat--attention { background: #FDF1EC; }
+.stat--attention .stat__label,
+.stat--attention .stat__value,
+.stat--attention .stat__hint { color: #8A3A10; }
+.stat--attention .stat__label { font-weight: 600; }
+
+/* ---------- Recentes: lista de atividades ---------- */
+.activity {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activity__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 14px 0;
+  border-top: 1px solid #ECEBE7;
+}
+
+.activity__row:first-child { border-top: 0; padding-top: 0; }
+.activity__row:last-child { padding-bottom: 0; }
+
+.activity__icon {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: #F0EFEC;
+  color: var(--color-ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activity__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activity__title {
+  font-weight: 600;
+  overflow-wrap: anywhere; /* um texto longo sem espaço não estoura a tela */
+}
+
+.activity__detail {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.activity__when {
+  width: 72px;
+  text-align: right;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* Selos de status */
+.badge {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge--enviado  { background: #EEF1F4; color: #2F3A46; }
+.badge--parcial  { background: #FFF3E6; color: #7A3E06; }
+.badge--entregue { background: #E8F5EC; color: #1D5B33; }
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1023px) {
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ---------- Celular ---------- */
+@media (max-width: 767px) {
+  .dash-hero__inner {
+    padding: 12px var(--page-gutter) 72px;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .dash-hero__title { font-size: 26px; }
+  .dash-hero__cta { justify-content: center; }
+
+  .dash {
+    margin-top: -48px;
+    padding: 0 var(--page-gutter) var(--space-4);
+    gap: 20px;
+  }
+
+  .stat-grid { gap: 12px; }
+  .stat { padding: 14px; gap: 6px; border-radius: 14px; }
+  .stat__hint { display: none; }
+
+  /* Atividade em duas linhas: título em cima, selo e horário embaixo */
+  .activity__row { flex-wrap: wrap; align-items: flex-start; }
+  .activity__icon { display: none; }
+  .activity__text { flex-basis: 100%; }
+  .activity__detail { display: none; }
+  .activity__when { width: auto; text-align: left; }
+}
