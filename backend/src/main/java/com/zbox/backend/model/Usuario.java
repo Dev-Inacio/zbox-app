@@ -1,6 +1,9 @@
 package com.zbox.backend.model;
 
+import com.zbox.backend.enums.Role;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -19,18 +22,13 @@ public class Usuario {
     @NotBlank
     private String senha;
 
+    @NotBlank
+    private String name;
+
+    @Enumerated(EnumType.STRING)
+    private Role role;
+
     public Usuario() {
-    }
-
-    public Usuario(Long id, String usuario, String senha) {
-        this.id = id;
-        this.usuario = usuario;
-        this.senha = senha;
-    }
-
-    public Usuario(String usuario, String senha) {
-        this.usuario = usuario;
-        this.senha = senha;
     }
 
     public Long getId() {
@@ -51,5 +49,21 @@ public class Usuario {
 
     public void setSenha(String senha) {
         this.senha = senha;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 }
