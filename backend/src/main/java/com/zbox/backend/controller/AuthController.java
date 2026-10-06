@@ -41,6 +41,6 @@ public class AuthController {
 
         AuthUser authUser = new AuthUser(usuario.getId(), usuario.getName(), usuario.getUsuario(), usuario.getRole().name());
 
-        return new LoginResponse(token, "Bearer", 28800, authUser);
+        return new LoginResponse(token, "Bearer", jwtUtil.getExpiracaoSegundos(), authUser);
     }
 }
