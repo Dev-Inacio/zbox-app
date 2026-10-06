@@ -37,7 +37,7 @@ public class AuthController {
 
         Usuario usuario = usuarioService.buscarPorUsuario(loginRequest.getEmail());
 
-        String token = jwtUtil.gerarToken(loginRequest.getEmail());
+        String token = jwtUtil.gerarToken(usuario.getUsuario());
 
         AuthUser authUser = new AuthUser(usuario.getId(), usuario.getName(), usuario.getUsuario(), usuario.getRole().name());
 
