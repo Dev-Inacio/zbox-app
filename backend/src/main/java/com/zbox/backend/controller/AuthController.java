@@ -1,7 +1,11 @@
 package com.zbox.backend.controller;
 
 import com.zbox.backend.config.JwtUtil;
+import com.zbox.backend.dto.AuthUser;
 import com.zbox.backend.dto.LoginRequest;
+import com.zbox.backend.dto.LoginResponse;
+import com.zbox.backend.model.Usuario;
+import com.zbox.backend.service.UsuarioService;
 import jakarta.validation.Valid;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -18,15 +22,25 @@ public class AuthController {
 
     private final JwtUtil jwtUtil;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil) {
+    private final UsuarioService usuarioService;
+
+    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, UsuarioService usuarioService) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
+        this.usuarioService = usuarioService;
     }
 
-    @PostMapping("/login")
-    public String logando(@Valid @RequestBody LoginRequest loginRequest) {
-        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
-        return jwtUtil.gerarToken(loginRequest.getEmail());
 
+    @PostMapping("/login")
+    public LoginResponse login(@Valid @RequestBody LoginRequest loginRequest) {
+        authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+
+        Usuario usuario = usuarioService.buscarPorUsuario(loginRequest.getEmail());
+
+        String token = jwtUtil.gerarToken(loginRequest.getEmail());
+
+        AuthUser authUser = new AuthUser(usuario.getId(), usuario.getName(), usuario.getUsuario(), usuario.getRole().name());
+
+        return new LoginResponse(token, "Bearer", 28800, authUser);
     }
 }
