@@ -1,6 +1,7 @@
 package com.zbox.backend.model;
 
 import com.zbox.backend.enums.Role;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -17,14 +18,18 @@ public class Usuario {
     private Long id;
 
     @NotBlank
+    @Column(unique = true, nullable = false)
     private String usuario;
 
     @NotBlank
+    @Column(nullable = false)
     private String senha;
 
     @NotBlank
+    @Column(nullable = false)
     private String name;
 
+    @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private Role role;
 
