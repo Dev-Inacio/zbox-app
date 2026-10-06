@@ -7,10 +7,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
 public class JwtUtil {
+
+    private static final long EXPIRACAO_SEGUNDOS = 28800;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -19,14 +22,14 @@ public class JwtUtil {
 
     @PostConstruct
     public void init() {
-        chaveSecreta = Keys.hmacShaKeyFor(jwtSecret.getBytes());
+        chaveSecreta = Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String gerarToken(String usuario) {
         return Jwts.builder()
                 .subject(usuario)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 8))
+                .expiration(new Date(System.currentTimeMillis() + EXPIRACAO_SEGUNDOS * 1000))
                 .signWith(chaveSecreta)
                 .compact();
     }
@@ -38,5 +41,9 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload()
                 .getSubject();
+    }
+
+    public long getExpiracaoSegundos() {
+        return EXPIRACAO_SEGUNDOS;
     }
 }
