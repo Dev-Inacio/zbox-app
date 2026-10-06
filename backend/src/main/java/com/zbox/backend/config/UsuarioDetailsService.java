@@ -17,19 +17,14 @@ public class UsuarioDetailsService implements UserDetailsService {
         this.usuarioService = usuarioService;
     }
 
-
     @Override
     public UserDetails loadUserByUsername(String usuario) throws UsernameNotFoundException {
-        try {
-            Usuario buscarUsuario = usuarioService.buscarPorUsuario(usuario);
+        Usuario usuarioEncontrado = usuarioService.buscarPorUsuario(usuario);
 
-            return User.builder()
-                    .username(buscarUsuario.getUsuario())
-                    .password(buscarUsuario.getSenha())
-                    .authorities("ROLE_ADMIN")
-                    .build();
-        }catch (RuntimeException exception){
-            throw new UsernameNotFoundException(exception.getMessage());
-        }
+        return User.builder()
+                .username(usuarioEncontrado.getUsuario())
+                .password(usuarioEncontrado.getSenha())
+                .authorities("ROLE_" + usuarioEncontrado.getRole().name())
+                .build();
     }
 }
