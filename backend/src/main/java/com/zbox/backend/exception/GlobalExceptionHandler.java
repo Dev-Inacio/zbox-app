@@ -2,6 +2,8 @@ package com.zbox.backend.exception;
 
 import com.zbox.backend.dto.ApiError;
 import com.zbox.backend.dto.FieldError;
+import com.zbox.backend.enums.ErrorCode;
+import com.zbox.backend.enums.FieldErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException exception, HttpServletRequest request) {
-        ApiError apiError = new ApiError(Instant.now().toString(), 401, "INVALID_CREDENTIALS", "Usuário ou senha inválidos", request.getRequestURI(), List.of());
+        ApiError apiError = new ApiError(Instant.now().toString(), 401, ErrorCode.INVALID_CREDENTIALS, "Usuário ou senha inválidos", request.getRequestURI(), List.of());
 
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(apiError);
     }
@@ -31,10 +33,10 @@ public class GlobalExceptionHandler {
         List<FieldError> fieldErrorList = new ArrayList<>();
 
         for (org.springframework.validation.FieldError error : exception.getBindingResult().getFieldErrors()) {
-            FieldError fieldError = new FieldError(error.getField(), "INVALID", error.getDefaultMessage());
+            FieldError fieldError = new FieldError(error.getField(), FieldErrorCode.INVALID, error.getDefaultMessage());
             fieldErrorList.add(fieldError);
         }
-        ApiError apiError = new ApiError(Instant.now().toString(), 400, "VALIDATION_ERROR", "Existem campos inválidos.", request.getRequestURI(), fieldErrorList);
+        ApiError apiError = new ApiError(Instant.now().toString(), 400, ErrorCode.VALIDATION_ERROR, "Existem campos inválidos.", request.getRequestURI(), fieldErrorList);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiError);
     }

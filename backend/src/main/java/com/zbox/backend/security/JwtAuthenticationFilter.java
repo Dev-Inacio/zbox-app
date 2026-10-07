@@ -1,4 +1,4 @@
-package com.zbox.backend.config;
+package com.zbox.backend.security;
 
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -18,12 +18,12 @@ import java.io.IOException;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
     private final UsuarioDetailsService usuarioDetailsService;
     private final JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, UsuarioDetailsService usuarioDetailsService, JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) {
-        this.jwtUtil = jwtUtil;
+    public JwtAuthenticationFilter(JwtService jwtService, UsuarioDetailsService usuarioDetailsService, JwtAuthenticationEntryPoint jwtAuthenticationEntryPoint) {
+        this.jwtService = jwtService;
         this.usuarioDetailsService = usuarioDetailsService;
         this.jwtAuthenticationEntryPoint = jwtAuthenticationEntryPoint;
     }
@@ -35,7 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 String token = authHeader.substring(7);
-                String usuario = jwtUtil.extrairUsuario(token);
+                String usuario = jwtService.extrairUsuario(token);
 
                 UserDetails userDetails = usuarioDetailsService.loadUserByUsername(usuario);
 

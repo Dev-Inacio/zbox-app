@@ -1,4 +1,4 @@
-package com.zbox.backend.config;
+package com.zbox.backend.security;
 
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -11,9 +11,10 @@ import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
-public class JwtUtil {
+public class JwtService {
 
-    private static final long EXPIRACAO_SEGUNDOS = 28800;
+    @Value("${jwt.expiration-seconds}")
+    private long expiracaoSegundos;
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -29,7 +30,7 @@ public class JwtUtil {
         return Jwts.builder()
                 .subject(usuario)
                 .issuedAt(new Date())
-                .expiration(new Date(System.currentTimeMillis() + EXPIRACAO_SEGUNDOS * 1000))
+                .expiration(new Date(System.currentTimeMillis() + expiracaoSegundos * 1000))
                 .signWith(chaveSecreta)
                 .compact();
     }
@@ -44,6 +45,6 @@ public class JwtUtil {
     }
 
     public long getExpiracaoSegundos() {
-        return EXPIRACAO_SEGUNDOS;
+        return expiracaoSegundos;
     }
 }

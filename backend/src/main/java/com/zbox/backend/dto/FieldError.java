@@ -1,12 +1,14 @@
 package com.zbox.backend.dto;
 
+import com.zbox.backend.enums.FieldErrorCode;
+
 public class FieldError {
 
     private String field;
-    private String code;
+    private FieldErrorCode code;
     private String message;
 
-    public FieldError(String field, String code, String message) {
+    public FieldError(String field, FieldErrorCode code, String message) {
         this.field = field;
         this.code = code;
         this.message = message;
@@ -20,11 +22,11 @@ public class FieldError {
         this.field = field;
     }
 
-    public String getCode() {
+    public FieldErrorCode getCode() {
         return code;
     }
 
-    public void setCode(String code) {
+    public void setCode(FieldErrorCode code) {
         this.code = code;
     }
 

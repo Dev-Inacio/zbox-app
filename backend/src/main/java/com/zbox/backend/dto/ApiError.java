@@ -1,17 +1,19 @@
 package com.zbox.backend.dto;
 
+import com.zbox.backend.enums.ErrorCode;
+
 import java.util.List;
 
 public class ApiError {
 
     private String timestamp;
     private int status;
-    private String code;
+    private ErrorCode code;
     private String message;
     private String path;
     private List<FieldError> fieldErrors;
 
-    public ApiError(String timestamp, int status, String code, String message, String path, List<FieldError> fieldErrors) {
+    public ApiError(String timestamp, int status, ErrorCode code, String message, String path, List<FieldError> fieldErrors) {
         this.timestamp = timestamp;
         this.status = status;
         this.code = code;
@@ -36,11 +38,11 @@ public class ApiError {
         this.status = status;
     }
 
-    public String getCode() {
+    public ErrorCode getCode() {
         return code;
     }
 
-    public void setCode(String code) {
+    public void setCode(ErrorCode code) {
         this.code = code;
     }
 
