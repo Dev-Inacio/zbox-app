@@ -1,6 +1,7 @@
-package com.zbox.backend.config;
+package com.zbox.backend.security;
 
 import com.zbox.backend.dto.ApiError;
+import com.zbox.backend.enums.ErrorCode;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -29,7 +30,7 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        ApiError apiError = new ApiError(Instant.now().toString(), 401, "UNAUTHORIZED", "Token ausente, inválido ou expirado.", request.getRequestURI(), List.of());
+        ApiError apiError = new ApiError(Instant.now().toString(), 401, ErrorCode.UNAUTHORIZED, "Token ausente, inválido ou expirado.", request.getRequestURI(), List.of());
 
         jsonMapper.writeValue(response.getWriter(), apiError);
     }

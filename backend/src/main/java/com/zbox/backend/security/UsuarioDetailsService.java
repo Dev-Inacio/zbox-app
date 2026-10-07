@@ -1,4 +1,4 @@
-package com.zbox.backend.config;
+package com.zbox.backend.security;
 
 import com.zbox.backend.model.Usuario;
 import com.zbox.backend.service.UsuarioService;
