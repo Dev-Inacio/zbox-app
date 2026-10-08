@@ -26,11 +26,16 @@ public class JwtAccessDeniedHandler implements AccessDeniedHandler {
 
     @Override
     public void handle(HttpServletRequest request, HttpServletResponse response, AccessDeniedException accessDeniedException) throws IOException, ServletException {
-        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setStatus(ErrorCode.FORBIDDEN.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        ApiError apiError = new ApiError(Instant.now().toString(), 403, ErrorCode.FORBIDDEN, "Você não tem permissão para realizar esta ação.", request.getRequestURI(), List.of());
+        ApiError apiError = new ApiError(Instant.now().toString(),
+                ErrorCode.FORBIDDEN.getStatus().value(),
+                ErrorCode.FORBIDDEN,
+                "Você não tem permissão para realizar esta ação.",
+                request.getRequestURI(), List.of());
+
         jsonMapper.writeValue(response.getWriter(), apiError);
     }
 }
