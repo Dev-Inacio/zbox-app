@@ -26,11 +26,15 @@ public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
 
     @Override
     public void commence(HttpServletRequest request, HttpServletResponse response, AuthenticationException authException) throws IOException, ServletException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(ErrorCode.UNAUTHORIZED.getStatus().value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding("UTF-8");
 
-        ApiError apiError = new ApiError(Instant.now().toString(), 401, ErrorCode.UNAUTHORIZED, "Token ausente, inválido ou expirado.", request.getRequestURI(), List.of());
+        ApiError apiError = new ApiError(Instant.now().toString(),
+                ErrorCode.UNAUTHORIZED.getStatus().value(),
+                ErrorCode.UNAUTHORIZED,
+                "Token ausente, inválido ou expirado.",
+                request.getRequestURI(), List.of());
 
         jsonMapper.writeValue(response.getWriter(), apiError);
     }
