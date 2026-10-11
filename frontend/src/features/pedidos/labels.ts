@@ -41,3 +41,8 @@ export const PREVIOUS_STEP: Partial<Record<OrderStatus, OrderStatus>> = {
   IN_PRODUCTION: 'NEW',
   READY: 'IN_PRODUCTION',
 }
+
+export const EXPENSE_TYPE_LABEL: Record<'MATERIAL' | 'LABOR', string> = {
+  MATERIAL: 'Material',
+  LABOR: 'Mão de obra',
+}

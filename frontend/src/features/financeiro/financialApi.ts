@@ -1,3 +1,5 @@
+import { ApiError } from '../auth/types'
+import { readMockSession } from '../auth/session'
 import type { Page } from '../clientes/types'
 import { daysBetween, todayIso } from '../pedidos/dates'
 import { mockAllOrders } from '../pedidos/ordersApi'
@@ -134,4 +136,58 @@ export async function listPaymentsByCustomer(customerId: number): Promise<Receiv
       id: p.id, orderId: o.id, orderNumber: o.number, customerName: o.customer.name, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt, userName: p.userName,
     })))
     .sort((a, b) => b.paidAt.localeCompare(a.paidAt) || b.id - a.id)
+}
+
+// ---------- HU27: lucro dos serviços no período (só ADMIN e MANAGER) ----------
+export type ProfitRow = {
+  orderId: number
+  number: string
+  customerName: string
+  status: OrderStatus
+  totalCents: number
+  expensesCents: number
+  profitCents: number
+  marginPercent: number
+  hasExpenses: boolean
+  materialCents: number
+  laborCents: number
+}
+
+export type ProfitReport = {
+  receivedCents: number   // pagamentos no período (não estornados)
+  materialCents: number   // gastos de material com data no período
+  laborCents: number      // gastos de mão de obra com data no período
+  expensesCents: number
+  cashCents: number       // recebido − gastos do período
+  orders: ProfitRow[]     // serviços com movimento no período, do maior lucro para o menor
+}
+
+// GET /api/financial/profit?from=&to=
+// Entra o pedido que teve movimento no período: criado, entregue ou com gasto lançado nele.
+export async function getProfitReport(from: string, to: string): Promise<ProfitReport> {
+  await wait(500)
+  check()
+  const role = readMockSession()?.role
+  if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Só Administrador e Gerente veem o lucro.')
+  const all = simulation() === 'vazio' ? [] : mockAllOrders()
+  const received = all.flatMap((o) => o.payments).filter((p) => !p.reversed && inPeriod(p.paidAt, from, to)).reduce((s, p) => s + p.amountCents, 0)
+  const expenses = all.flatMap((o) => o.expenses ?? []).filter((e) => inPeriod(e.date, from, to))
+  const sum = (t: 'MATERIAL' | 'LABOR') => expenses.filter((e) => e.type === t).reduce((s, e) => s + e.amountCents, 0)
+  const materialCents = sum('MATERIAL')
+  const laborCents = sum('LABOR')
+  const orders = all
+    .filter((o) => inPeriod(o.createdAt.slice(0, 10), from, to) || (o.deliveredOn !== null && inPeriod(o.deliveredOn, from, to)) || (o.expenses ?? []).some((e) => inPeriod(e.date, from, to)))
+    .filter((o) => o.status !== 'CANCELED' || (o.expenses ?? []).length > 0) // cancelado só aparece se teve gasto (prejuízo)
+    .map((o): ProfitRow => ({
+      orderId: o.id, number: o.number, customerName: o.customer.name, status: o.status,
+      totalCents: o.status === 'CANCELED' ? 0 : o.totalCents,
+      expensesCents: o.profit!.expensesCents,
+      profitCents: o.status === 'CANCELED' ? -o.profit!.expensesCents : o.profit!.profitCents,
+      marginPercent: o.status === 'CANCELED' ? 0 : o.profit!.marginPercent,
+      hasExpenses: (o.expenses ?? []).length > 0,
+      materialCents: o.profit!.materialCents,
+      laborCents: o.profit!.laborCents,
+    }))
+    .sort((a, b) => Number(b.hasExpenses) - Number(a.hasExpenses) || b.profitCents - a.profitCents)
+  return { receivedCents: received, materialCents, laborCents, expensesCents: materialCents + laborCents, cashCents: received - materialCents - laborCents, orders }
 }

@@ -2,14 +2,15 @@ import { useState } from 'react'
 import { Alert } from '../../components/ui/Alert'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { ApiError } from '../auth/types'
-import { maskPhone, onlyDigits } from '../clientes/format'
+import { onlyDigits } from '../clientes/format'
 import { formatMoney, maskMoneyInput, parseDecimalToHundredths } from '../orcamentos/money'
-import { convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, registerCollection, reversePayment } from './ordersApi'
+import { addExpense, deleteExpense, updateExpense, convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, getOrder, registerCollection, reversePayment } from './ordersApi'
+import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { formatDay, todayIso } from './dates'
 import { collectionMessage } from './messages'
 import type { CollectTarget } from './messages'
-import { METHOD_LABEL, METHODS } from './labels'
-import type { Order, Payment, PaymentMethod } from './types'
+import { EXPENSE_TYPE_LABEL, METHOD_LABEL, METHODS } from './labels'
+import type { ExpenseType, Order, OrderExpense, Payment, PaymentMethod } from './types'
 import type { Quote } from '../orcamentos/types'
 import '../orcamentos/Orcamentos.css'
 import './Pedidos.css'
@@ -403,7 +404,8 @@ export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { ord
 
 // ---------- HU24: cobrar pelo WhatsApp ----------
 export function CollectDialog({ target, onCancel, onDone }: { target: CollectTarget; onCancel: () => void; onDone: Done }) {
-  const [phone, setPhone] = useState(maskPhone(target.customerWhatsapp ?? ''))
+  // Número já preenchido com o WhatsApp ATUAL do cliente (a cobrança só sabe o pedido: busca o cliente dele)
+  const { phone, setPhone, registered } = useCustomerWhatsapp(() => getOrder(target.id).then((o) => o.customer.id), target.customerWhatsapp)
   const [message, setMessage] = useState(collectionMessage(target))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -429,9 +431,9 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
       <div className="oc-dialog-fields">
         <label className="cl-field">
           <span className="cl-field__label">WhatsApp</span>
-          <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" aria-invalid={phone && invalid ? true : undefined} />
+          <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" aria-invalid={phone && invalid ? true : undefined} />
         </label>
-        {!target.customerWhatsapp && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para esta cobrança.</p>}
+        {!registered && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para esta cobrança.</p>}
         <label className="cl-field">
           <span className="cl-field__label">Mensagem (pode editar)</span>
           <textarea autoComplete="off" className="cl-input cl-textarea" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} data-testid="mensagem-cobranca" />
@@ -439,6 +441,86 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
         <p className="oc-note">O WhatsApp abre com a mensagem pronta. <strong>Você revisa e aperta enviar</strong>; o ZBOX não envia sozinho. Fica registrado "Cobrado em" no pedido.</p>
         {error && <Alert variant="error">{error}</Alert>}
       </div>
+    </ConfirmDialog>
+  )
+}
+
+// ---------- HU27: lançar / corrigir gasto do serviço ----------
+export function ExpenseDialog({ order, expense, onCancel, onDone }: { order: Order; expense: OrderExpense | null; onCancel: () => void; onDone: (order: Order) => void }) {
+  const today = todayIso()
+  const [type, setType] = useState<ExpenseType | null>(expense?.type ?? null)
+  const [amount, setAmount] = useState(expense ? maskMoneyInput(String(expense.amountCents)) : '')
+  const [date, setDate] = useState(expense?.date ?? today)
+  const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [general, setGeneral] = useState<string | null>(null)
+  const amountCents = parseDecimalToHundredths(amount) ?? 0
+
+  async function submit() {
+    const e: Record<string, string> = {}
+    if (!type) e.type = 'Escolha Material ou Mão de obra.'
+    if (amountCents <= 0) e.amountCents = 'Informe um valor maior que zero.'
+    if (!date) e.date = 'Informe a data do gasto.'
+    else if (date > today) e.date = 'A data do gasto não pode ser no futuro.'
+    setErrors(e)
+    setGeneral(null)
+    if (Object.keys(e).length || busy || !type) return
+    setBusy(true)
+    try {
+      const body = { type, description: expense?.description ?? null, amountCents, date }
+      onDone(expense ? await updateExpense(order.id, expense.id, body) : await addExpense(order.id, body))
+    } catch (err) {
+      const r = readError(err)
+      setErrors(r.fields)
+      setGeneral(r.general)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title={expense ? 'Corrigir gasto' : 'Lançar gasto'} confirmLabel={expense ? 'Salvar' : 'Lançar gasto'} loading={busy} loadingText="Salvando…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">Pedido #{order.number} · {order.customer.name}</p>
+        <fieldset className="pd-fieldset">
+          <legend className="cl-field__label">O que foi gasto?</legend>
+          <div className="pd-choices">
+            {(['MATERIAL', 'LABOR'] as ExpenseType[]).map((t) => (
+              <label key={t} className="pd-choice">
+                <input autoComplete="off" type="radio" name="tipo-gasto" checked={type === t} onChange={() => setType(t)} data-testid={`gasto-${t === 'MATERIAL' ? 'material' : 'mao-de-obra'}`} />
+                <span><strong>{EXPENSE_TYPE_LABEL[t]}</strong><span>{t === 'MATERIAL' ? 'Alumínio, vidro, ferragens…' : 'O que pagou para quem fez ou instalou'}</span></span>
+              </label>
+            ))}
+          </div>
+          {errors.type && <p className="field__error">{errors.type}</p>}
+        </fieldset>
+        <div className="pd-grid-2">
+          <MoneyField id="gasto-valor" label="Valor" value={amount} onChange={setAmount} error={errors.amountCents} />
+          <DateField id="gasto-data" label="Data" value={date} max={today} onChange={setDate} error={errors.date} />
+        </div>
+        {general && <Alert variant="error">{general}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+export function DeleteExpenseDialog({ order, expense, onCancel, onDone }: { order: Order; expense: OrderExpense; onCancel: () => void; onDone: (order: Order) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    try {
+      onDone(await deleteExpense(order.id, expense.id))
+    } catch (e) {
+      setError(readError(e).general ?? NETWORK)
+      setBusy(false)
+    }
+  }
+  return (
+    <ConfirmDialog open title="Excluir gasto?" confirmLabel="Excluir" variant="danger" loading={busy} loadingText="Excluindo…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <p>{EXPENSE_TYPE_LABEL[expense.type]} · <strong>{formatMoney(expense.amountCents)}</strong> ({formatDay(expense.date)})</p>
+      <p className="oc-small cl-muted">Fica registrado quem excluiu e quando.</p>
+      {error && <Alert variant="error">{error}</Alert>}
     </ConfirmDialog>
   )
 }
