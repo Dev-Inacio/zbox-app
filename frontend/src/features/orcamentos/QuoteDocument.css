@@ -138,18 +138,5 @@
 }
 .qd__header .qd__mono { white-space: nowrap; }
 
-/* Impressora (preto e branco, 11/10): fundo branco para economizar tinta.
-   O PDF do WhatsApp não usa @media print, então continua com o cabeçalho escuro. */
-@media print {
-  .qd__header { background: #FFFFFF; color: #1B1F23; box-shadow: none; border-bottom: 2px solid #1B1F23; }
-  .qd__brand-text { border-left-color: #C9CCD0; }
-  .qd__info-label, .qd__header .qd__label { color: #5A6067; }
-  .qd__info-value { color: #3F454B; }
-  .qd__info-value--big { color: #1B1F23; }
-  .qd__header .qd__docbox { background: none; border-left: 1.5px solid #1B1F23; }
-  .qd__header .qd__doctitle { color: #1B1F23; border-bottom-color: #C9CCD0; }
-  .qd__header .qd__docfield { color: #1B1F23; }
-  .qd__header .qd__docfield + .qd__docfield { border-left-color: #C9CCD0; }
-  .qd__final { background: #FFFFFF; color: #1B1F23; border-top: 2px solid #1B1F23; }
-  .qd__final .qd__label, .qd__final .qd__label--light { color: #5A6067; }
-}
+/* Imprimir, Baixar PDF e WhatsApp usam o MESMO layout (decisão 11/10): cabeçalho grafite e logo colorida.
+   O print-color-adjust: exact (acima) faz o navegador imprimir os fundos escuros em vez de apagar. */
