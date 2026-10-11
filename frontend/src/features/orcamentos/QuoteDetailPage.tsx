@@ -7,8 +7,9 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Toast } from '../../components/ui/Toast'
 import { useFlashMessage } from '../../hooks/useFlashMessage'
 import { useRequest } from '../../hooks/useRequest'
+import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { ApiError } from '../auth/types'
-import { formatDateTime, maskPhone, onlyDigits } from '../clientes/format'
+import { formatDateTime, onlyDigits } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
 import { APPROVAL_LABEL, REJECTION_LABEL, STATUS_LABEL } from './labels'
 import { formatAreaM2, formatMeters, formatMoney, formatPercent } from './money'
@@ -444,7 +445,8 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
   quote: Quote; busy: boolean; error: string | null; onCancel: () => void; onSent: (toast: string) => void
 }) {
   const firstName = quote.customer.name.split(' ')[0]
-  const [phone, setPhone] = useState(maskPhone(quote.customer.whatsapp ?? ''))
+  // Número já preenchido com o WhatsApp ATUAL do cadastro do cliente
+  const { phone, setPhone, registered } = useCustomerWhatsapp(quote.customer.id, quote.customer.whatsapp)
   const [message, setMessage] = useState(defaultWhatsAppMessage(quote))
   const [shareError, setShareError] = useState<string | null>(null)
 
@@ -508,9 +510,9 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
           <>
             <label className="cl-field">
               <span className="cl-field__label">WhatsApp</span>
-              <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" aria-invalid={phone && phoneInvalid ? true : undefined} />
+              <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" aria-invalid={phone && phoneInvalid ? true : undefined} />
             </label>
-            {!quote.customer.whatsapp && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para este envio.</p>}
+            {!registered && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para este envio.</p>}
           </>
         )}
         <label className="cl-field">

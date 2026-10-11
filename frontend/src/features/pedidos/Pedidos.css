@@ -207,3 +207,26 @@
   .pd-rec__actions .btn { flex: 1; }
   .pd-totals { justify-content: flex-start; flex-direction: column; }
 }
+
+/* HU27 — Gastos e lucro (só ADMIN/MANAGER) */
+.pd-profit { gap: 14px; }
+.pd-profit__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pd-profit__lock { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; color: var(--color-text-muted); background: #EFEEEA; border-radius: 999px; padding: 3px 9px; }
+.pd-profit__big { display: flex; flex-direction: column; gap: 2px; padding: 14px 16px; border-radius: 12px; background: #E8F3EC; color: #1E5A35; }
+.pd-profit__big > span:first-child { font-size: 14px; font-weight: 600; }
+.pd-profit__big strong { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
+.pd-profit__big.is-loss { background: #FDECEA; color: #9B1C1C; }
+.pd-profit__margin { font-size: 13px; opacity: 0.85; }
+.pd-profit__bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #ECEBE7; gap: 2px; }
+.pd-profit__bar span { display: block; height: 100%; }
+.pd-profit__rows { display: flex; flex-direction: column; gap: 6px; }
+.pd-profit__rows .oc-summary__row span:first-child { display: inline-flex; align-items: center; gap: 8px; }
+.is-material { background: #6B7F99; }
+.is-labor { background: #C2592A; }
+.is-profit { background: #2E8B57; }
+.pd-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
+.pd-profit__cash { margin: 0; padding: 10px 12px; border-radius: 10px; background: #F7F6F3; font-size: 13px; color: #3F454B; }
+.pd-profit__cash.is-neg strong { color: #9B1C1C; }
+.pd-expenses li .pd-payments__side { flex-direction: row; gap: 12px; }
+.pd-textlink--danger { color: #9B1C1C; }
+.pd-profit__big.is-pending { background: #FFF4E5; color: #7A4A00; }

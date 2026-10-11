@@ -9,6 +9,10 @@ import { addDaysIso, todayIso } from './dates'
 import { METHOD_LABEL, METHODS } from './labels'
 import type {
   ConvertToOrderRequest,
+  ExpenseRequest,
+  ExpenseType,
+  OrderExpense,
+  ProfitSummary,
   DeliverRequest,
   ListOrdersParams,
   Order,
@@ -42,6 +46,7 @@ let nextOrderId = 1
 let nextNumber = 40
 let nextPaymentId = 1
 let nextEventId = 1
+let nextExpenseId = 1
 // Idempotency-Key → pagamento já criado (o back guarda por 24 h). Evita pagamento duplicado no duplo clique.
 const idempotency = new Map<string, number>()
 
@@ -58,9 +63,38 @@ function recompute(order: Order) {
           : 'UNPAID'
 }
 
+// HU27: lucro = total − gastos; sobrou no caixa = recebido − gastos. Sempre calculado aqui (no back).
+export function computeProfit(order: Order): ProfitSummary {
+  const expenses = order.expenses ?? []
+  const sum = (t: ExpenseType) => expenses.filter((e) => e.type === t).reduce((acc, e) => acc + e.amountCents, 0)
+  const materialCents = sum('MATERIAL')
+  const laborCents = sum('LABOR')
+  const expensesCents = materialCents + laborCents
+  const profitCents = order.totalCents - expensesCents
+  return {
+    materialCents, laborCents, expensesCents, profitCents,
+    marginPercent: order.totalCents > 0 ? Math.round((profitCents / order.totalCents) * 1000) / 10 : 0,
+    cashBalanceCents: order.paidCents - expensesCents,
+  }
+}
+
+const seesProfit = () => {
+  const role = readMockSession()?.role
+  return role === 'ADMIN' || role === 'MANAGER'
+}
+
 function snapshot(order: Order): Order {
   recompute(order)
-  return structuredClone(order)
+  const copy = structuredClone(order)
+  if (seesProfit()) {
+    copy.expenses = [...(order.expenses ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+    copy.profit = computeProfit(order)
+  } else {
+    // EMPLOYEE não recebe gastos nem lucro (nem escondido na resposta)
+    copy.expenses = null
+    copy.profit = null
+  }
+  return copy
 }
 
 function event(order: Order, type: OrderEvent['type'], detail: string | null = null, when = now(), who = userName()) {
@@ -123,6 +157,7 @@ function fromQuote(quote: Quote, createdAt: string): Order {
     createdAt,
     deliveredAt: null, deliveredOn: null, receivedBy: null, deliveryNote: null, canceledAt: null, cancelReason: null,
     payments: [], lastCollectionAt: null, events: [],
+    expenses: [], profit: null,
   }
 }
 
@@ -147,7 +182,9 @@ function byPriority(a: Order, b: Order): number {
 
 // ---------- Dados de exemplo (datas relativas a hoje) ----------
 type SeedPayment = { amountCents: number; method: PaymentMethod; daysAgo: number; note?: string }
+type SeedExpense = { type: ExpenseType; description: string; amountCents: number; daysAgo: number }
 type Seed = {
+  expenses?: SeedExpense[]
   customerId: number; createdDaysAgo: number; status: OrderStatus
   items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[]
   payments?: SeedPayment[]; deliveredDaysAgo?: number; receivedBy?: string; collectedDaysAgo?: number; half?: boolean
@@ -156,16 +193,29 @@ type Seed = {
 function seed() {
   const seeds: Seed[] = [
     { customerId: 1, createdDaysAgo: 60, status: 'DELIVERED', deliveredDaysAgo: 40, receivedBy: 'Síndico Paulo', half: true,
+      expenses: [
+        { type: 'MATERIAL', description: 'Perfis de alumínio e vidro 6 mm', amountCents: 520000, daysAgo: 55 },
+        { type: 'LABOR', description: 'Instalação: equipe do Marcos', amountCents: 240000, daysAgo: 40 },
+      ],
       items: [{ description: 'Janela de correr 2 folhas (fachada)', chargeType: 'AREA', quantity: 12, unit: null, widthCm: 150, heightCm: 120, unitPriceCents: 62000 }],
       payments: [{ amountCents: 0, method: 'TRANSFER', daysAgo: 40, note: 'Restante na entrega' }] },
     { customerId: 5, createdDaysAgo: 50, status: 'DELIVERED', deliveredDaysAgo: 35, receivedBy: 'Dra. Helena', collectedDaysAgo: 22, half: true,
+      expenses: [
+        { type: 'MATERIAL', description: 'Vidro temperado 8 mm e ferragens', amountCents: 210000, daysAgo: 45 },
+        { type: 'LABOR', description: 'Instalador João', amountCents: 80000, daysAgo: 35 },
+      ],
       items: [
         { description: 'Box de vidro temperado 8 mm', chargeType: 'AREA', quantity: 4, unit: null, widthCm: 120, heightCm: 190, unitPriceCents: 42000 },
         { description: 'Espelho bisotê', chargeType: 'UNIT', quantity: 1, unit: 'un', widthCm: null, heightCm: null, unitPriceCents: 36960 },
       ] },
     { customerId: 6, createdDaysAgo: 30, status: 'DELIVERED', deliveredDaysAgo: 22, receivedBy: 'Roberto',
+      expenses: [
+        { type: 'MATERIAL', description: 'Chapas, tubos e motor', amountCents: 260000, daysAgo: 28 },
+        { type: 'LABOR', description: 'Soldador e instalação', amountCents: 120000, daysAgo: 22 },
+      ],
       items: [{ description: 'Portão de garagem', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 300, heightCm: 220, unitPriceCents: 47000 }] },
     { customerId: 4, createdDaysAgo: 20, status: 'IN_PRODUCTION', half: true,
+      expenses: [{ type: 'MATERIAL', description: 'Vidro laminado 10 mm', amountCents: 185000, daysAgo: 12 }],
       items: [{ description: 'Fachada de vidro da loja', chargeType: 'UNIT', quantity: 1, unit: 'conj', widthCm: null, heightCm: null, unitPriceCents: 420000 }] },
     { customerId: 8, createdDaysAgo: 10, status: 'READY',
       items: [
@@ -216,6 +266,9 @@ function seed() {
       order.lastCollectionAt = daysAgoIso(s.collectedDaysAgo)
       event(order, 'COLLECTION', 'WHATSAPP', order.lastCollectionAt, 'Thayná')
     }
+    for (const e of s.expenses ?? []) {
+      order.expenses!.push({ id: nextExpenseId++, type: e.type, description: null, amountCents: e.amountCents, date: addDaysIso(todayIso(), -e.daysAgo), userName: 'Thayná', createdAt: daysAgoIso(e.daysAgo) })
+    }
     order.events.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
     recompute(order)
     store.set(order.id, order)
@@ -226,7 +279,12 @@ seed()
 
 // Para o mock do Financeiro e do Início (no back real, são consultas no mesmo banco)
 export function mockAllOrders(): Order[] {
-  return [...store.values()].map(snapshot)
+  return [...store.values()].map((o) => {
+    recompute(o)
+    const copy = structuredClone(o)
+    copy.profit = computeProfit(o)
+    return copy
+  })
 }
 
 // ---------- Endpoints ----------
@@ -397,5 +455,61 @@ export async function cancelOrder(id: number, reason: string): Promise<Order> {
   order.canceledAt = now()
   order.cancelReason = reason.trim()
   event(order, 'CANCELED', order.cancelReason)
+  return snapshot(order)
+}
+
+// ---------- HU27: gastos do serviço (só ADMIN e MANAGER) ----------
+function forbidIfEmployee() {
+  if (!seesProfit()) throw new ApiError(403, 'FORBIDDEN', 'Só Administrador e Gerente podem ver e lançar gastos.')
+}
+
+function validateExpense(r: ExpenseRequest): ExpenseRequest {
+  const errors: FieldError[] = []
+  const description = (r.description ?? '').trim() || null // PO 11/10: sem descrição na tela (campo opcional)
+  if (r.type !== 'MATERIAL' && r.type !== 'LABOR') errors.push({ field: 'type', code: 'REQUIRED', message: 'Escolha Material ou Mão de obra.' })
+  if (description && description.length > 120) errors.push({ field: 'description', code: 'SIZE', message: 'Descreva o gasto (2 a 120 letras).' })
+  if (!Number.isInteger(r.amountCents) || r.amountCents <= 0) errors.push({ field: 'amountCents', code: 'POSITIVE', message: 'Informe um valor maior que zero.' })
+  else if (r.amountCents > 100_000_000) errors.push({ field: 'amountCents', code: 'MAX', message: 'Valor alto demais. Confira os números.' })
+  if (!isDay(r.date)) errors.push({ field: 'date', code: 'REQUIRED', message: 'Informe a data do gasto.' })
+  else if (r.date > todayIso()) errors.push({ field: 'date', code: 'PAST', message: 'A data do gasto não pode ser no futuro.' })
+  if (errors.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', errors)
+  return { ...r, description }
+}
+
+function findExpense(order: Order, expenseId: number): OrderExpense {
+  const expense = order.expenses?.find((e) => e.id === expenseId)
+  if (!expense) throw new ApiError(404, 'EXPENSE_NOT_FOUND', 'Gasto não encontrado.')
+  return expense
+}
+
+// POST /api/orders/{id}/expenses
+export async function addExpense(id: number, request: ExpenseRequest): Promise<Order> {
+  await wait(500)
+  forbidIfEmployee()
+  const order = find(id)
+  const r = validateExpense(request)
+  order.expenses ??= []
+  order.expenses.push({ id: nextExpenseId++, type: r.type, description: r.description, amountCents: r.amountCents, date: r.date, userName: userName(), createdAt: now() })
+  return snapshot(order)
+}
+
+// PUT /api/orders/{id}/expenses/{expenseId}
+export async function updateExpense(id: number, expenseId: number, request: ExpenseRequest): Promise<Order> {
+  await wait(500)
+  forbidIfEmployee()
+  const order = find(id)
+  const expense = findExpense(order, expenseId)
+  const r = validateExpense(request)
+  Object.assign(expense, { type: r.type, description: r.description, amountCents: r.amountCents, date: r.date })
+  return snapshot(order)
+}
+
+// DELETE /api/orders/{id}/expenses/{expenseId}
+export async function deleteExpense(id: number, expenseId: number): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  findExpense(order, expenseId)
+  order.expenses = order.expenses!.filter((e) => e.id !== expenseId)
   return snapshot(order)
 }

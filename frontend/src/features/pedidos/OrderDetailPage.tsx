@@ -7,18 +7,19 @@ import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Toast } from '../../components/ui/Toast'
 import { useFlashMessage } from '../../hooks/useFlashMessage'
 import { useRequest } from '../../hooks/useRequest'
+import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { useAuth } from '../auth/useAuth'
 import { ApiError } from '../auth/types'
 import { formatDateTime, maskPhone, whatsappLink } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
 import { formatAreaM2, formatMeters, formatMoney } from '../orcamentos/money'
 import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from './dates'
-import { METHOD_LABEL, NEXT_STEP, ORDER_STATUS_LABEL, ORDER_STEPS, PREVIOUS_STEP } from './labels'
+import { EXPENSE_TYPE_LABEL, METHOD_LABEL, NEXT_STEP, ORDER_STATUS_LABEL, ORDER_STEPS, PREVIOUS_STEP } from './labels'
 import { AlertIcon, OrderStatusBadge, PaymentStatusBadge } from './OrderBadges'
-import { CancelOrderDialog, CollectDialog, DeliverDialog, PaymentDialog, ReversePaymentDialog } from './OrderDialogs'
-import { canReversePayment } from './permissions'
+import { CancelOrderDialog, CollectDialog, DeleteExpenseDialog, DeliverDialog, ExpenseDialog, PaymentDialog, ReversePaymentDialog } from './OrderDialogs'
+import { canReversePayment, canSeeProfit } from './permissions'
 import { changeOrderStatus, getOrder } from './ordersApi'
-import type { Order, OrderEvent, OrderStatus, Payment } from './types'
+import type { Order, OrderEvent, OrderExpense, OrderStatus, Payment } from './types'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
 import '../orcamentos/Orcamentos.css'
@@ -27,7 +28,7 @@ import './Pedidos.css'
 // HU21 (andamento), HU22 (entregar), HU23 (pagamentos), HU24 (cobrar).
 // Regra de ouro: andamento e pagamento são coisas separadas. Entregar não é receber.
 
-type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | { reverse: Payment } | null
+type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | 'expense' | { reverse: Payment } | { editExpense: OrderExpense } | { deleteExpense: OrderExpense } | null
 
 export function OrderDetailPage() {
   const { id } = useParams()
@@ -150,11 +151,9 @@ function OrderDetail({ id }: { id: number }) {
             <div className="pd-customer">
               <span className="pd-customer__text">
                 <Link to={`/clientes/${order.customer.id}`} className="pd-customer__name">{order.customer.name}</Link>
-                <span className="cl-muted oc-small">{[order.customer.whatsapp ? maskPhone(order.customer.whatsapp) : order.customer.phone ? maskPhone(order.customer.phone) : null, order.customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
+                <CustomerContact customer={order.customer} />
               </span>
-              {order.customer.whatsapp && (
-                <a className="btn btn--secondary pd-btn-link" href={whatsappLink(order.customer.whatsapp)} target="_blank" rel="noopener noreferrer"><WhatsIcon />WhatsApp</a>
-              )}
+              <CustomerWhatsappButton customer={order.customer} />
             </div>
           </section>
 
@@ -178,6 +177,9 @@ function OrderDetail({ id }: { id: number }) {
         <aside className="oc-aside">
           <PaymentCard order={order} canReverse={canReversePayment(user?.role)}
             onPay={() => setDialog('pay')} onCollect={() => setDialog('collect')} onReverse={(p) => setDialog({ reverse: p })} />
+          {canSeeProfit(user?.role) && order.profit && order.expenses && (
+            <ProfitCard order={order} onAdd={() => setDialog('expense')} onEdit={(e) => setDialog({ editExpense: e })} onDelete={(e) => setDialog({ deleteExpense: e })} />
+          )}
           {active && <Button className="btn--danger-outline" fullWidth onClick={() => setDialog('cancel')} data-testid="cancelar-pedido">Cancelar pedido</Button>}
         </aside>
       </main>
@@ -192,7 +194,14 @@ function OrderDetail({ id }: { id: number }) {
       )}
       {dialog === 'cancel' && <CancelOrderDialog order={order} onCancel={() => setDialog(null)} onDone={done('Pedido cancelado.')} />}
       {dialog === 'collect' && canCharge && <CollectDialog target={collectTarget} onCancel={() => setDialog(null)} onDone={done('WhatsApp aberto. Confira a mensagem e envie por lá.')} />}
-      {dialog !== null && typeof dialog === 'object' && (
+      {dialog === 'expense' && <ExpenseDialog order={order} expense={null} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto lançado.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'editExpense' in dialog && (
+        <ExpenseDialog order={order} expense={dialog.editExpense} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto corrigido.')(u)} />
+      )}
+      {dialog !== null && typeof dialog === 'object' && 'deleteExpense' in dialog && (
+        <DeleteExpenseDialog order={order} expense={dialog.deleteExpense} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto excluído.')(u)} />
+      )}
+      {dialog !== null && typeof dialog === 'object' && 'reverse' in dialog && (
         <ReversePaymentDialog order={order} payment={dialog.reverse} onCancel={() => setDialog(null)} onDone={done('Pagamento estornado.')} />
       )}
       <ConfirmDialog
@@ -315,6 +324,73 @@ function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order
   )
 }
 
+// ---------- HU27: gastos e lucro (só ADMIN e MANAGER) ----------
+function ProfitCard({ order, onAdd, onEdit, onDelete }: { order: Order; onAdd: () => void; onEdit: (e: OrderExpense) => void; onDelete: (e: OrderExpense) => void }) {
+  const p = order.profit!
+  const expenses = order.expenses!
+  const loss = p.profitCents < 0
+  // Lançou só um dos dois? O "sobrou" ainda não é lucro de verdade: falta o outro gasto.
+  const missing = expenses.length === 0 ? null : p.materialCents === 0 ? 'o material' : p.laborCents === 0 ? 'a mão de obra' : null
+  const pending = !loss && (expenses.length === 0 || missing !== null)
+  const total = Math.max(order.totalCents, p.expensesCents, 1)
+  const w = (cents: number) => `${Math.max(0, (cents / total) * 100)}%`
+  return (
+    <section className="oc-summary pd-profit" aria-labelledby="t-lucro" data-testid="cartao-lucro">
+      <div className="pd-profit__head">
+        <h2 id="t-lucro" className="cl-card__title">Gastos e lucro</h2>
+        <span className="pd-profit__lock" title="Funcionário não vê este quadro"><LockIcon />Só Admin e Gerente</span>
+      </div>
+
+      <div className={`pd-profit__big${loss ? ' is-loss' : pending ? ' is-pending' : ''}`}>
+        <span>{loss ? 'Prejuízo neste serviço' : pending ? 'Ainda não dá para saber o lucro' : 'Sobrou para você'}</span>
+        <strong data-testid="lucro">{formatMoney(p.profitCents)}</strong>
+        <span className="pd-profit__margin">
+          {expenses.length === 0 ? 'Lance o material e a mão de obra para ver quanto sobrou.'
+            : missing ? `Falta lançar ${missing}. Esse valor ainda vai diminuir.`
+              : `${String(p.marginPercent).replace('.', ',')}% do valor do serviço`}
+        </span>
+      </div>
+
+      <div className="pd-profit__bar" role="img" aria-label={`Material ${formatMoney(p.materialCents)}, mão de obra ${formatMoney(p.laborCents)}, lucro ${formatMoney(p.profitCents)}`}>
+        <span className="is-material" style={{ width: w(p.materialCents) }} />
+        <span className="is-labor" style={{ width: w(p.laborCents) }} />
+        {!loss && <span className="is-profit" style={{ width: w(p.profitCents) }} />}
+      </div>
+
+      <div className="pd-profit__rows">
+        <div className="oc-summary__row"><span>Valor do serviço</span><span>{formatMoney(order.totalCents)}</span></div>
+        <div className="oc-summary__row"><span><i className="pd-dot is-material" />Material</span><span data-testid="total-material">− {formatMoney(p.materialCents)}</span></div>
+        <div className="oc-summary__row"><span><i className="pd-dot is-labor" />Mão de obra</span><span data-testid="total-mao-de-obra">− {formatMoney(p.laborCents)}</span></div>
+      </div>
+
+      {order.paidCents < order.totalCents && expenses.length > 0 && order.status !== 'CANCELED' && (
+        <p className={`pd-profit__cash${p.cashBalanceCents < 0 ? ' is-neg' : ''}`} data-testid="sobrou-no-caixa">
+          No caixa hoje: recebeu {formatMoney(order.paidCents)} e gastou {formatMoney(p.expensesCents)} → <strong>{formatMoney(p.cashBalanceCents)}</strong>
+        </p>
+      )}
+
+      <Button className="btn--secondary" fullWidth onClick={onAdd} data-testid="lancar-gasto"><PlusIcon />Lançar gasto</Button>
+
+      {expenses.length > 0 && (
+        <ul className="pd-payments pd-expenses" data-testid="lista-gastos">
+          {expenses.map((e) => (
+            <li key={e.id}>
+              <span className="pd-payments__main">
+                <span className="pd-payments__value">{formatMoney(e.amountCents)}</span>
+                <span className="cl-muted oc-small"><i className={`pd-dot ${e.type === 'MATERIAL' ? 'is-material' : 'is-labor'}`} />{EXPENSE_TYPE_LABEL[e.type]}{e.description ? ` · ${e.description}` : ''} · {formatDayShort(e.date)}</span>
+              </span>
+              <span className="pd-payments__side">
+                <button type="button" className="pd-textlink pd-textlink--small" onClick={() => onEdit(e)} aria-label={`Corrigir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}>Corrigir</button>
+                <button type="button" className="pd-textlink pd-textlink--small pd-textlink--danger" onClick={() => onDelete(e)} aria-label={`Excluir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}>Excluir</button>
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  )
+}
+
 // ---------- Histórico ----------
 function eventText(ev: OrderEvent): string {
   switch (ev.type) {
@@ -346,6 +422,19 @@ function eventIcon(ev: OrderEvent) {
 }
 
 // ---------- Ícones ----------
+// Contato e botão do WhatsApp usam o cadastro ATUAL do cliente (o pedido guarda uma cópia antiga)
+function CustomerContact({ customer }: { customer: Order['customer'] }) {
+  const { registered } = useCustomerWhatsapp(customer.id, customer.whatsapp)
+  const contact = registered ? maskPhone(registered) : customer.phone ? maskPhone(customer.phone) : null
+  return <span className="cl-muted oc-small">{[contact, customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
+}
+
+function CustomerWhatsappButton({ customer }: { customer: Order['customer'] }) {
+  const { registered } = useCustomerWhatsapp(customer.id, customer.whatsapp)
+  if (!registered) return null
+  return <a className="btn btn--secondary pd-btn-link" href={whatsappLink(registered)} target="_blank" rel="noopener noreferrer"><WhatsIcon />WhatsApp</a>
+}
+
 function WhatsIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12z" /></svg>
 }
@@ -360,4 +449,10 @@ function PlayIcon() {
 }
 function CheckIcon() {
   return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+}
+function PlusIcon() {
+  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+}
+function LockIcon() {
+  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
 }

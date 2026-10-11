@@ -57,7 +57,36 @@ export type Order = {
   payments: Payment[]
   lastCollectionAt: string | null
   events: OrderEvent[]
+  // HU27: só vem para ADMIN e MANAGER. Para EMPLOYEE o back manda null.
+  expenses: OrderExpense[] | null
+  profit: ProfitSummary | null
 }
+
+// ---------- HU27: gastos e lucro do serviço ----------
+// Decisão da PO (11/10): só dois tipos, bem resumido.
+export type ExpenseType = 'MATERIAL' | 'LABOR'
+
+export type OrderExpense = {
+  id: number
+  type: ExpenseType
+  description: string | null
+  amountCents: number
+  date: string // YYYY-MM-DD
+  userName: string
+  createdAt: string
+}
+
+// Calculado pelo BACK. O front só mostra.
+export type ProfitSummary = {
+  materialCents: number
+  laborCents: number
+  expensesCents: number
+  profitCents: number      // total do pedido − gastos (pode ser negativo)
+  marginPercent: number    // lucro ÷ total, 1 casa decimal
+  cashBalanceCents: number // recebido − gastos (pode ser negativo)
+}
+
+export type ExpenseRequest = { type: ExpenseType; description: string | null; amountCents: number; date: string }
 
 export type OrderSummary = {
   id: number

@@ -1,5 +1,5 @@
-import mascote from '../../assets/zbox-mascote.webp'
-import { companyContactLine } from '../empresa/format'
+import logo from '../../assets/zbox-logo.webp'
+import { companyAddressLine } from '../empresa/format'
 import type { Company } from '../empresa/types'
 import { formatDate, maskPhone } from '../clientes/format'
 import { formatAreaM2, formatMeters, formatMoney, formatPercent } from './money'
@@ -90,14 +90,26 @@ function noBreakHyphen(text: string): string {
 
 // Marca + dados da empresa no topo do orçamento. Também aparece como prévia no Perfil.
 export function CompanyBrand({ company }: { company: Company }) {
-  const contact = companyContactLine(company)
+  const address = companyAddressLine(company)
+  const phones = [company.whatsapp ? maskPhone(company.whatsapp) : null, company.phone ? maskPhone(company.phone) : null].filter(Boolean).join(' · ')
   return (
     <div className="qd__brand">
-      <img src={mascote} alt="" className="qd__mascot" />
-      <div className="qd__brand-text">
+      {/* A logo já traz o nome e a frase: o texto fica só para leitor de tela */}
+      <img src={logo} alt={company.name} className="qd__logo" />
+      <div className="qd__brand-text" data-testid="contato-empresa">
         <span className="qd__name">{company.name}</span>
-        {company.tagline && <span className="qd__tagline">{company.tagline}</span>}
-        {contact && <span className="qd__contact" data-testid="contato-empresa">{contact}</span>}
+        {phones && (
+          <span className="qd__info">
+            <span className="qd__info-label">WhatsApp</span>
+            <span className="qd__info-value qd__info-value--big">{phones}</span>
+          </span>
+        )}
+        {address && (
+          <span className="qd__info">
+            <span className="qd__info-label">Endereço</span>
+            <span className="qd__info-value">{address}</span>
+          </span>
+        )}
       </div>
     </div>
   )

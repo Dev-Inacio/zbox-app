@@ -5,3 +5,8 @@ import type { Role } from '../auth/types'
 export function canReversePayment(role: Role | undefined): boolean {
   return role === 'ADMIN' || role === 'MANAGER'
 }
+
+// HU27: gastos e lucro só para ADMIN e MANAGER (o back devolve 403 e manda expenses/profit = null)
+export function canSeeProfit(role: Role | undefined): boolean {
+  return role === 'ADMIN' || role === 'MANAGER'
+}

@@ -73,3 +73,41 @@
 }
 
 .fn-search { max-width: 520px; }
+
+/* HU27 — aba Gastos e lucro */
+.fn-profit { display: flex; flex-direction: column; gap: 16px; }
+.fn-cash { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1.3fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.fn-cash__item { display: flex; flex-direction: column; gap: 4px; padding: 16px 18px; border-radius: 14px; background: #F7F6F3; min-width: 0; }
+.fn-cash__item > span:first-child { font-size: 14px; font-weight: 500; color: var(--color-text-muted); }
+.fn-cash__item strong { font-family: var(--font-display); font-weight: 800; font-size: 26px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fn-cash__op { font-family: var(--font-display); font-size: 26px; font-weight: 700; color: #9AA0A6; }
+.fn-cash__result { background: #E8F3EC; }
+.fn-cash__result > span:first-child, .fn-cash__result strong { color: #1E5A35; }
+.fn-cash__result.is-neg { background: #FDECEA; }
+.fn-cash__result.is-neg > span:first-child, .fn-cash__result.is-neg strong { color: #9B1C1C; }
+.fn-subtitle { margin: 8px 0 0; font-family: var(--font-display); font-size: 18px; font-weight: 700; }
+.fn-warn { margin: 0; padding: 10px 14px; border-radius: 10px; background: #FFF4E5; color: #7A4A00; font-size: 14px; }
+.fn-prow { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(80px, 0.6fr) minmax(0, 0.9fr) 140px auto; gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid #ECEBE7; }
+.fn-prow:first-child { border-top: 0; }
+.fn-prow__bar { height: 8px; border-radius: 999px; background: #2E8B57; overflow: hidden; }
+.fn-prow__bar span { display: block; height: 100%; background: #C9CCD0; }
+.fn-prow__bar span.is-loss { background: #D64545; }
+.fn-prow__nums { display: flex; flex-direction: column; gap: 2px; font-variant-numeric: tabular-nums; }
+.fn-pos { color: #1E5A35; }
+.fn-neg { color: #9B1C1C; }
+.fn-missing { font-weight: 600; color: var(--color-accent-strong, #A8481F); }
+@media (max-width: 1023px) {
+  .fn-cash { grid-template-columns: 1fr; }
+  .fn-cash__op { display: none; }
+  .fn-prow { grid-template-columns: minmax(0, 1fr) auto; }
+  .fn-prow__nums { display: none; }
+  .fn-prow__bar { grid-column: 1 / -1; grid-row: 2; }
+}
+.fn-prow__bar.is-empty { background: repeating-linear-gradient(45deg, #ECEBE7 0 6px, #F7F6F3 6px 12px); }
+.fn-add { height: 40px; padding: 0 14px; white-space: nowrap; }
+.fn-add-more { align-self: flex-end; margin-bottom: 2px; }
+@media (max-width: 1023px) {
+  .fn-prow { grid-template-columns: minmax(0, 1fr) auto; }
+  .fn-prow .fn-add { grid-column: 1 / -1; grid-row: 3; width: 100%; }
+}
+.fn-pending { color: #7A4A00; font-weight: 600; }

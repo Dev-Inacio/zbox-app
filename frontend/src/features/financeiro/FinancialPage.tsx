@@ -9,9 +9,14 @@ import { formatMoney } from '../orcamentos/money'
 import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from '../pedidos/dates'
 import { METHOD_LABEL, ORDER_STATUS_LABEL } from '../pedidos/labels'
 import { AlertIcon, PaymentStatusBadge } from '../pedidos/OrderBadges'
-import { CollectDialog, PaymentDialog } from '../pedidos/OrderDialogs'
-import { getFinancialSummary, listReceivables, listReceivedPayments } from './financialApi'
-import type { Receivable, ReceivableFilter } from './financialApi'
+import { CollectDialog, ExpenseDialog, PaymentDialog } from '../pedidos/OrderDialogs'
+import { getOrder } from '../pedidos/ordersApi'
+import type { Order } from '../pedidos/types'
+import { getFinancialSummary, getProfitReport, listReceivables, listReceivedPayments } from './financialApi'
+import type { ProfitReport, Receivable, ReceivableFilter } from './financialApi'
+import { useAuth } from '../auth/useAuth'
+import { canSeeProfit } from '../pedidos/permissions'
+import { ORDER_STATUS_LABEL as STATUS } from '../pedidos/labels'
 import { PERIODS, periodRange, readPeriod } from './period'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
@@ -29,11 +34,14 @@ const FILTERS: { value: ReceivableFilter; label: string }[] = [
   { value: 'OPEN', label: 'Ainda não entregue' },
 ]
 
-type Action = { kind: 'pay' | 'collect'; row: Receivable } | null
+type Action = { kind: 'pay' | 'collect'; row: Receivable } | { kind: 'expense'; order: Order } | null
 
 export function FinancialPage() {
   const [params, setParams] = useSearchParams()
-  const tab = params.get('aba') === 'recebidos' ? 'received' : 'receivable'
+  const { user } = useAuth()
+  const showProfit = canSeeProfit(user?.role)
+  const aba = params.get('aba')
+  const tab = aba === 'recebidos' ? 'received' : aba === 'lucro' && showProfit ? 'profit' : 'receivable'
   const period = readPeriod(params.get('periodo'))
   const filter = (FILTERS.find((f) => f.value === params.get('filtro'))?.value ?? 'ALL') as ReceivableFilter
   const page = Math.max(0, Number(params.get('pagina') ?? '1') - 1) || 0
@@ -72,6 +80,9 @@ export function FinancialPage() {
   }, [term, search, update])
   const payFetcher = useCallback(() => listReceivedPayments(range.from, range.to, page, PAGE_SIZE), [range.from, range.to, page])
   const received = useRequest(`pay|${range.from}|${range.to}|${page}|${version}`, payFetcher)
+
+  const profitFetcher = useCallback(() => (showProfit && tab === 'profit' ? getProfitReport(range.from, range.to) : Promise.resolve(null)), [showProfit, tab, range.from, range.to])
+  const profit = useRequest(`lucro|${tab}|${range.from}|${range.to}|${version}`, profitFetcher)
 
   const s = summary.data
   const methods = s?.byMethod.map((m) => `${METHOD_LABEL[m.method]} ${formatMoney(m.amountCents)}`).join(' · ')
@@ -136,9 +147,19 @@ export function FinancialPage() {
             <button type="button" role="tab" aria-selected={tab === 'received'} className="fn-tab" onClick={() => update({ aba: 'recebidos', pagina: null })} data-testid="aba-recebidos">
               Recebidos{s ? ` · ${s.receivedPayments}` : ''}
             </button>
+            {showProfit && (
+              <button type="button" role="tab" aria-selected={tab === 'profit'} className="fn-tab" onClick={() => update({ aba: 'lucro', pagina: null })} data-testid="aba-lucro">
+                Gastos e lucro
+              </button>
+            )}
           </div>
 
-          {tab === 'receivable' ? (
+          {tab === 'profit' ? (
+            <>
+              <ListState loading={profit.loading} error={profit.error} empty={false} emptyTitle="" emptyText="" onRetry={() => setVersion((n) => n + 1)} />
+              {profit.data && <ProfitTab report={profit.data} label={range.label} from={range.from} to={range.to} onAddExpense={(id) => { void getOrder(id).then((order) => setAction({ kind: 'expense', order })).catch(() => setToast('Não foi possível abrir o pedido. Tente de novo.')) }} />}
+            </>
+          ) : tab === 'receivable' ? (
             <>
               <div className="oc-chips" role="group" aria-label="Filtrar">
                 {FILTERS.map((f) => (
@@ -205,8 +226,69 @@ export function FinancialPage() {
         <CollectDialog target={{ id: action.row.orderId, number: action.row.number, customerName: action.row.customerName, customerWhatsapp: action.row.customerWhatsapp, remainingCents: action.row.remainingCents, deliveredOn: action.row.deliveredOn }}
           onCancel={() => setAction(null)} onDone={() => finished('WhatsApp aberto. Confira a mensagem e envie por lá.')} />
       )}
+      {action?.kind === 'expense' && (
+        <ExpenseDialog order={action.order} expense={null} onCancel={() => setAction(null)} onDone={(o) => finished(`Gasto lançado no pedido #${o.number}.`)} />
+      )}
       <Toast message={toast} onClose={clearToast} />
     </>
+  )
+}
+
+// HU27 — Gastos e lucro do período (só ADMIN e MANAGER)
+function ProfitTab({ report, label, from, to, onAddExpense }: { report: ProfitReport; label: string; from: string; to: string; onAddExpense: (orderId: number) => void }) {
+  const neg = report.cashCents < 0
+  const missing = report.orders.filter((o) => !o.hasExpenses || o.materialCents === 0 || o.laborCents === 0).length
+  return (
+    <div className="fn-profit">
+      <p className="oc-small cl-muted">Dinheiro que entrou e saiu {label} ({formatDay(from)} a {formatDay(to)}).</p>
+      <div className="fn-cash" data-testid="resumo-lucro">
+        <div className="fn-cash__item"><span>Recebido</span><strong className="pd-plus">{formatMoney(report.receivedCents)}</strong></div>
+        <span className="fn-cash__op" aria-hidden="true">−</span>
+        <div className="fn-cash__item">
+          <span>Gastos</span><strong>{formatMoney(report.expensesCents)}</strong>
+          <span className="oc-small cl-muted"><i className="pd-dot is-material" />Material {formatMoney(report.materialCents)} · <i className="pd-dot is-labor" />Mão de obra {formatMoney(report.laborCents)}</span>
+        </div>
+        <span className="fn-cash__op" aria-hidden="true">=</span>
+        <div className={`fn-cash__item fn-cash__result${neg ? ' is-neg' : ''}`}><span>Sobrou {label}</span><strong data-testid="sobrou-periodo">{formatMoney(report.cashCents)}</strong></div>
+      </div>
+
+      <h3 className="fn-subtitle">Quanto cada serviço deu</h3>
+      {report.orders.length === 0 ? (
+        <div className="cl-state"><p className="cl-state__title">Nenhum serviço com movimento no período.</p><p className="cl-state__text">Escolha outro período no topo da página.</p></div>
+      ) : (
+        <>
+          {missing > 0 && <p className="fn-warn" role="note">{missing === 1 ? '1 serviço ainda não tem' : `${missing} serviços ainda não têm`} material e mão de obra lançados. Lance os dois para o lucro ficar certo.</p>}
+          <ul className="fn-list" data-testid="lista-lucro">
+            {report.orders.map((o) => {
+              const loss = o.profitCents < 0
+              const missing = !o.hasExpenses ? null : o.materialCents === 0 ? 'Falta lançar material' : o.laborCents === 0 ? 'Falta lançar mão de obra' : null
+              const pct = o.totalCents > 0 ? Math.min(100, Math.max(0, (o.expensesCents / o.totalCents) * 100)) : 100
+              return (
+                <li key={o.orderId} className="fn-prow">
+                  <span className="fn-row__who">
+                    <span className="fn-row__title"><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link></span>
+                    <span className="cl-muted oc-small">Pedido #{o.number} · {STATUS[o.status]}</span>
+                  </span>
+                  <span className={`fn-prow__bar${o.hasExpenses ? '' : ' is-empty'}`} aria-hidden="true">{o.hasExpenses && <span style={{ width: `${pct}%` }} className={loss ? 'is-loss' : ''} />}</span>
+                  <span className="fn-prow__nums cl-muted oc-small"><span>Serviço {formatMoney(o.totalCents)}</span><span>Gastos {formatMoney(o.expensesCents)}</span></span>
+                  <span className="fn-row__rest">
+                    {o.hasExpenses ? (
+                      <>
+                        <span className={missing && !loss ? 'fn-pending oc-small' : 'cl-muted oc-small'}>{loss ? 'Prejuízo' : missing ?? `Lucro · ${String(o.marginPercent).replace('.', ',')}%`}</span>
+                        <strong className={loss ? 'fn-neg' : missing ? '' : 'fn-pos'}>{formatMoney(o.profitCents)}</strong>
+                      </>
+                    ) : (
+                      <span className="cl-muted oc-small">Sem gastos lançados</span>
+                    )}
+                  </span>
+                  <button type="button" className="btn btn--secondary fn-add" onClick={() => onAddExpense(o.orderId)} aria-label={`Lançar gasto no pedido ${o.number} de ${o.customerName}`} data-testid="lancar-gasto-linha">+ Lançar gasto</button>
+                </li>
+              )
+            })}
+          </ul>
+        </>
+      )}
+    </div>
   )
 }
 
