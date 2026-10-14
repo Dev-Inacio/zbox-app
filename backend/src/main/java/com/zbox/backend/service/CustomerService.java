@@ -2,13 +2,20 @@ package com.zbox.backend.service;
 
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
+import com.zbox.backend.dto.CustomerSummaryResponse;
+import com.zbox.backend.dto.PageResponse;
 import com.zbox.backend.enums.CustomerStatus;
+import com.zbox.backend.enums.CustomerType;
 import com.zbox.backend.enums.ErrorCode;
 import com.zbox.backend.exception.BusinessException;
 import com.zbox.backend.mapper.CustomerMapper;
 
 import com.zbox.backend.model.Customer;
 import com.zbox.backend.repository.CustomerRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -86,5 +93,26 @@ public class CustomerService {
         customer.setUpdatedAt(now);
 
         return customerMapper.toResponse(customerRepository.save(customer));
+    }
+
+    public PageResponse<CustomerSummaryResponse> findAll(String search, String status, CustomerType type, int page, int size) {
+        String searchFilter = null;
+        if (search != null && search.trim().length() >= 2) {
+            searchFilter = search.trim();
+        }
+
+        CustomerStatus statusFilter = null;
+        if (!status.equals("ALL")) {
+            statusFilter = CustomerStatus.valueOf(status);
+        }
+
+        int safeSize = Math.min(size, 100);
+
+        Pageable pageable = PageRequest.of(page, safeSize, Sort.by("name"));
+
+        Page<Customer> result = customerRepository.search(searchFilter, statusFilter, type, pageable);
+
+        Page<CustomerSummaryResponse> summaries = result.map(customer -> customerMapper.toSummary(customer));
+        return PageResponse.from(summaries);
     }
 }

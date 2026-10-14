@@ -2,6 +2,9 @@ package com.zbox.backend.controller;
 
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
+import com.zbox.backend.dto.CustomerSummaryResponse;
+import com.zbox.backend.dto.PageResponse;
+import com.zbox.backend.enums.CustomerType;
 import com.zbox.backend.service.CustomerService;
 import jakarta.validation.Valid;
 
@@ -15,6 +18,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -54,5 +58,15 @@ public class CustomerController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public CustomerResponse activate(@PathVariable Long id) {
         return customerService.activate(id);
+    }
+
+    @GetMapping
+    public PageResponse<CustomerSummaryResponse> findAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "ACTIVE") String status,
+            @RequestParam(required = false) CustomerType type,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return customerService.findAll(search, status, type, page, size);
     }
 }
