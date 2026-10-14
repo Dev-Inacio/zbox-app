@@ -8,7 +8,7 @@ import com.zbox.backend.enums.CustomerType;
 import com.zbox.backend.service.CustomerService;
 import jakarta.validation.Valid;
 
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,8 +19,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
 
 @RestController
 @RequestMapping("/api/customers")
@@ -33,9 +34,9 @@ public class CustomerController {
     }
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
-    public CustomerResponse create(@Valid @RequestBody CustomerRequest request) {
-        return customerService.create(request);
+    public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerRequest request) {
+        CustomerResponse response = customerService.create(request);
+        return ResponseEntity.created(URI.create("/api/customers/" + response.getId())).body(response);
     }
 
     @GetMapping("/{id}")
