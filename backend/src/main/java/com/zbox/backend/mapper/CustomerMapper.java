@@ -3,6 +3,7 @@ package com.zbox.backend.mapper;
 import com.zbox.backend.dto.AddressRequest;
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
+import com.zbox.backend.dto.CustomerSummaryResponse;
 import com.zbox.backend.model.Address;
 import com.zbox.backend.model.Customer;
 import org.springframework.stereotype.Component;
@@ -81,5 +82,27 @@ public class CustomerMapper {
         customer.setWhatsapp(request.getWhatsapp());
         customer.setNotes(request.getNotes());
         customer.setAddress(toAddress(request.getAddress()));
+    }
+
+    public CustomerSummaryResponse toSummary(Customer customer) {
+        Address address = customer.getAddress();
+
+        String city = null;
+        String state = null;
+
+        if (address != null) {
+            city = address.getCity();
+            state = address.getState();
+
+        }
+
+        return new CustomerSummaryResponse(customer.getId(),
+                customer.getName(),
+                customer.getType(),
+                customer.getPhone(),
+                customer.getWhatsapp(),
+                city,
+                state,
+                customer.getStatus());
     }
 }
