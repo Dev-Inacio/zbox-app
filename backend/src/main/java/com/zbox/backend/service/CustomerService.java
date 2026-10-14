@@ -96,6 +96,19 @@ public class CustomerService {
     }
 
     public PageResponse<CustomerSummaryResponse> findAll(String search, String status, CustomerType type, int page, int size) {
+
+        if (page < 0) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "page não pode ser negativo.");
+        }
+
+        if (!status.equals("ACTIVE") && !status.equals("INACTIVE") && !status.equals("ALL")) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER,"status deve ser ACTIVE, INACTIVE ou ALL.");
+        }
+
+        if (size < 1) {
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "size deve ser no mínimo 1.");
+        }
+
         String searchFilter = null;
         if (search != null && search.trim().length() >= 2) {
             searchFilter = search.trim();
@@ -108,7 +121,7 @@ public class CustomerService {
 
         int safeSize = Math.min(size, 100);
 
-        Pageable pageable = PageRequest.of(page, safeSize, Sort.by("name"));
+        Pageable pageable = PageRequest.of(page, safeSize, Sort.by("name").and(Sort.by("id")));
 
         Page<Customer> result = customerRepository.search(searchFilter, statusFilter, type, pageable);
 
