@@ -25,6 +25,16 @@ import java.util.List;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    private FieldErrorCode toFieldErrorCode(String constraint) {
+        if (constraint.equals("NotBlank")) {
+            return FieldErrorCode.REQUIRED;
+        }
+        if (constraint.equals("Size")) {
+            return FieldErrorCode.SIZE;
+        }
+        return FieldErrorCode.INVALID;
+    }
+
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiError> handleBadCredentials(BadCredentialsException exception, HttpServletRequest request) {
         ApiError apiError = new ApiError(Instant.now().toString(),
@@ -42,7 +52,7 @@ public class GlobalExceptionHandler {
         List<FieldError> fieldErrorList = new ArrayList<>();
 
         for (org.springframework.validation.FieldError error : exception.getBindingResult().getFieldErrors()) {
-            FieldError fieldError = new FieldError(error.getField(), FieldErrorCode.INVALID, error.getDefaultMessage());
+            FieldError fieldError = new FieldError(error.getField(), toFieldErrorCode(error.getCode()), error.getDefaultMessage());
             fieldErrorList.add(fieldError);
         }
         ApiError apiError = new ApiError(Instant.now().toString(),

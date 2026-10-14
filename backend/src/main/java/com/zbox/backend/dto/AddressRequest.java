@@ -5,25 +5,25 @@ import jakarta.validation.constraints.Size;
 
 public class AddressRequest {
 
-    @Pattern(regexp = "\\d{8}")
+    @Pattern(regexp = "\\d{8}", message = "O CEP deve ter 8 dígitos, só números.")
     private String zipCode;
 
-    @Size(max = 120)
+    @Size(max = 120, message = "A rua pode ter no máximo 120 caracteres.")
     private String street;
 
-    @Size(max = 20)
+    @Size(max = 20, message = "O número pode ter no máximo 20 caracteres.")
     private String number;
 
-    @Size(max = 120)
+    @Size(max = 120, message = "O complemento pode ter no máximo 120 caracteres.")
     private String complement;
 
-    @Size(max = 120)
+    @Size(max = 120, message = "O bairro pode ter no máximo 120 caracteres.")
     private String district;
 
-    @Size(max = 120)
+    @Size(max = 120, message = "A cidade pode ter no máximo 120 caracteres.")
     private String city;
 
-    @Pattern(regexp = "[A-Z]{2}")
+    @Pattern(regexp = "AC|AL|AP|AM|BA|CE|DF|ES|GO|MA|MT|MS|MG|PA|PB|PR|PE|PI|RJ|RN|RS|RO|RR|SC|SP|SE|TO", message = "O estado deve ser uma UF válida, por exemplo SP.")
     private String state;
 
     public AddressRequest() {
