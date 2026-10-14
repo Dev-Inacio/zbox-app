@@ -38,7 +38,7 @@ public class CustomerService {
 
     public CustomerResponse create(CustomerRequest request) {
         Customer customer = customerMapper.toEntity(request);
-        customer.setName(customer.getName().trim());
+
         customer.setStatus(CustomerStatus.ACTIVE);
 
         Instant now = Instant.now();
@@ -60,7 +60,7 @@ public class CustomerService {
         Customer customer = getCustomerOrThrow(id);
 
         customerMapper.updateEntity(request, customer);
-        customer.setName(customer.getName().trim());
+
         customer.setUpdatedAt(Instant.now());
         Customer salvo = customerRepository.save(customer);
 

@@ -1,5 +1,6 @@
 package com.zbox.backend.dto;
 
+import com.zbox.backend.util.TextUtils;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -34,7 +35,7 @@ public class AddressRequest {
     }
 
     public void setZipCode(String zipCode) {
-        this.zipCode = zipCode;
+        this.zipCode = TextUtils.blankToNull(zipCode);
     }
 
     public String getStreet() {
@@ -42,7 +43,7 @@ public class AddressRequest {
     }
 
     public void setStreet(String street) {
-        this.street = street;
+        this.street = TextUtils.blankToNull(street);
     }
 
     public String getNumber() {
@@ -50,7 +51,7 @@ public class AddressRequest {
     }
 
     public void setNumber(String number) {
-        this.number = number;
+        this.number = TextUtils.blankToNull(number);
     }
 
     public String getComplement() {
@@ -58,7 +59,7 @@ public class AddressRequest {
     }
 
     public void setComplement(String complement) {
-        this.complement = complement;
+        this.complement = TextUtils.blankToNull(complement);
     }
 
     public String getDistrict() {
@@ -66,7 +67,7 @@ public class AddressRequest {
     }
 
     public void setDistrict(String district) {
-        this.district = district;
+        this.district = TextUtils.blankToNull(district);
     }
 
     public String getCity() {
@@ -74,7 +75,7 @@ public class AddressRequest {
     }
 
     public void setCity(String city) {
-        this.city = city;
+        this.city = TextUtils.blankToNull(city);
     }
 
     public String getState() {
@@ -82,6 +83,6 @@ public class AddressRequest {
     }
 
     public void setState(String state) {
-        this.state = state;
+        this.state = TextUtils.blankToNull(state);;
     }
 }

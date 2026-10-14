@@ -1,6 +1,7 @@
 package com.zbox.backend.dto;
 
 import com.zbox.backend.enums.CustomerType;
+import com.zbox.backend.util.TextUtils;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -34,7 +35,7 @@ public class CustomerRequest {
     }
 
     public void setName(String name) {
-        this.name = name;
+        this.name = TextUtils.blankToNull(name);
     }
 
     public CustomerType getType() {
@@ -50,7 +51,7 @@ public class CustomerRequest {
     }
 
     public void setPhone(String phone) {
-        this.phone = phone;
+        this.phone = TextUtils.blankToNull(phone);
     }
 
     public String getWhatsapp() {
@@ -58,7 +59,7 @@ public class CustomerRequest {
     }
 
     public void setWhatsapp(String whatsapp) {
-        this.whatsapp = whatsapp;
+        this.whatsapp = TextUtils.blankToNull(whatsapp);
     }
 
     public AddressRequest getAddress() {
@@ -74,6 +75,6 @@ public class CustomerRequest {
     }
 
     public void setNotes(String notes) {
-        this.notes = notes;
+        this.notes = TextUtils.blankToNull(notes);
     }
 }
