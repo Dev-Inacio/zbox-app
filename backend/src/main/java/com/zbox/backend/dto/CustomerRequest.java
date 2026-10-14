@@ -8,22 +8,22 @@ import jakarta.validation.constraints.Size;
 
 public class CustomerRequest {
 
-    @NotBlank
-    @Size(min = 3,max = 120)
+    @NotBlank(message = "O nome é obrigatório.")
+    @Size(min = 3,max = 120, message = "O nome precisa ter entre 3 e 120 caracteres.")
     private String name;
 
     private CustomerType type;
 
-    @Pattern(regexp = "\\d{10,11}")
+    @Pattern(regexp = "\\d{10,11}", message = "O telefone deve ter 10 ou 11 dígitos, só números.")
     private String phone;
 
-    @Pattern(regexp = "\\d{11}")
+    @Pattern(regexp = "\\d{11}", message = "O WhatsApp deve ter 11 dígitos, só números.")
     private String whatsapp;
 
     @Valid
     private AddressRequest address;
 
-    @Size(max = 500)
+    @Size(max = 500, message = "As observações podem ter no máximo 500 caracteres.")
     private String notes;
 
     public CustomerRequest() {
