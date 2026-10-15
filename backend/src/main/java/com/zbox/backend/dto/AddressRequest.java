@@ -83,6 +83,6 @@ public class AddressRequest {
     }
 
     public void setState(String state) {
-        this.state = TextUtils.blankToNull(state);;
+        this.state = TextUtils.blankToNull(state);
     }
 }
