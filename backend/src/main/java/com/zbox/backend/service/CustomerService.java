@@ -25,10 +25,12 @@ public class CustomerService {
 
     private final CustomerRepository customerRepository;
     private final CustomerMapper customerMapper;
+    private final UsuarioService usuarioService;
 
-    public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper) {
+    public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper, UsuarioService usuarioService) {
         this.customerRepository = customerRepository;
         this.customerMapper = customerMapper;
+        this.usuarioService = usuarioService;
     }
 
     private Customer getCustomerOrThrow(Long id) {
@@ -36,9 +38,12 @@ public class CustomerService {
                 .orElseThrow(() -> new BusinessException(ErrorCode.CUSTOMER_NOT_FOUND, "Cliente não encontrado."));
     }
 
+    private String getUserName(String login) {
+        return usuarioService.buscarPorUsuario(login).getName();
+    }
+
     public CustomerResponse create(CustomerRequest request) {
         Customer customer = customerMapper.toEntity(request);
-
         customer.setStatus(CustomerStatus.ACTIVE);
 
         Instant now = Instant.now();
@@ -58,7 +63,6 @@ public class CustomerService {
 
     public CustomerResponse update(Long id, CustomerRequest request) {
         Customer customer = getCustomerOrThrow(id);
-
         customerMapper.updateEntity(request, customer);
 
         customer.setUpdatedAt(Instant.now());
@@ -67,7 +71,7 @@ public class CustomerService {
         return customerMapper.toResponse(salvo);
     }
 
-    public CustomerResponse deactivate(Long id, String userName) {
+    public CustomerResponse deactivate(Long id, String login) {
         Customer customer = getCustomerOrThrow(id);
         if (customer.getStatus() == CustomerStatus.INACTIVE) {
             throw new BusinessException(ErrorCode.CUSTOMER_ALREADY_INACTIVE, "Cliente já está inativo.");
@@ -75,7 +79,7 @@ public class CustomerService {
         customer.setStatus(CustomerStatus.INACTIVE);
         Instant now = Instant.now();
         customer.setDeactivatedAt(now);
-        customer.setDeactivatedBy(userName);
+        customer.setDeactivatedBy(getUserName(login));
         customer.setUpdatedAt(now);
 
         return customerMapper.toResponse(customerRepository.save(customer));
@@ -102,7 +106,7 @@ public class CustomerService {
         }
 
         if (!status.equals("ACTIVE") && !status.equals("INACTIVE") && !status.equals("ALL")) {
-            throw new BusinessException(ErrorCode.INVALID_PARAMETER,"status deve ser ACTIVE, INACTIVE ou ALL.");
+            throw new BusinessException(ErrorCode.INVALID_PARAMETER, "status deve ser ACTIVE, INACTIVE ou ALL.");
         }
 
         if (size < 1) {
