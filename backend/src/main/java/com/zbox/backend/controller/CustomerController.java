@@ -34,8 +34,8 @@ public class CustomerController {
     }
 
     @PostMapping
-    public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerRequest request) {
-        CustomerResponse response = customerService.create(request);
+    public ResponseEntity<CustomerResponse> create(@Valid @RequestBody CustomerRequest request, Authentication authentication) {
+        CustomerResponse response = customerService.create(request, authentication.getName());
         return ResponseEntity.created(URI.create("/api/customers/" + response.getId())).body(response);
     }
 
@@ -57,8 +57,8 @@ public class CustomerController {
 
     @PatchMapping("/{id}/activate")
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
-    public CustomerResponse activate(@PathVariable Long id) {
-        return customerService.activate(id);
+    public CustomerResponse activate(@PathVariable Long id, Authentication authentication) {
+        return customerService.activate(id, authentication.getName());
     }
 
     @GetMapping

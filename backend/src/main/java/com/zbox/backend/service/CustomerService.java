@@ -4,6 +4,7 @@ import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
 import com.zbox.backend.dto.CustomerSummaryResponse;
 import com.zbox.backend.dto.PageResponse;
+import com.zbox.backend.enums.CustomerAction;
 import com.zbox.backend.enums.CustomerStatus;
 import com.zbox.backend.enums.CustomerType;
 import com.zbox.backend.enums.ErrorCode;
@@ -11,12 +12,16 @@ import com.zbox.backend.exception.BusinessException;
 import com.zbox.backend.mapper.CustomerMapper;
 
 import com.zbox.backend.model.Customer;
+import com.zbox.backend.model.CustomerAuditLog;
+import com.zbox.backend.repository.CustomerAuditLogRepository;
 import com.zbox.backend.repository.CustomerRepository;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 
@@ -26,11 +31,13 @@ public class CustomerService {
     private final CustomerRepository customerRepository;
     private final CustomerMapper customerMapper;
     private final UsuarioService usuarioService;
+    private final CustomerAuditLogRepository customerAuditLogRepository;
 
-    public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper, UsuarioService usuarioService) {
+    public CustomerService(CustomerRepository customerRepository, CustomerMapper customerMapper, UsuarioService usuarioService, CustomerAuditLogRepository customerAuditLogRepository) {
         this.customerRepository = customerRepository;
         this.customerMapper = customerMapper;
         this.usuarioService = usuarioService;
+        this.customerAuditLogRepository = customerAuditLogRepository;
     }
 
     private Customer getCustomerOrThrow(Long id) {
@@ -42,7 +49,8 @@ public class CustomerService {
         return usuarioService.buscarPorUsuario(login).getName();
     }
 
-    public CustomerResponse create(CustomerRequest request) {
+    @Transactional
+    public CustomerResponse create(CustomerRequest request, String login) {
         Customer customer = customerMapper.toEntity(request);
         customer.setStatus(CustomerStatus.ACTIVE);
 
@@ -51,6 +59,7 @@ public class CustomerService {
         customer.setUpdatedAt(now);
 
         Customer salvo = customerRepository.save(customer);
+        saveLog(salvo.getId(), CustomerAction.CREATED, null, login);
 
         return customerMapper.toResponse(salvo);
     }
@@ -71,6 +80,7 @@ public class CustomerService {
         return customerMapper.toResponse(salvo);
     }
 
+    @Transactional
     public CustomerResponse deactivate(Long id, String login) {
         Customer customer = getCustomerOrThrow(id);
         if (customer.getStatus() == CustomerStatus.INACTIVE) {
@@ -82,10 +92,13 @@ public class CustomerService {
         customer.setDeactivatedBy(getUserName(login));
         customer.setUpdatedAt(now);
 
-        return customerMapper.toResponse(customerRepository.save(customer));
+        Customer salvo = customerRepository.save(customer);
+        saveLog(salvo.getId(), CustomerAction.DEACTIVATED, null, login);
+        return customerMapper.toResponse(salvo);
     }
 
-    public CustomerResponse activate(Long id) {
+    @Transactional
+    public CustomerResponse activate(Long id, String login) {
         Customer customer = getCustomerOrThrow(id);
         if (customer.getStatus() == CustomerStatus.ACTIVE) {
             throw new BusinessException(ErrorCode.CUSTOMER_ALREADY_ACTIVE, "Cliente já está ativo.");
@@ -96,7 +109,11 @@ public class CustomerService {
         customer.setDeactivatedBy(null);
         customer.setUpdatedAt(now);
 
-        return customerMapper.toResponse(customerRepository.save(customer));
+        Customer salvo = customerRepository.save(customer);
+
+        saveLog(salvo.getId(), CustomerAction.ACTIVATED, null, login);
+
+        return customerMapper.toResponse(salvo);
     }
 
     public PageResponse<CustomerSummaryResponse> findAll(String search, String status, CustomerType type, int page, int size) {
@@ -131,5 +148,15 @@ public class CustomerService {
 
         Page<CustomerSummaryResponse> summaries = result.map(customer -> customerMapper.toSummary(customer));
         return PageResponse.from(summaries);
+    }
+
+    private void saveLog(Long customerId, CustomerAction action, String changedFields, String login) {
+        CustomerAuditLog log = new CustomerAuditLog();
+        log.setCustomerId(customerId);
+        log.setAction(action);
+        log.setChangedFields(changedFields);
+        log.setUserName(getUserName(login));
+        log.setCreatedAt(Instant.now());
+        customerAuditLogRepository.save(log);
     }
 }
