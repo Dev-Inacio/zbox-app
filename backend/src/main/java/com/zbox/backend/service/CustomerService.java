@@ -1,5 +1,6 @@
 package com.zbox.backend.service;
 
+import com.zbox.backend.dto.AddressRequest;
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
 import com.zbox.backend.dto.CustomerSummaryResponse;
@@ -11,6 +12,7 @@ import com.zbox.backend.enums.ErrorCode;
 import com.zbox.backend.exception.BusinessException;
 import com.zbox.backend.mapper.CustomerMapper;
 
+import com.zbox.backend.model.Address;
 import com.zbox.backend.model.Customer;
 import com.zbox.backend.model.CustomerAuditLog;
 import com.zbox.backend.repository.CustomerAuditLogRepository;
@@ -24,6 +26,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 @Service
 public class CustomerService {
@@ -64,18 +69,66 @@ public class CustomerService {
         return customerMapper.toResponse(salvo);
     }
 
+    private boolean addressChanged(Address current, AddressRequest requested) {
+        if (current == null) {
+            current = new Address();
+        }
+
+        if (requested == null) {
+            requested = new AddressRequest();
+        }
+        return !Objects.equals(current.getZipCode(), requested.getZipCode()) ||
+                !Objects.equals(current.getStreet(), requested.getStreet()) ||
+                !Objects.equals(current.getNumber(), requested.getNumber()) ||
+                !Objects.equals(current.getComplement(), requested.getComplement()) ||
+                !Objects.equals(current.getDistrict(), requested.getDistrict()) ||
+                !Objects.equals(current.getCity(), requested.getCity()) ||
+                !Objects.equals(current.getState(), requested.getState());
+    }
+
     public CustomerResponse findById(Long id) {
         Customer customer = getCustomerOrThrow(id);
 
         return customerMapper.toResponse(customer);
     }
 
-    public CustomerResponse update(Long id, CustomerRequest request) {
+    @Transactional
+    public CustomerResponse update(Long id, CustomerRequest request, String login) {
         Customer customer = getCustomerOrThrow(id);
+        List<String> changed = new ArrayList<>();
+
+        if (!Objects.equals(customer.getName(), request.getName())) {
+            changed.add("name");
+        }
+
+        if (!Objects.equals(customer.getType(), request.getType())) {
+            changed.add("type");
+        }
+
+        if (!Objects.equals(customer.getPhone(), request.getPhone())) {
+            changed.add("phone");
+        }
+
+        if (!Objects.equals(customer.getWhatsapp(), request.getWhatsapp())) {
+            changed.add("whatsapp");
+        }
+
+        if (!Objects.equals(customer.getNotes(), request.getNotes())) {
+            changed.add("notes");
+        }
+
+        if (addressChanged(customer.getAddress(), request.getAddress())) {
+            changed.add("address");
+        }
+
         customerMapper.updateEntity(request, customer);
 
         customer.setUpdatedAt(Instant.now());
         Customer salvo = customerRepository.save(customer);
+
+        if (!changed.isEmpty()) {
+            saveLog(salvo.getId(), CustomerAction.UPDATED, String.join(",", changed), login);
+        }
 
         return customerMapper.toResponse(salvo);
     }
