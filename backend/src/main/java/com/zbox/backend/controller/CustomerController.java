@@ -45,8 +45,8 @@ public class CustomerController {
     }
 
     @PutMapping("/{id}")
-    public CustomerResponse update(@PathVariable Long id, @Valid @RequestBody CustomerRequest request) {
-        return customerService.update(id, request);
+    public CustomerResponse update(@PathVariable Long id, @Valid @RequestBody CustomerRequest request, Authentication authentication) {
+        return customerService.update(id, request, authentication.getName());
     }
 
     @PatchMapping("/{id}/deactivate")
