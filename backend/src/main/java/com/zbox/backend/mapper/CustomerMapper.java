@@ -1,12 +1,18 @@
 package com.zbox.backend.mapper;
 
 import com.zbox.backend.dto.AddressRequest;
+import com.zbox.backend.dto.CustomerHistoryResponse;
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
 import com.zbox.backend.dto.CustomerSummaryResponse;
 import com.zbox.backend.model.Address;
 import com.zbox.backend.model.Customer;
+import com.zbox.backend.model.CustomerAuditLog;
 import org.springframework.stereotype.Component;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 
 @Component
 public class CustomerMapper {
@@ -104,5 +110,18 @@ public class CustomerMapper {
                 city,
                 state,
                 customer.getStatus());
+    }
+
+    public CustomerHistoryResponse toHistoryResponse(CustomerAuditLog customerAuditLog) {
+        List<String> fields = new ArrayList<>();
+
+        if (customerAuditLog.getChangedFields() != null) {
+            fields = Arrays.asList(customerAuditLog.getChangedFields().split(","));
+        }
+        return new CustomerHistoryResponse(customerAuditLog.getId(),
+                customerAuditLog.getAction(),
+                fields,
+                customerAuditLog.getUserName(),
+                customerAuditLog.getCreatedAt());
     }
 }

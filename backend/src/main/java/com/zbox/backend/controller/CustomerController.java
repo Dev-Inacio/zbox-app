@@ -1,5 +1,6 @@
 package com.zbox.backend.controller;
 
+import com.zbox.backend.dto.CustomerHistoryResponse;
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
 import com.zbox.backend.dto.CustomerSummaryResponse;
@@ -22,6 +23,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/customers")
@@ -42,6 +44,11 @@ public class CustomerController {
     @GetMapping("/{id}")
     public CustomerResponse findById(@PathVariable Long id) {
         return customerService.findById(id);
+    }
+
+    @GetMapping("/{id}/history")
+    public List<CustomerHistoryResponse> getHistory(@PathVariable Long id) {
+        return customerService.getHistory(id);
     }
 
     @PutMapping("/{id}")

@@ -1,6 +1,7 @@
 package com.zbox.backend.service;
 
 import com.zbox.backend.dto.AddressRequest;
+import com.zbox.backend.dto.CustomerHistoryResponse;
 import com.zbox.backend.dto.CustomerRequest;
 import com.zbox.backend.dto.CustomerResponse;
 import com.zbox.backend.dto.CustomerSummaryResponse;
@@ -211,5 +212,18 @@ public class CustomerService {
         log.setUserName(getUserName(login));
         log.setCreatedAt(Instant.now());
         customerAuditLogRepository.save(log);
+    }
+
+    public List<CustomerHistoryResponse> getHistory(Long id) {
+        getCustomerOrThrow(id);
+
+        List<CustomerAuditLog> logs = customerAuditLogRepository.findByCustomerIdOrderByCreatedAtDesc(id);
+
+        List<CustomerHistoryResponse> history = new ArrayList<>();
+
+        for (CustomerAuditLog log : logs) {
+            history.add(customerMapper.toHistoryResponse(log));
+        }
+        return history;
     }
 }
