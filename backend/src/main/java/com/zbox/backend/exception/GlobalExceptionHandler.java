@@ -5,6 +5,7 @@ import com.zbox.backend.dto.FieldError;
 import com.zbox.backend.enums.ErrorCode;
 import com.zbox.backend.enums.FieldErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -170,4 +171,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(ErrorCode.UNSUPPORTED_MEDIA_TYPE.getStatus()).body(apiError);
     }
 
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiError> handleDataIntegrityViolation(DataIntegrityViolationException exception, HttpServletRequest request) {
+        ApiError apiError = new ApiError(Instant.now().toString(),
+                ErrorCode.DATA_INTEGRITY_VIOLATION.getStatus().value(),
+                ErrorCode.DATA_INTEGRITY_VIOLATION,
+                "Operação conflita com dados existentes.",
+                request.getRequestURI(),
+                List.of());
+
+        return ResponseEntity.status(ErrorCode.DATA_INTEGRITY_VIOLATION.getStatus()).body(apiError);
+    }
 }
