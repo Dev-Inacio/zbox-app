@@ -51,6 +51,13 @@ public class CustomerController {
         return customerService.getHistory(id);
     }
 
+    @GetMapping("/duplicates")
+    public List<CustomerSummaryResponse> findDuplicates(@RequestParam(required = false) String phone,
+                                                        @RequestParam(required = false) String whatsapp,
+                                                        @RequestParam(required = false) Long excludeId) {
+        return customerService.findDuplicates(phone, whatsapp, excludeId);
+    }
+
     @PutMapping("/{id}")
     public CustomerResponse update(@PathVariable Long id, @Valid @RequestBody CustomerRequest request, Authentication authentication) {
         return customerService.update(id, request, authentication.getName());

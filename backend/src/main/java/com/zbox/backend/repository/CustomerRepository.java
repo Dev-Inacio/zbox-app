@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
+
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
 
     @Query("SELECT c FROM Customer c WHERE(:search IS NULL OR" +
@@ -22,4 +24,10 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
                           @Param("status") CustomerStatus status,
                           @Param("type") CustomerType type,
                           Pageable pageable);
+
+    @Query("SELECT c FROM Customer c WHERE (c.phone IN :numbers " +
+            "OR c.whatsapp IN :numbers) AND (:excludeId IS NULL " +
+            "OR c.id <> :excludeId) ORDER BY c.name, c.id")
+    List<Customer> findDuplicates(@Param("numbers") List<String> numbers,
+                                @Param("excludeId") Long excludeId);
 }

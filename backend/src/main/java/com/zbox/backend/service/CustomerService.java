@@ -19,6 +19,7 @@ import com.zbox.backend.model.CustomerAuditLog;
 import com.zbox.backend.repository.CustomerAuditLogRepository;
 import com.zbox.backend.repository.CustomerRepository;
 
+import com.zbox.backend.util.TextUtils;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -225,5 +226,29 @@ public class CustomerService {
             history.add(customerMapper.toHistoryResponse(log));
         }
         return history;
+    }
+
+    public List<CustomerSummaryResponse> findDuplicates(String phone, String whatsapp, Long excludeId) {
+        String cleanPhone = TextUtils.blankToNull(phone);
+        String cleanWhatsapp = TextUtils.blankToNull(whatsapp);
+
+        List<String> numbers = new ArrayList<>();
+        if (cleanPhone != null) {
+            numbers.add(cleanPhone);
+        }
+        if (cleanWhatsapp != null) {
+            numbers.add(cleanWhatsapp);
+        }
+        if (numbers.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<Customer> customers = customerRepository.findDuplicates(numbers, excludeId);
+
+        List<CustomerSummaryResponse> result = new ArrayList<>();
+
+        for (Customer customer : customers) {
+            result.add(customerMapper.toSummary(customer));
+        }
+        return result;
     }
 }
