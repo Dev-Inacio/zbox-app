@@ -27,7 +27,7 @@ import java.util.List;
 public class GlobalExceptionHandler {
 
     private FieldErrorCode toFieldErrorCode(String constraint) {
-        if (constraint.equals("NotBlank")) {
+        if (constraint.equals("NotBlank") || constraint.equals("NotNull")) {
             return FieldErrorCode.REQUIRED;
         }
         if (constraint.equals("Size")) {
