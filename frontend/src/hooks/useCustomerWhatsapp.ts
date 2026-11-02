@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCustomer } from '../features/clientes/customersApi'
-import { maskPhone } from '../features/clientes/format'
+import { customerMobile, maskPhone } from '../features/clientes/format'
 
 // WhatsApp do cliente para QUALQUER envio (orçamento, cobrança, botão "WhatsApp").
 //
@@ -23,8 +23,10 @@ export function useCustomerWhatsapp(customerId: number | null | (() => Promise<n
       .then((resolved) => (resolved == null ? null : getCustomer(resolved)))
       .then((customer) => {
         if (!active || !customer) return
-        setRegistered(customer.whatsapp)
-        if (customer.whatsapp && !touched.current) setPhoneState(maskPhone(customer.whatsapp))
+        // O cliente tem um número só ("Celular"). Cadastro antigo com só "Telefone" também vale.
+        const mobile = customerMobile(customer)
+        setRegistered(mobile)
+        if (mobile && !touched.current) setPhoneState(maskPhone(mobile))
       })
       .catch(() => { /* sem conexão: fica com a cópia */ })
     return () => {

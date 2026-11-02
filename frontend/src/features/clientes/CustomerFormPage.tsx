@@ -1,20 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ChangeEvent, FormEvent } from 'react'
+import type { ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Input } from '../../components/ui/Input'
+import { NoAutofill } from '../../components/ui/NoAutofill'
 import { useRequest } from '../../hooks/useRequest'
 import { ApiError } from '../auth/types'
 import { CardSkeleton, CustomerLoadError } from './CustomerLoadStates'
 import { createCustomer, findDuplicates, getCustomer, updateCustomer } from './customersApi'
-import { maskCep, maskPhone, onlyDigits } from './format'
+import { customerMobile, maskCep, maskPhone, onlyDigits } from './format'
 import { NOTES_MAX, UFS, validateCustomer, validateField } from './validation'
 import type { CustomerFormErrors, CustomerFormValues } from './validation'
 import { lookupCep } from './viaCep'
 import type { Customer, CustomerRequest, CustomerSummary } from './types'
+import { AppIcon } from '../../components/ui/AppIcon'
 import '../../components/ui/ButtonVariants.css'
 import './Clientes.css'
 
@@ -22,7 +24,7 @@ import './Clientes.css'
 // Regra aprovada pela PO: SÓ o nome é obrigatório.
 
 const EMPTY: CustomerFormValues = {
-  name: '', type: '', phone: '', whatsapp: '', zipCode: '', street: '', number: '',
+  name: '', type: '', whatsapp: '', zipCode: '', street: '', number: '',
   complement: '', district: '', city: '', state: '', notes: '',
 }
 
@@ -30,8 +32,7 @@ function toValues(c: Customer): CustomerFormValues {
   return {
     name: c.name,
     type: c.type ?? '',
-    phone: maskPhone(c.phone ?? ''),
-    whatsapp: maskPhone(c.whatsapp ?? ''),
+    whatsapp: maskPhone(customerMobile(c) ?? ''),
     zipCode: maskCep(c.address.zipCode ?? ''),
     street: c.address.street ?? '',
     number: c.address.number ?? '',
@@ -50,8 +51,10 @@ function toRequest(v: CustomerFormValues): CustomerRequest {
   return {
     name: v.name.trim(),
     type: v.type === '' ? null : v.type,
-    phone: digits(v.phone),
-    whatsapp: digits(v.whatsapp),
+    // Um campo só na tela ("Celular"). O back aceita WhatsApp só com 11 dígitos:
+    // celular (11) vai em whatsapp; fixo (10) vai em phone. A tela sempre lê os dois (customerMobile).
+    phone: onlyDigits(v.whatsapp).length === 10 ? onlyDigits(v.whatsapp) : null,
+    whatsapp: onlyDigits(v.whatsapp).length === 11 ? onlyDigits(v.whatsapp) : null,
     address: {
       zipCode: digits(v.zipCode),
       street: text(v.street),
@@ -164,7 +167,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
   function handleChange(field: keyof CustomerFormValues) {
     return (event: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
       let value = event.target.value
-      if (field === 'phone' || field === 'whatsapp') value = maskPhone(value)
+      if (field === 'whatsapp') value = maskPhone(value)
       if (field === 'zipCode') value = maskCep(value)
 
       const next = { ...values, [field]: value }
@@ -180,8 +183,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
     return () => setErrors((prev) => ({ ...prev, [field]: validateField(field, values) }))
   }
 
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault()
+  async function handleSubmit() {
     if (submitting) return // evita duplo clique
 
     const found = validateCustomer(values)
@@ -196,11 +198,12 @@ function CustomerForm({ customer }: { customer?: Customer }) {
     const request = toRequest(values)
 
     // Possível duplicado (sem CPF, a checagem é pelo número). Só avisa, não impede.
-    const numbersChanged = !editing || request.phone !== customer.phone || request.whatsapp !== customer.whatsapp
-    if (numbersChanged && (request.phone || request.whatsapp)) {
+    const number = customerMobile(request)
+    const numbersChanged = !editing || number !== customerMobile(customer)
+    if (numbersChanged && number) {
       setSubmitting(true)
       try {
-        const dups = await findDuplicates(request.phone, request.whatsapp, customer?.id)
+        const dups = await findDuplicates(number, number, customer?.id) // o número pode estar salvo em qualquer um dos dois
         if (dups.length > 0) {
           setDuplicates(dups)
           setSubmitting(false)
@@ -257,11 +260,14 @@ function CustomerForm({ customer }: { customer?: Customer }) {
       <PageHero
         title={editing ? 'Editar cliente' : 'Novo cliente'}
         back={{ to: backTo, label: editing ? 'Voltar para o cliente' : 'Voltar para clientes' }}
-        subtitle={editing ? customer.name : 'Só o nome é obrigatório. O resto você completa quando tiver.'}
+        subtitle={editing ? customer.name : 'Preencha o que tiver agora. Dá para completar depois.'}
       />
 
       <main className="page-body">
-        <form className="cl-card cl-card--elevated cl-form" onSubmit={handleSubmit} noValidate data-testid="form-cliente">
+        {/* <div> e não <form>: cada campo fica no seu próprio <form> (NoAutofill) para o Chrome não oferecer
+            "Salvar endereço?". O Enter num campo continua salvando. */}
+        <div className="cl-card cl-card--elevated cl-form" data-testid="form-cliente"
+          onKeyDown={(e) => { if (e.key === 'Enter' && e.target instanceof HTMLInputElement && e.target.type !== 'radio') { e.preventDefault(); void handleSubmit() } }}>
           {formError && (
             <div className="cl-form__alert">
               <Alert variant="error">{formError}</Alert>
@@ -272,7 +278,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
             <legend className="sr-only">Dados</legend>
             <div className="cl-form__intro">
               <h2 className="cl-form__title">Dados</h2>
-              <p className="cl-form__desc">Quem é o cliente.</p>
+              <p className="cl-form__desc">Quem é o cliente. Só o nome é obrigatório.</p>
             </div>
             <div className="cl-form__fields">
               <div className="cl-field">
@@ -291,14 +297,14 @@ function CustomerForm({ customer }: { customer?: Customer }) {
 
               <Input
                 id="cliente-name"
-                label="Nome *"
+                label="Nome completo *"
                 value={values.name}
                 onChange={handleChange('name')}
                 onBlur={handleBlur('name')}
                 error={errors.name}
                 aria-required="true"
                 maxLength={120}
-                autoComplete="off"
+                noAutofill
                 data-testid="campo-nome"
               />
             </div>
@@ -308,32 +314,20 @@ function CustomerForm({ customer }: { customer?: Customer }) {
             <legend className="sr-only">Contato</legend>
             <div className="cl-form__intro">
               <h2 className="cl-form__title">Contato</h2>
-              <p className="cl-form__desc">Opcional. O WhatsApp é usado para enviar orçamentos.</p>
+              <p className="cl-form__desc">Para onde vão o orçamento e a cobrança.</p>
             </div>
             <div className="cl-form__fields cl-form__fields--2">
               <Input
-                id="cliente-phone"
-                label="Telefone"
-                type="tel"
-                inputMode="numeric"
-                placeholder="(00) 0000-0000"
-                value={values.phone}
-                onChange={handleChange('phone')}
-                onBlur={handleBlur('phone')}
-                error={errors.phone}
-                data-testid="campo-telefone"
-              />
-              <Input
                 id="cliente-whatsapp"
-                label="WhatsApp"
-                type="tel"
+                label="Celular (WhatsApp)"
                 inputMode="numeric"
                 placeholder="(00) 00000-0000"
                 value={values.whatsapp}
                 onChange={handleChange('whatsapp')}
                 onBlur={handleBlur('whatsapp')}
                 error={errors.whatsapp}
-                data-testid="campo-whatsapp"
+                noAutofill
+                data-testid="campo-celular"
               />
             </div>
           </fieldset>
@@ -342,12 +336,13 @@ function CustomerForm({ customer }: { customer?: Customer }) {
             <legend className="sr-only">Endereço</legend>
             <div className="cl-form__intro">
               <h2 className="cl-form__title">Endereço</h2>
-              <p className="cl-form__desc">Digite o CEP e o endereço é preenchido.</p>
+              <p className="cl-form__desc">Digite o CEP e o resto é preenchido.</p>
             </div>
             <div className="cl-form__fields cl-form__fields--address">
               <div className="cl-span-2">
                 <Input
                   id="cliente-zipCode"
+                  noAutofill
                   label="CEP"
                   inputMode="numeric"
                   placeholder="00000-000"
@@ -360,40 +355,42 @@ function CustomerForm({ customer }: { customer?: Customer }) {
                 <p className={`cl-cep cl-cep--${cepStatus}`} aria-live="polite" data-testid="cep-status">
                   {cepStatus === 'loading' && <span className="cl-cep__spinner" aria-hidden="true" />}
                   {cepStatus === 'found' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+                    <AppIcon name="check" size={16} />
                   )}
                   {CEP_MESSAGES[cepStatus]}
                 </p>
               </div>
               <div className="cl-span-4 cl-hide-mobile" aria-hidden="true" />
               <div className="cl-span-4">
-                <Input id="cliente-street" label="Rua" value={values.street} onChange={handleChange('street')} onBlur={handleBlur('street')} error={errors.street} maxLength={120} />
+                <Input noAutofill id="cliente-street" label="Rua" value={values.street} onChange={handleChange('street')} onBlur={handleBlur('street')} error={errors.street} maxLength={120} />
               </div>
               <div className="cl-span-2">
-                <Input ref={numberRef} id="cliente-number" label="Número" placeholder="Ex.: 120 ou S/N" value={values.number} onChange={handleChange('number')} onBlur={handleBlur('number')} error={errors.number} maxLength={20} />
+                <Input noAutofill ref={numberRef} id="cliente-number" label="Número" placeholder="Ex.: 120 ou S/N" value={values.number} onChange={handleChange('number')} onBlur={handleBlur('number')} error={errors.number} maxLength={20} />
               </div>
               <div className="cl-span-3">
-                <Input id="cliente-complement" label="Complemento" placeholder="Apto, bloco, referência" value={values.complement} onChange={handleChange('complement')} onBlur={handleBlur('complement')} error={errors.complement} maxLength={120} />
+                <Input noAutofill id="cliente-complement" label="Complemento" placeholder="Apto, bloco, referência" value={values.complement} onChange={handleChange('complement')} onBlur={handleBlur('complement')} error={errors.complement} maxLength={120} />
               </div>
               <div className="cl-span-3">
-                <Input id="cliente-district" label="Bairro" value={values.district} onChange={handleChange('district')} onBlur={handleBlur('district')} error={errors.district} maxLength={120} />
+                <Input noAutofill id="cliente-district" label="Bairro" value={values.district} onChange={handleChange('district')} onBlur={handleBlur('district')} error={errors.district} maxLength={120} />
               </div>
               <div className="cl-span-4">
-                <Input id="cliente-city" label="Cidade" value={values.city} onChange={handleChange('city')} onBlur={handleBlur('city')} error={errors.city} maxLength={120} />
+                <Input noAutofill id="cliente-city" label="Cidade" value={values.city} onChange={handleChange('city')} onBlur={handleBlur('city')} error={errors.city} maxLength={120} />
               </div>
               <div className="cl-span-2 cl-field">
-                <label htmlFor="cliente-state" className="cl-field__label">UF</label>
-                <select autoComplete="off"
-                  id="cliente-state"
-                  className="cl-input"
-                  value={values.state}
-                  onChange={handleChange('state')}
-                  aria-invalid={errors.state ? true : undefined}
-                >
-                  <option value="">Selecione</option>
-                  {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
-                </select>
-                {errors.state && <p className="field__error">{errors.state}</p>}
+                <NoAutofill>
+                  <label htmlFor="cliente-state" className="cl-field__label">UF</label>
+                  <select autoComplete="off"
+                    id="cliente-state"
+                    className="cl-input"
+                    value={values.state}
+                    onChange={handleChange('state')}
+                    aria-invalid={errors.state ? true : undefined}
+                  >
+                    <option value="">Selecione</option>
+                    {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+                  </select>
+                  {errors.state && <p className="field__error">{errors.state}</p>}
+                </NoAutofill>
               </div>
             </div>
           </fieldset>
@@ -402,10 +399,11 @@ function CustomerForm({ customer }: { customer?: Customer }) {
             <legend className="sr-only">Observações</legend>
             <div className="cl-form__intro">
               <h2 className="cl-form__title">Observações</h2>
-              <p className="cl-form__desc">Não registre dados sensíveis aqui.</p>
+              <p className="cl-form__desc">Algo útil para atender este cliente.</p>
             </div>
             <div className="cl-form__fields">
               <div className="cl-field">
+                <NoAutofill>
                 <label htmlFor="cliente-notes" className="cl-field__label">Observações</label>
                 <textarea autoComplete="off"
                   id="cliente-notes"
@@ -422,17 +420,18 @@ function CustomerForm({ customer }: { customer?: Customer }) {
                 <p id="cliente-notes-contador" className={`cl-counter${notesLeft <= 20 ? ' cl-counter--low' : ''}`}>
                   {values.notes.length}/{NOTES_MAX}
                 </p>
+                </NoAutofill>
               </div>
             </div>
           </fieldset>
 
           <div className="cl-form__footer">
             <Button className="btn--secondary" onClick={handleCancel} disabled={submitting}>Cancelar</Button>
-            <Button type="submit" loading={submitting} loadingText="Salvando…" data-testid="salvar-cliente">
+            <Button onClick={() => void handleSubmit()} loading={submitting} loadingText="Salvando…" data-testid="salvar-cliente">
               {editing ? 'Salvar alterações' : 'Salvar cliente'}
             </Button>
           </div>
-        </form>
+        </div>
       </main>
 
       <ConfirmDialog
@@ -450,7 +449,7 @@ function CustomerForm({ customer }: { customer?: Customer }) {
           {duplicates?.map((d) => (
             <li key={d.id}>
               <Link to={`/clientes/${d.id}`} target="_blank" rel="noopener">{d.name}</Link>
-              <span>{maskPhone(d.whatsapp ?? d.phone ?? '')}{d.status === 'INACTIVE' ? ' · inativo' : ''}</span>
+              <span>{maskPhone(customerMobile(d) ?? '')}{d.status === 'INACTIVE' ? ' · inativo' : ''}</span>
             </li>
           ))}
         </ul>

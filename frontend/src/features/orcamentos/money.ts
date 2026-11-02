@@ -83,6 +83,13 @@ export function formatAreaM2(cm2: number): string {
   return (cm2 / 10000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
+// Linha de "como chegou no valor" do item, igual no orçamento, no pedido e no PDF
+//   UNIT: "6 peças × R$ 1.500,00"  |  AREA: "2,40 m² × R$ 850,00/m²"
+export function itemPriceText(item: { chargeType: ChargeType; quantity: number; unitPriceCents: number; areaPerPieceCm2: number | null }): string {
+  if (item.chargeType === 'UNIT') return `${item.quantity} ${item.quantity === 1 ? 'peça' : 'peças'} × ${formatMoney(item.unitPriceCents)}`
+  return `${formatAreaM2((item.areaPerPieceCm2 ?? 0) * item.quantity)} m² × ${formatMoney(item.unitPriceCents)}/m²`
+}
+
 // 500 → "5"  |  1250 → "12,5"
 export function formatPercent(hundredths: number): string {
   return (hundredths / 100).toLocaleString('pt-BR', { maximumFractionDigits: 2 })
@@ -96,6 +103,21 @@ export function parseDecimalToHundredths(text: string): number | null {
   if (!/^\d+(,\d{1,2})?$/.test(clean)) return null
   const [int, dec = ''] = clean.split(',')
   return Number(int) * 100 + Number(dec.padEnd(2, '0'))
+}
+
+// Medida digitada, em metros (o máximo aceito é 20 m):
+//   número inteiro até 20 é metro:  3 → "3,00"
+//   número inteiro acima de 20 é centímetro:  290 → "2,90"  |  45 → "0,45"
+//   com vírgula é metro:  2,9 → "2,90"
+export function normalizeMeters(text: string): string {
+  const clean = text.trim().replace(/\./g, ',')
+  if (/^\d+$/.test(clean)) {
+    const n = Number(clean)
+    return formatMeters(n <= 20 ? n * 100 : n)
+  }
+  const match = /^(\d*),(\d{0,2})$/.exec(clean)
+  if (match && (match[1] || match[2])) return `${match[1] || '0'},${match[2].padEnd(2, '0')}`
+  return clean
 }
 
 // Enquanto a pessoa digita o preço: só números, vira "1.500,00" da direita para a esquerda

@@ -1,9 +1,10 @@
+import { customerMobile } from '../clientes/format'
 import { countQuotes, mockQuoteEvents } from '../orcamentos/quotesApi'
 import type { QuoteEvent } from '../orcamentos/types'
-import { ORDER_STATUS_LABEL } from '../pedidos/labels'
+import { formatMoney } from '../orcamentos/money'
 import { daysBetween, isoDateTimeToDay, todayIso } from '../pedidos/dates'
 import { mockAllOrders } from '../pedidos/ordersApi'
-import type { Order, OrderEvent, OrderStatus } from '../pedidos/types'
+import type { Order, OrderEvent, OrderExpense, OrderStatus } from '../pedidos/types'
 
 // ⚠️ SIMULAÇÃO (mock) — o conteúdo das seções e o endpoint ainda serão definidos
 // pela PO e pelo Back-end (HU04/HU05). Os números abaixo são só exemplos.
@@ -12,18 +13,15 @@ import type { Order, OrderEvent, OrderStatus } from '../pedidos/types'
 //   ?recentes=vazio     ?recentes=erro   (Recentes: histórico de pedidos e orçamentos)
 //   ?inicio=erro        (números, "não pagaram" e "em andamento": GET /api/dashboard)
 
-// ---------- HU05: Recentes ----------
-// Montado a partir do histórico REAL de pedidos e orçamentos (antes eram frases de exemplo,
-// que contradiziam os pedidos: "Pedido #0044 entregue" com o #000044 ainda "Pronto").
-
-export type ActivityTone = 'neutral' | 'warn' | 'ok' | 'danger'
+// ---------- HU05: Últimas atividades ----------
+// Montado a partir do histórico REAL de pedidos e orçamentos.
+// Design 31/10: só pagamento, orçamento e material. Troca de etapa do pedido ("em produção") não entra.
 
 export type ActivityItem = {
   id: string
-  kind: 'orcamento' | 'pagamento' | 'pedido'
+  kind: 'orcamento' | 'aprovado' | 'pagamento' | 'estorno' | 'cobranca' | 'material'
   title: string
   detail: string
-  badge: { label: string; tone: ActivityTone }
   to: string // link para o pedido/orçamento
   when: string
 }
@@ -46,30 +44,32 @@ function relativeTime(iso: string): string {
 }
 
 function fromOrder(o: Order, ev: OrderEvent): Draft | null {
-  const base = { id: `o${ev.id}`, kind: 'pedido' as const, to: `/pedidos/${o.id}`, at: ev.createdAt }
-  const by = `${o.customer.name} · por ${ev.userName}`
+  const base = { id: `o${ev.id}`, to: `/pedidos/${o.id}`, at: ev.createdAt }
   switch (ev.type) {
-    case 'CREATED':
-      return { ...base, title: `Pedido #${o.number} criado`, detail: by, badge: { label: 'Novo', tone: 'neutral' } }
-    case 'STATUS_CHANGED': {
-      const to = (ev.detail ?? '').split('→')[1] as OrderStatus
-      const label = ORDER_STATUS_LABEL[to] ?? 'Andamento'
-      if (to === 'READY') return { ...base, title: `Pedido #${o.number} pronto`, detail: by, badge: { label, tone: 'ok' } }
-      return { ...base, title: `Pedido #${o.number}: ${label.toLowerCase()}`, detail: by, badge: { label, tone: 'neutral' } }
-    }
-    case 'DELIVERED':
-      return { ...base, title: `Pedido #${o.number} entregue`, detail: `Recebido por ${ev.detail ?? '—'} · por ${ev.userName}`, badge: { label: 'Entregue', tone: 'ok' } }
     case 'PAYMENT':
-      return { ...base, kind: 'pagamento', title: `Pagamento no pedido #${o.number}`, detail: `${ev.detail ?? ''} · por ${ev.userName}`, badge: { label: 'Recebido', tone: 'ok' } }
+      return { ...base, kind: 'pagamento', ...paymentText(o, ev) }
     case 'PAYMENT_REVERSED':
-      return { ...base, kind: 'pagamento', title: `Pagamento estornado no pedido #${o.number}`, detail: `${ev.detail ?? ''} · por ${ev.userName}`, badge: { label: 'Estornado', tone: 'danger' } }
+      return { ...base, kind: 'estorno', title: `Pagamento estornado no pedido #${o.number}`, detail: `${ev.detail ?? ''} · por ${ev.userName}` }
     case 'COLLECTION':
-      return { ...base, kind: 'pagamento', title: `Cobrança enviada · pedido #${o.number}`, detail: by, badge: { label: 'Cobrado', tone: 'warn' } }
-    case 'CANCELED':
-      return { ...base, title: `Pedido #${o.number} cancelado`, detail: by, badge: { label: 'Cancelado', tone: 'danger' } }
+      return { ...base, kind: 'cobranca', title: `Cobrança enviada · pedido #${o.number}`, detail: `${o.customer.name} · por ${ev.userName}` }
     default:
-      return null // mudança de prazo não entra no resumo
+      return null
   }
+}
+
+// "R$ 1.681,50 · PIX · Entrada" vira "Entrada de R$ 1.681,50 no pedido #45" + "PIX · por Thayná"
+function paymentText(o: Order, ev: OrderEvent) {
+  const [amount, ...rest] = (ev.detail ?? '').split(' · ')
+  const isDown = rest.includes('Entrada')
+  const info = rest.filter((r) => r !== 'Entrada')
+  return {
+    title: `${isDown ? 'Entrada' : 'Pagamento'} de ${amount} no pedido #${o.number}`,
+    detail: [...info, `por ${ev.userName}`].join(' · '),
+  }
+}
+
+function fromExpense(o: Order, e: OrderExpense): Draft {
+  return { id: `e${e.id}`, kind: 'material', to: `/pedidos/${o.id}`, at: e.createdAt, title: `Material de ${formatMoney(e.amountCents)} no pedido #${o.number}`, detail: `${o.customer.name} · por ${e.userName}` }
 }
 
 const DISPATCH_TITLE: Record<string, (n: string) => string> = {
@@ -80,25 +80,24 @@ const DISPATCH_TITLE: Record<string, (n: string) => string> = {
 
 function fromQuote(q: { quoteId: number; number: string; customerName: string; event: QuoteEvent }): Draft | null {
   const ev = q.event
-  const base = { id: `q${ev.id}`, kind: 'orcamento' as const, to: `/orcamentos/${q.quoteId}`, at: ev.createdAt }
-  const by = `${q.customerName} · por ${ev.userName}`
+  const base = { id: `q${ev.id}`, kind: 'orcamento' as ActivityItem['kind'], to: `/orcamentos/${q.quoteId}`, at: ev.createdAt, detail: `${q.customerName} · por ${ev.userName}` }
   switch (ev.type) {
     case 'CREATED':
-      return { ...base, title: `Orçamento #${q.number} criado`, detail: by, badge: { label: 'Rascunho', tone: 'neutral' } }
+      return { ...base, title: `Orçamento #${q.number} criado` }
     case 'CONFIRMED':
-      return { ...base, title: `Orçamento #${q.number} confirmado`, detail: by, badge: { label: 'Confirmado', tone: 'neutral' } }
+      return { ...base, title: `Orçamento #${q.number} confirmado` }
     case 'DISPATCHED':
-      return { ...base, title: (DISPATCH_TITLE[ev.detail ?? ''] ?? DISPATCH_TITLE.WHATSAPP)(q.number), detail: by, badge: { label: 'Enviado', tone: 'neutral' } }
+      return { ...base, title: (DISPATCH_TITLE[ev.detail ?? ''] ?? DISPATCH_TITLE.WHATSAPP)(q.number) }
     case 'APPROVED':
-      return { ...base, title: `Orçamento #${q.number} aprovado`, detail: by, badge: { label: 'Aprovado', tone: 'ok' } }
+      return { ...base, kind: 'aprovado', title: `Orçamento #${q.number} aprovado` }
     case 'REJECTED':
-      return { ...base, title: `Orçamento #${q.number} recusado`, detail: by, badge: { label: 'Recusado', tone: 'danger' } }
+      return { ...base, title: `Orçamento #${q.number} recusado` }
     case 'CANCELED':
-      return { ...base, title: `Orçamento #${q.number} cancelado`, detail: by, badge: { label: 'Cancelado', tone: 'danger' } }
+      return { ...base, title: `Orçamento #${q.number} cancelado` }
     case 'CONVERTED':
-      return { ...base, title: `Orçamento #${q.number} virou o pedido #${ev.detail ?? ''}`, detail: by, badge: { label: 'Virou pedido', tone: 'ok' } }
+      return { ...base, title: `Orçamento #${q.number} virou o pedido #${ev.detail ?? ''}` }
     case 'NEW_VERSION':
-      return ev.version > 1 ? { ...base, title: `Nova versão do orçamento #${q.number} (v${ev.version})`, detail: by, badge: { label: `v${ev.version}`, tone: 'neutral' } } : null
+      return ev.version > 1 ? { ...base, title: `Nova versão do orçamento #${q.number} (v${ev.version})` } : null
     default:
       return null // edições do rascunho não entram no resumo
   }
@@ -116,6 +115,7 @@ export async function getRecentes(): Promise<ActivityItem[]> {
       const d = fromOrder(o, ev)
       if (d) drafts.push(d)
     }
+    for (const e of o.expenses ?? []) drafts.push(fromExpense(o, e))
   }
   for (const q of mockQuoteEvents()) {
     const d = fromQuote(q)
@@ -137,6 +137,8 @@ export type Dashboard = {
   ordersReady: number
   receivableCents: number
   receivableOrders: number
+  overdueCents: number
+  overdueOrders: number
   unpaid: { orderId: number; number: string; customerName: string; customerWhatsapp: string | null; remainingCents: number; daysSinceDelivery: number }[]
   // Sem prazo de entrega (decisão da PO): pedidos em andamento, os que estão esperando há mais tempo primeiro
   inProgress: { orderId: number; number: string; customerName: string; createdOn: string; status: OrderStatus; daysOpen: number }[]
@@ -158,11 +160,13 @@ export async function getDashboard(): Promise<Dashboard> {
     ordersNew: orders.filter((o) => o.status === 'NEW').length,
     receivableCents: open.reduce((s, o) => s + o.remainingCents, 0),
     receivableOrders: open.length,
+    overdueCents: open.filter((o) => o.paymentStatus === 'OVERDUE').reduce((s, o) => s + o.remainingCents, 0),
+    overdueOrders: open.filter((o) => o.paymentStatus === 'OVERDUE').length,
     unpaid: open
       .filter((o) => o.paymentStatus === 'OVERDUE' && o.deliveredOn)
       .sort((a, b) => (a.deliveredOn ?? '').localeCompare(b.deliveredOn ?? ''))
       .slice(0, 5)
-      .map((o) => ({ orderId: o.id, number: o.number, customerName: o.customer.name, customerWhatsapp: o.customer.whatsapp, remainingCents: o.remainingCents, daysSinceDelivery: daysBetween(o.deliveredOn!, today) })),
+      .map((o) => ({ orderId: o.id, number: o.number, customerName: o.customer.name, customerWhatsapp: customerMobile(o.customer), remainingCents: o.remainingCents, daysSinceDelivery: daysBetween(o.deliveredOn!, today) })),
     inProgress: active
       .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
       .slice(0, 5)

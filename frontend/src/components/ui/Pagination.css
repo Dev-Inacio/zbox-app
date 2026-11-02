@@ -1,40 +1,15 @@
-/* Paginação */
-.pg {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-}
+.pg { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pg__info { font-size: 16px; color: var(--color-text-muted); }
+.pg__buttons { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pg-num { width: 48px; height: 48px; border-radius: 10px; border: 1px solid var(--color-border); background: #FFFFFF; color: var(--color-ink); font: inherit; font-size: 17px; font-weight: 600; cursor: pointer; }
+.pg-num[aria-current='page'] { border: 0; background: var(--color-accent); color: #FFFFFF; }
+.pg-num:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
+.pg__current { display: none; font-size: 15px; color: var(--color-text-muted); white-space: nowrap; }
 
-.pg__info { font-size: 14px; color: var(--color-text-muted); }
-
-.pg__buttons { display: flex; align-items: center; gap: 6px; }
-
-.pg-btn {
-  min-width: 44px;
-  height: 44px;
-  padding: 0 8px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  color: var(--color-ink);
-  font-family: var(--font-body);
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.pg-btn--number { border-color: transparent; background: transparent; }
-.pg-btn:hover:not(:disabled) { background: #F0EFEC; }
-.pg-btn[aria-current='page'] { background: var(--color-ink); border-color: var(--color-ink); color: #FFFFFF; font-weight: 600; }
-.pg-btn:disabled { color: #A3A8AE; border-color: #DCDDDF; cursor: not-allowed; }
-
-.pg-btn:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
-
-@media (max-width: 767px) {
-  .pg { justify-content: center; }
-  .pg__info { width: 100%; text-align: center; }
+/* Celular: Anterior · Página 1 de 7 · Próxima */
+@media (max-width: 640px) {
+  .pg:has(.pg__buttons) .pg__info, .pg-num { display: none; }
+  .pg__current { display: inline; }
+  .pg__buttons { width: 100%; justify-content: space-between; flex-wrap: nowrap; }
+  .pg__buttons .zv-btn { padding: 0 14px; }
 }
