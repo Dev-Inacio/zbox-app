@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import type { CSSProperties, FormEvent } from 'react'
+import type { FormEvent } from 'react'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Alert } from '../../components/ui/Alert'
-import { Logo } from '../../components/ui/Logo'
+import logoEscuro from '../../assets/zbox-logo-escuro.png'
 import { login } from './authApi'
 import { useAuth } from './useAuth'
 import { ApiError } from './types'
@@ -77,18 +77,23 @@ export function LoginPage() {
   return (
     <div className="login">
       <aside className="login__brand">
-        {/* Esquadria animada no fundo (só decoração) */}
-        <WindowFrame />
-        <div className="login__logo">
-          <Logo size="lg" />
+        {/* Fundo animado (só decoração) */}
+        <div className="login__fx" aria-hidden="true">
+          <span className="login__sweep" /><span className="login__sweep login__sweep--2" />
+          {[8, 22, 37, 55, 70, 86, 94].map((x, i) => <i key={x} className="login__dot" style={{ left: `${x}%`, animationDelay: `${i * 1.7}s` }} />)}
+        </div>
+        <div className="login__logo-wrap">
+          <img src={logoEscuro} alt="ZBOX Serralheria e Alumínio" className="login__logo-img" />
+          <p className="login__tag">SERRALHERIA E ALUMÍNIO</p>
+          <p className="login__tag2">QUALIDADE EM CADA DETALHE</p>
         </div>
         <div className="login__pitch login__rise">
           <h2 className="login__headline">Do orçamento à entrega, tudo no mesmo lugar.</h2>
           <p className="login__lead">
-            Clientes, orçamentos, pedidos e financeiro da empresa organizados para decidir rápido.
+            Clientes, orçamentos, pedidos e o dinheiro que falta receber — organizados para a sua serralheria.
           </p>
         </div>
-        <p className="login__copy">© ZBOX · Uso interno</p>
+        <p className="login__copy">© ZBOX · Serralheria e Alumínio</p>
       </aside>
 
       <main className="login__main">
@@ -96,10 +101,10 @@ export function LoginPage() {
         <form className="login__form" onSubmit={handleSubmit} noValidate>
           <div className="login__heading">
             <h1 className="login__title">Entrar</h1>
-            <p className="login__subtitle">Acesse com seu usuário e senha.</p>
+            <p className="login__subtitle">Use o usuário e a senha que você recebeu.</p>
           </div>
 
-          {notice && !formMessage && <Alert variant="success">{notice}</Alert>}
+          {notice && !formMessage && <Alert variant="info">{notice}</Alert>}
 
           <Input
             ref={usernameRef}
@@ -137,6 +142,8 @@ export function LoginPage() {
             Entrar
           </Button>
 
+          {import.meta.env.VITE_DEMO === 'true' && <p className="login__help" data-testid="acesso-demo">Demonstração: usuário <b>demo</b> e senha <b>demo1234</b></p>}
+
           <p className="login__help">Problemas para acessar? Fale com o administrador do sistema.</p>
         </form>
       </main>
@@ -160,76 +167,4 @@ function toFormMessage(error: unknown): FormMessage {
   }
   // fetch lança TypeError quando não consegue falar com o servidor
   return { variant: 'info', text: 'Não foi possível conectar. Verifique sua internet e tente novamente.' }
-}
-
-// ---------- Esquadria animada (decoração do painel escuro) ----------
-// 1. o contorno e os vidros são "desenhados" na tela, como se a esquadria fosse montada
-// 2. dois pontos de solda soltam faíscas de tempos em tempos
-// 3. um reflexo de luz passa pelo vidro
-// 4. depois de montada, ela flutua devagar
-const PANES = [
-  { x: 15, y: 15 },
-  { x: 217, y: 15 },
-  { x: 15, y: 196.33 },
-  { x: 217, y: 196.33, accent: true }, // o vidro com a linha laranja
-  { x: 15, y: 377.67 },
-  { x: 217, y: 377.67 },
-]
-
-const SPARKS_A = [[-18, -14], [16, -20], [22, 6], [-12, 18], [6, 24], [-24, 2], [12, -26]]
-const SPARKS_B = [[-16, -12], [14, -18], [18, 8], [-10, 16], [-20, -2]]
-
-function WindowFrame() {
-  return (
-    <svg className="login__frame" viewBox="0 0 420 560" aria-hidden="true">
-      <defs>
-        <clipPath id="login-frame-clip">
-          <rect x="0" y="0" width="420" height="560" />
-        </clipPath>
-      </defs>
-
-      <rect className="frame__outline" x="1" y="1" width="418" height="558" pathLength={1} />
-
-      {PANES.map((pane, i) => (
-        <rect
-          key={i}
-          className={`frame__pane${pane.accent ? ' frame__pane--accent' : ''}`}
-          x={pane.x}
-          y={pane.y}
-          width="188"
-          height="167.33"
-          pathLength={1}
-          style={{ animationDelay: `${0.5 + i * 0.12}s` }}
-        />
-      ))}
-
-      <g clipPath="url(#login-frame-clip)">
-        <rect className="frame__glass" x="-200" y="-100" width="120" height="760" />
-      </g>
-
-      <circle className="frame__weld" cx="217" cy="196.33" r="3" />
-      {SPARKS_A.map(([dx, dy], i) => (
-        <circle
-          key={`a${i}`}
-          className="frame__spark"
-          cx="217"
-          cy="196.33"
-          r="1.6"
-          style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties}
-        />
-      ))}
-
-      <circle className="frame__weld frame__weld--b" cx="203" cy="377.67" r="2.6" />
-      {SPARKS_B.map(([dx, dy], i) => (
-        <circle
-          key={`b${i}`}
-          className="frame__spark frame__spark--b"
-          cx="203"
-          cy="377.67"
-          r="1.4"
-          style={{ '--dx': `${dx}px`, '--dy': `${dy}px` } as CSSProperties}
-        />
-      ))}
-    </svg>
-  )
 }

@@ -6,6 +6,11 @@ export function canReversePayment(role: Role | undefined): boolean {
   return role === 'ADMIN' || role === 'MANAGER'
 }
 
+// HU29: só ADMIN e MANAGER anotam a nota fiscal. O back bloqueia de verdade (403).
+export function canEditInvoice(role: Role | undefined): boolean {
+  return role === 'ADMIN' || role === 'MANAGER'
+}
+
 // HU27: gastos e lucro só para ADMIN e MANAGER (o back devolve 403 e manda expenses/profit = null)
 export function canSeeProfit(role: Role | undefined): boolean {
   return role === 'ADMIN' || role === 'MANAGER'

@@ -25,5 +25,3 @@ export const REJECTION_LABEL: Record<RejectionReason, string> = {
   GAVE_UP: 'Desistiu',
   OTHER: 'Outro',
 }
-
-export const PAYMENT_SHORTCUTS = ['À vista no PIX', '50% de entrada e 50% na entrega', 'Cartão em até 10x']

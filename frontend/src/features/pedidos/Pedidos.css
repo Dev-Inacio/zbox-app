@@ -7,7 +7,7 @@
 .pd-badge--ready { background: #E3F2F1; color: #145C57; }
 .pd-badge--delivered { background: #E8F5EC; color: #1D5B33; }
 .pd-badge--canceled { background: #F0EFEC; color: #5A6067; }
-.pd-badge--late { background: #FDF1EC; color: #8A3A10; }
+.pd-badge--late { background: var(--wine-soft); color: var(--color-danger); }
 .pd-badge--pay-unpaid { background: #F0EFEC; color: #3F454B; }
 .pd-badge--pay-partial { background: #FFF3E6; color: #7A3E06; }
 .pd-badge--pay-paid { background: #E8F5EC; color: #1D5B33; }
@@ -15,15 +15,15 @@
 .pd-badges { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 
 /* ---------- Lista ---------- */
-.pd-chip--late { border-color: #F2C6AE; background: #FDF1EC; color: #8A3A10; display: inline-flex; align-items: center; gap: 6px; }
-.pd-chip--late[aria-pressed='true'] { background: #8A3A10; border-color: #8A3A10; color: #FFFFFF; }
+.pd-chip--late { border-color: var(--color-accent-soft); background: var(--wine-soft); color: var(--color-danger); display: inline-flex; align-items: center; gap: 6px; }
+.pd-chip--late[aria-pressed='true'] { background: var(--color-danger); border-color: var(--color-danger); color: #FFFFFF; }
 .pd-chip--late[aria-pressed='true'] .oc-chip__count { color: #FBE3D6; }
 .pd-chip-sep { width: 1px; height: 28px; background: #DCDDDF; align-self: center; margin: 0 4px; }
 .pd-filters { display: grid; grid-template-columns: minmax(0, 1fr) 240px; gap: 12px 16px; align-items: start; }
 .pd-table td { padding-top: 14px; padding-bottom: 14px; vertical-align: middle; }
 .pd-due { display: flex; flex-direction: column; gap: 2px; }
 .pd-due__hint { font-size: 13px; color: var(--color-text-muted); }
-.pd-due__hint.is-late { color: #8A3A10; font-weight: 600; }
+.pd-due__hint.is-late { color: var(--color-danger); font-weight: 600; }
 .pd-due__hint.is-soon { color: #7A3E06; font-weight: 600; }
 .pd-table__rest { font-weight: 700; }
 .pd-table__rest.is-overdue { color: #9B1C1C; }
@@ -36,7 +36,7 @@
 
 /* ---------- Detalhe ---------- */
 .pd-stage { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #EEF3FA; flex-wrap: wrap; }
-.pd-stage--late { background: #FDF1EC; }
+.pd-stage--late { background: var(--wine-soft); }
 .pd-stage--done { background: #E8F5EC; }
 .pd-stage--canceled { background: #F0EFEC; }
 .pd-stage__text { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 4px; }
@@ -48,10 +48,6 @@
 .pd-link:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
 .pd-totals { display: flex; justify-content: flex-end; gap: 8px 24px; flex-wrap: wrap; color: #3F454B; font-variant-numeric: tabular-nums; }
 .pd-totals strong { color: var(--color-ink); }
-.pd-customer { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-.pd-customer__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.pd-customer__text a { font-weight: 600; color: var(--color-ink); text-decoration: none; }
-.pd-customer__text a:hover { text-decoration: underline; }
 
 /* Cartão de pagamento */
 .pd-pay { display: flex; flex-direction: column; gap: 14px; }
@@ -133,26 +129,20 @@
 .pd-methods { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: 14px; color: #3F454B; }
 
 /* ---------- Detalhe do pedido ---------- */
-.pd-hero-link { color: #E9A06E; font-weight: 600; }
+.pd-hero-link { color: var(--color-accent); font-weight: 600; }
 .pd-hero-link:hover { color: #FFFFFF; }
 .pd-step-panel { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #F0EFEC; flex-wrap: wrap; }
 .pd-step-panel--in_production { background: #EEF3FA; }
 .pd-step-panel--ready { background: #E3F2F1; }
-.pd-step-panel.is-late { background: #FDF1EC; }
-.pd-late-text { color: #8A3A10; font-weight: 700; }
+.pd-step-panel.is-late { background: var(--wine-soft); }
+.pd-late-text { color: var(--color-danger); font-weight: 700; }
 .pd-textlink { min-height: 44px; padding: 0; border: 0; background: none; font-family: var(--font-body); font-weight: 600; font-size: 14px; color: var(--color-text-muted); text-decoration: underline; cursor: pointer; }
 .pd-textlink--accent { color: var(--color-accent); }
 .pd-textlink--small { min-height: 32px; font-size: 13px; }
 .pd-textlink:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
 .pd-items-total { display: flex; justify-content: flex-end; gap: 8px 24px; flex-wrap: wrap; padding-top: 8px; color: #3F454B; font-variant-numeric: tabular-nums; }
 .pd-items-total strong { color: var(--color-ink); }
-.pd-customer__name { font-weight: 600; color: var(--color-ink); text-decoration: none; }
-.pd-customer__name:hover { color: var(--color-accent); text-decoration: underline; }
 .pd-btn-link { display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-.oc-event__icon.pd-ev--payment, .oc-event__icon.pd-ev--delivered { background: #E8F5EC; color: #1D5B33; }
-.oc-event__icon.pd-ev--status_changed { background: #E6EEF8; color: #1F4E85; }
-.oc-event__icon.pd-ev--collection, .oc-event__icon.pd-ev--payment_reversed { background: #FDECEA; color: #9B1C1C; }
-.oc-event__icon.pd-ev--due_date_changed { background: #FFF3E6; color: #7A3E06; }
 .pd-pay { gap: 12px; }
 .pd-pay--overdue { border-color: #F0B9B3; }
 .pd-plus { color: #1D5B33; font-weight: 600; }
@@ -179,12 +169,12 @@
 /* ---------- Celular ---------- */
 @media (max-width: 767px) {
   /* No celular, quanto falta receber vem logo depois do andamento */
-  .pd-layout { display: flex; flex-direction: column; }
+  .pd-layout { display: flex; flex-direction: column; align-items: stretch; }
   .pd-layout .oc-layout__main { display: contents; }
   .pd-layout .oc-layout__main > :first-child { order: 0; }
   .pd-layout .oc-aside { order: 1; }
   .pd-layout .oc-layout__main > :nth-child(n+2) { order: 2; }
-  .pd-filters { grid-template-columns: 1fr; gap: 10px; }
+  .pd-filters { grid-template-columns: minmax(0, 1fr); gap: 10px; }
   .pd-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; padding-right: 14px; }
   .pd-table .pd-table__num { grid-column: 1; }
   .pd-table .pd-table__rest { grid-column: 2; grid-row: 1; text-align: right; }
@@ -201,7 +191,7 @@
   .pd-tiles > :first-child { grid-column: 1 / -1; }
   .pd-tile { padding: 16px; }
   .pd-tile__value { font-size: 24px; }
-  .pd-choices, .pd-grid-2 { grid-template-columns: 1fr; }
+  .pd-choices, .pd-grid-2 { grid-template-columns: minmax(0, 1fr); }
   .pd-step-panel { padding: 16px; }
   .pd-step-panel .btn { width: 100%; }
   .pd-rec__actions .btn { flex: 1; }
@@ -217,12 +207,8 @@
 .pd-profit__big strong { font-family: var(--font-display); font-weight: 800; font-size: 30px; line-height: 1.15; font-variant-numeric: tabular-nums; }
 .pd-profit__big.is-loss { background: #FDECEA; color: #9B1C1C; }
 .pd-profit__margin { font-size: 13px; opacity: 0.85; }
-.pd-profit__bar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: #ECEBE7; gap: 2px; }
-.pd-profit__bar span { display: block; height: 100%; }
-.pd-profit__rows { display: flex; flex-direction: column; gap: 6px; }
-.pd-profit__rows .oc-summary__row span:first-child { display: inline-flex; align-items: center; gap: 8px; }
 .is-material { background: #6B7F99; }
-.is-labor { background: #C2592A; }
+.is-labor { background: var(--wine-2); }
 .is-profit { background: #2E8B57; }
 .pd-dot { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 6px; vertical-align: 0; }
 .pd-profit__cash { margin: 0; padding: 10px 12px; border-radius: 10px; background: #F7F6F3; font-size: 13px; color: #3F454B; }
@@ -230,3 +216,88 @@
 .pd-expenses li .pd-payments__side { flex-direction: row; gap: 12px; }
 .pd-textlink--danger { color: #9B1C1C; }
 .pd-profit__big.is-pending { background: #FFF4E5; color: #7A4A00; }
+
+/* Régua da mão de obra (30% a 45% do serviço é o normal, abaixo de 30% é prejuízo) */
+.pd-health { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border-radius: 10px; background: #F7F6F3; font-size: 13px; color: #3F454B; }
+.pd-health p { margin: 0; }
+.pd-health__head { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pd-health__tag { font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: #ECEBE7; }
+.pd-health--out_of_pocket .pd-health__tag, .pd-health--low .pd-health__tag { background: #FDECEC; color: #9B1C1C; }
+.pd-health--normal .pd-health__tag { background: #E7F4EC; color: #1E6B3A; }
+.pd-health--great .pd-health__tag { background: #DDF1E4; color: #14532D; }
+.pd-health__track { position: relative; height: 10px; border-radius: 999px; background: #F3D6D3; }
+.pd-health__ok { position: absolute; top: 0; bottom: 0; background: #9FD3B0; }
+/* Acima de 45% é ótimo: verde mais forte até o fim (antes voltava ao rosa do prejuízo) */
+.pd-health__great { position: absolute; top: 0; bottom: 0; background: #4CAF73; border-radius: 0 999px 999px 0; }
+.pd-health__mark { position: absolute; top: -2px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px; background: #1B1F23; }
+.pd-health__scale { position: relative; height: 14px; font-size: 11px; color: #5A6067; }
+.pd-health__scale span { position: absolute; transform: translateX(-50%); }
+.pd-health__scale span:first-child { transform: none; left: 0; }
+
+/* Gastos e lucro do pedido: a conta curta (serviço − material = sua mão de obra), sem quebrar valores */
+.pd-calc { margin: 0; display: flex; flex-direction: column; font-size: 14px; }
+.pd-calc > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 0; border-top: 1px solid #ECEBE7; }
+.pd-calc > div:first-child { border-top: 0; }
+.pd-calc dt { color: #3F454B; }
+.pd-calc dd { margin: 0; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pd-calc__total { border-top: 2px solid #1B1F23 !important; }
+.pd-calc__total dt, .pd-calc__total dd { font-weight: 800; font-size: 16px; color: #1E5A35; }
+.pd-calc__total.is-neg dt, .pd-calc__total.is-neg dd { color: #9B1C1C; }
+.pd-profit__title { display: flex; align-items: center; gap: 10px; }
+
+/* Selos de situação com ícone (18 px) */
+.pd-badge { gap: 6px; padding: 3px 10px 3px 4px; }
+
+/* Corrigir / Excluir do gasto: botões com ícone, no mesmo padrão do resto (antes eram links sublinhados) */
+.pd-expense-btn { display: inline-flex; align-items: center; gap: 6px; height: 40px; padding: 0 12px 0 8px; font-size: 14px; white-space: nowrap; }
+.pd-expense-btn--danger { color: #9B1C1C; }
+/* Valor em cima; Corrigir e Excluir lado a lado embaixo, dividindo a largura (o quadro é estreito) */
+.pd-expenses > li { flex-direction: column; align-items: stretch; gap: 8px; }
+.pd-expenses .pd-payments__side { display: flex; flex-direction: row; gap: 8px; }
+.pd-expenses .pd-expense-btn { flex: 1; justify-content: center; }
+.pd-payments__side .pd-expense-btn { margin-top: 4px; } /* Estornar embaixo do nome de quem lançou */
+
+/* Gastos e lucro (imagens do design 31/10) */
+.pd-profit__top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pd-profit__tag { display: inline-flex; align-items: center; gap: 4px; flex: none; background: #FFFFFF; }
+.pd-profit__tag.pd-health--normal { color: #1E6B3A; }
+.pd-profit__tag.pd-health--great { color: #14532D; }
+.pd-calc__icon { display: flex; align-items: center; gap: 8px; }
+.pd-calc > div { align-items: center; }
+.pd-health__track { background: #E8E8E4; }
+.pd-health__scale span:last-child { left: 100%; transform: translateX(-100%); }
+.pd-health__legend { font-size: 12px; font-weight: 600; color: #3F454B; }
+
+/* Tablet: a tabela completa não cabe. "Total" e "Data" saem (o que falta receber fica) */
+@media (min-width: 768px) and (max-width: 1300px) {
+  .pd-table th:nth-last-child(3), .pd-table td.pd-table__total, .pd-table th:nth-child(3), .pd-table td.pd-table__due { display: none; }
+  .pd-table .pd-table__num { white-space: nowrap; }
+  .pd-table th, .pd-table td { padding-left: 8px; padding-right: 8px; }
+}
+.pd-table__customer { overflow-wrap: break-word; }
+
+@media (max-width: 767px) {
+  .pd-table.cl-table tbody tr { padding-right: 14px; }
+  .pd-hero-link { display: inline-block; padding-block: 10px; margin-block: -10px; }
+}
+
+@media (max-width: 480px) {
+  .pd-calc__total { flex-wrap: wrap; }
+  .pd-calc__total dt { flex: 1 1 100%; }
+  .pd-calc__total dd { margin-left: auto; }
+  .pd-profit__top { flex-wrap: wrap; }
+  .pd-table .pd-table__status, .pd-table .pd-table__pay { grid-column: 1 / -1; text-align: left; }
+}
+
+
+/* v3: link do topo em fundo claro */
+.pd-hero-link:hover { color: var(--color-accent-hover); }
+
+/* Tablet estreito: sem o botão "Ver" (o número do pedido já abre) */
+@media (min-width: 768px) and (max-width: 960px) {
+  .pd-table th:last-child, .pd-table td.zb-ver-cell { display: none; }
+}
+
+/* Lista: total e quanto falta, para o pagamento aparecer aqui também */
+.pd-list-money { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
+.pd-list-money span { font-size: 15px; color: var(--color-text-muted); }

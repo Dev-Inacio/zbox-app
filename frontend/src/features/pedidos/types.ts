@@ -1,4 +1,4 @@
-import type { QuoteCustomer, QuoteItem } from '../orcamentos/types'
+import type { DiscountType, QuoteCustomer, QuoteItem } from '../orcamentos/types'
 
 // Tipos que espelham o contrato de Pedidos e Financeiro (docs/contrato-api-pedidos-financeiro.md).
 // Dinheiro em CENTAVOS (inteiro). Datas sem hora em "YYYY-MM-DD". Data-hora em ISO 8601.
@@ -32,6 +32,19 @@ export type OrderEvent = {
   createdAt: string
 }
 
+// HU29: o ZBOX não emite a nota, só guarda o número (e o arquivo, opcional)
+export type InvoiceType = 'SERVICE' | 'PRODUCT' | 'BOTH'
+export type Invoice = {
+  number: string
+  issuedAt: string // YYYY-MM-DD
+  type: InvoiceType
+  notes: string | null
+  hasFile: boolean
+  updatedBy: string
+  updatedAt: string
+}
+export type InvoiceRequest = Pick<Invoice, 'number' | 'issuedAt' | 'type' | 'notes'>
+
 export type Order = {
   id: number
   number: string
@@ -41,6 +54,8 @@ export type Order = {
   customer: QuoteCustomer
   items: QuoteItem[]
   subtotalCents: number
+  discountType: DiscountType | null
+  discountValue: number | null // PERCENT: centésimos de % | AMOUNT: centavos
   discountCents: number
   totalCents: number
   paidCents: number
@@ -57,6 +72,7 @@ export type Order = {
   payments: Payment[]
   lastCollectionAt: string | null
   events: OrderEvent[]
+  invoice: Invoice | null
   // HU27: só vem para ADMIN e MANAGER. Para EMPLOYEE o back manda null.
   expenses: OrderExpense[] | null
   profit: ProfitSummary | null
@@ -81,14 +97,16 @@ export type ProfitSummary = {
   materialCents: number
   laborCents: number
   expensesCents: number
-  profitCents: number      // total do pedido − gastos (pode ser negativo)
-  marginPercent: number    // lucro ÷ total, 1 casa decimal
+  profitCents: number         // o que já sobrou de verdade: recebido − gastos (0 até receber). Negativo só quando é prejuízo
+  expectedProfitCents: number // quando receber tudo: total do pedido − gastos (negativo = prejuízo)
+  marginPercent: number       // profitCents ÷ total, 1 casa decimal
   cashBalanceCents: number // recebido − gastos (pode ser negativo)
 }
 
 export type ExpenseRequest = { type: ExpenseType; description: string | null; amountCents: number; date: string }
 
 export type OrderSummary = {
+  invoiceNumber: string | null
   id: number
   number: string
   customerName: string

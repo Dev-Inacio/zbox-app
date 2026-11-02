@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AuthContext } from './AuthContext'
-import { SESSION_KEY, clearSession, readMockSession, saveSession } from './session'
+import { UNAUTHORIZED_EVENT } from './http'
+import { SESSION_KEY, clearSession, readMockSession, saveSession, withDisplayName } from './session'
 import type { AuthUser, LoginResponse } from './types'
 
 // Guarda "quem está logado" em um lugar só e entrega para qualquer tela via useAuth().
@@ -13,7 +14,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = useCallback((response: LoginResponse) => {
     saveSession(response)
     setNotice(undefined)
-    setUser(response.user)
+    setUser(withDisplayName(response.user))
   }, [])
 
   const signOut = useCallback((message?: string) => {
@@ -34,6 +35,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.addEventListener('storage', handleStorage)
     return () => window.removeEventListener('storage', handleStorage)
   }, [])
+
+  // Token vencido ou inválido (o back respondeu 401 numa chamada): sai do sistema com recado
+  useEffect(() => {
+    function handleUnauthorized() {
+      if (!readMockSession()) return
+      signOut('Sua sessão expirou. Entre de novo.')
+    }
+    window.addEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
+    return () => window.removeEventListener(UNAUTHORIZED_EVENT, handleUnauthorized)
+  }, [signOut])
 
   const value = useMemo(() => ({ user, notice, signIn, signOut }), [user, notice, signIn, signOut])
 

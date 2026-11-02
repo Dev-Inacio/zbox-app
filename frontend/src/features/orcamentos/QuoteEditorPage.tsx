@@ -6,14 +6,16 @@ import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
 import { useRequest } from '../../hooks/useRequest'
 import { ApiError } from '../auth/types'
-import { maskPhone } from '../clientes/format'
+import { customerMobile, maskPhone } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
-import { PAYMENT_SHORTCUTS } from './labels'
-import { PieceDrawing } from './PieceDrawing'
-import { PIECE_LABEL, detectLeaves, detectPiece, isSliding } from './pieceKind'
+import { ChevronRight, CircleCheck, Lock, Plus, Trash2 } from 'lucide-react'
+import { StatusTag } from '../../components/zbox'
+import { suggestPieceType } from './pieceKind'
+import { QuoteSteps } from './QuoteSteps'
 import {
-  areaCm2, discountCents, formatAreaM2, formatMeters, formatMoney, formatPercent,
+  discountCents, formatMeters, formatMoney, formatPercent,
   itemSubtotalCents, maskMoneyInput, parseDecimalToHundredths, validateDiscount,
+  normalizeMeters,
 } from './money'
 import { getQuote, updateQuote } from './quotesApi'
 import type { ChargeType, DiscountType, ItemUnit, Quote, QuoteItemRequest, QuoteRequest } from './types'
@@ -24,15 +26,17 @@ import './Orcamentos.css'
 // HU14 — Criar/editar orçamento (só RASCUNHO).
 // A tela calcula ao vivo para ajudar; o back recalcula e é quem vale.
 
-// Todo item é cobrado por m²: os campos são sempre Qtd. (peças), Unid. (m²), Largura, Altura e Preço por m²
-const AREA_OPTION = 'm2'
+// Decisão da PO (11/10): quem dá o preço é a pessoa, não o sistema.
+// Campos do item: Quantidade (começa vazia), Largura e Altura (só a medida), Preço de cada peça e Detalhes.
+// Subtotal = quantidade × preço de cada peça (6 box de R$ 1.500 = R$ 9.000). Nada de "por m²".
 const NOTES_MAX = 1000
-const TERMS_MAX = 300
+const DETAILS_MAX = 80 // cabe numa linha do PDF
 
 // Item no formulário: tudo texto, do jeito que a pessoa digita
 type ItemForm = {
   key: string
   description: string
+  details: string
   chargeType: ChargeType
   quantity: string
   unit: ItemUnit
@@ -45,7 +49,6 @@ type FormState = {
   items: ItemForm[]
   discountType: DiscountType
   discountValue: string
-  paymentTerms: string
   notes: string
 }
 
@@ -55,7 +58,7 @@ let keySeq = 0
 const newKey = () => `item-${++keySeq}`
 
 function emptyItem(): ItemForm {
-  return { key: newKey(), description: '', chargeType: 'AREA', quantity: '1', unit: 'un', width: '', height: '', price: '' }
+  return { key: newKey(), description: '', details: '', chargeType: 'UNIT', quantity: '', unit: 'un', width: '', height: '', price: '' }
 }
 
 function toForm(q: Quote): FormState {
@@ -63,17 +66,19 @@ function toForm(q: Quote): FormState {
     items: q.items.map((i) => ({
       key: newKey(),
       description: i.description,
-      chargeType: 'AREA', // item antigo cobrado por unidade também abre como m² (preencher largura e altura)
+      details: i.details ?? '',
+      chargeType: 'UNIT',
       quantity: String(i.quantity),
       unit: i.unit ?? 'un',
       width: i.widthCm ? formatMeters(i.widthCm) : '',
       height: i.heightCm ? formatMeters(i.heightCm) : '',
-      price: maskMoneyInput(String(i.unitPriceCents)),
+      // Item antigo por m²: abre com o preço de cada peça (subtotal ÷ quantidade), para o total não mudar
+      price: maskMoneyInput(String(i.chargeType === 'AREA' ? Math.round(i.subtotalCents / Math.max(1, i.quantity)) : i.unitPriceCents)),
     })),
     discountType: q.discountType ?? 'PERCENT',
     discountValue: q.discountValue ? (q.discountType === 'AMOUNT' ? maskMoneyInput(String(q.discountValue)) : formatPercent(q.discountValue)) : '',
-    paymentTerms: q.paymentTerms ?? '',
-    notes: q.notes ?? '',
+    // Condições viraram Observações (design 31/10): o texto antigo vem para cá, não se perde
+    notes: [q.paymentTerms && `Pagamento: ${q.paymentTerms}`, q.notes].filter(Boolean).join('\n'),
   }
 }
 
@@ -82,8 +87,8 @@ function parseItem(i: ItemForm) {
   const quantity = /^\d+$/.test(i.quantity.trim()) ? Number(i.quantity.trim()) : null
   return {
     quantity,
-    widthCm: parseDecimalToHundredths(i.width),
-    heightCm: parseDecimalToHundredths(i.height),
+    widthCm: parseDecimalToHundredths(normalizeMeters(i.width)),
+    heightCm: parseDecimalToHundredths(normalizeMeters(i.height)),
     priceCents: parseDecimalToHundredths(i.price),
   }
 }
@@ -91,8 +96,7 @@ function parseItem(i: ItemForm) {
 function liveSubtotal(i: ItemForm): number {
   const p = parseItem(i)
   if (!p.quantity || !p.priceCents) return 0
-  if (i.chargeType === 'AREA' && (!p.widthCm || !p.heightCm)) return 0
-  return itemSubtotalCents({ chargeType: i.chargeType, quantity: p.quantity, widthCm: p.widthCm, heightCm: p.heightCm, unitPriceCents: p.priceCents })
+  return itemSubtotalCents({ chargeType: 'UNIT', quantity: p.quantity, widthCm: null, heightCm: null, unitPriceCents: p.priceCents })
 }
 
 function validateItem(i: ItemForm): Errors {
@@ -101,12 +105,12 @@ function validateItem(i: ItemForm): Errors {
   const desc = i.description.trim()
   if (desc.length < 2) e[`${i.key}.description`] = 'Descreva o item.'
   else if (desc.length > 200) e[`${i.key}.description`] = 'Máximo de 200 caracteres.'
-  if (p.quantity === null || p.quantity < 1 || p.quantity > 9999) e[`${i.key}.quantity`] = 'De 1 a 9.999.'
+  if (i.details.trim().length > DETAILS_MAX) e[`${i.key}.details`] = `Máximo de ${DETAILS_MAX} caracteres.`
+  if (p.quantity === null || p.quantity < 1 || p.quantity > 9999) e[`${i.key}.quantity`] = i.quantity.trim() ? 'De 1 a 9.999.' : 'Informe a quantidade.'
   if (p.priceCents === null || p.priceCents <= 0) e[`${i.key}.price`] = 'Informe o preço.'
-  if (i.chargeType === 'AREA') {
-    if (p.widthCm === null || p.widthCm < 1 || p.widthCm > 2000) e[`${i.key}.width`] = 'De 0,01 a 20,00 m.'
-    if (p.heightCm === null || p.heightCm < 1 || p.heightCm > 2000) e[`${i.key}.height`] = 'De 0,01 a 20,00 m.'
-  }
+  // Medidas são opcionais (só aparecem no PDF). Se preencher, tem que ser uma medida válida.
+  if (i.width.trim() && (p.widthCm === null || p.widthCm < 1 || p.widthCm > 2000)) e[`${i.key}.width`] = 'De 0,01 a 20,00 m.'
+  if (i.height.trim() && (p.heightCm === null || p.heightCm < 1 || p.heightCm > 2000)) e[`${i.key}.height`] = 'De 0,01 a 20,00 m.'
   return e
 }
 
@@ -198,17 +202,19 @@ function Editor({ quote }: { quote: Quote }) {
         const p = parseItem(i)
         return {
           description: i.description.trim(),
-          chargeType: i.chargeType,
+          pieceType: suggestPieceType(i.description),
+          details: i.details.trim() || null,
+          chargeType: 'UNIT',
           quantity: p.quantity ?? 0,
-          unit: i.chargeType === 'UNIT' ? i.unit : null,
-          widthCm: i.chargeType === 'AREA' ? p.widthCm : null,
-          heightCm: i.chargeType === 'AREA' ? p.heightCm : null,
+          unit: i.unit,
+          widthCm: p.widthCm,
+          heightCm: p.heightCm,
           unitPriceCents: p.priceCents ?? 0,
         }
       }),
       discountType: discountValue ? form.discountType : null,
       discountValue: discountValue || null,
-      paymentTerms: form.paymentTerms.trim() || null,
+      paymentTerms: null,
       notes: form.notes.trim() || null,
     }
   }
@@ -241,7 +247,7 @@ function Editor({ quote }: { quote: Quote }) {
         if (e.code === 'VALIDATION_ERROR') {
           // "items[2].unitPriceCents" → erro no campo certo do item 3
           const mapped: Errors = { form: 'Confira os campos destacados.' }
-          const fieldName: Record<string, string> = { description: 'description', quantity: 'quantity', unitPriceCents: 'price', widthCm: 'width', heightCm: 'height' }
+          const fieldName: Record<string, string> = { description: 'description', details: 'details', quantity: 'quantity', unitPriceCents: 'price', widthCm: 'width', heightCm: 'height' }
           for (const fe of e.fieldErrors) {
             const m = fe.field.match(/^items\[(\d+)\]\.(\w+)$/)
             const item = m ? form.items[Number(m[1])] : undefined
@@ -275,30 +281,26 @@ function Editor({ quote }: { quote: Quote }) {
   return (
     <>
       <PageHero
-        title={`Orçamento #${quote.number}`}
+        title={`Orçamento nº ${quote.number}`}
         back={{ to: '/orcamentos', label: 'Voltar para orçamentos' }}
-        badge={<span className="oc-hero-badge">Rascunho · v{quote.version}</span>}
-        subtitle={dirty ? 'Alterações não salvas' : `Rascunho salvo às ${savedTime}`}
-        actions={
-          <button type="button" className="cl-hero-btn" onClick={() => save('draft')} disabled={saving !== null} data-testid="salvar-rascunho">
-            {saving === 'draft' ? 'Salvando…' : 'Salvar rascunho'}
-          </button>
-        }
+        badge={<StatusTag tone="neutral">Rascunho · {quote.version}ª proposta</StatusTag>}
+        subtitle={dirty ? 'Alterações não salvas' : <span className="zv-saved"><CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />Rascunho salvo às {savedTime}</span>}
       />
 
+      <QuoteSteps current={2} />
       <main className="page-body">
         <form className="oc-layout" onSubmit={onSubmit} noValidate data-testid="form-orcamento">
           <div className="oc-layout__main">
             {errors.form && <Alert variant="error">{errors.form}</Alert>}
             {quote.versionReason && <Alert variant="info">Versão {quote.version}: {quote.versionReason}</Alert>}
 
-            <section className="cl-card cl-card--elevated" aria-labelledby="t-cliente">
+            <section className="cl-card" aria-labelledby="t-cliente">
               <h2 id="t-cliente" className="cl-card__title">Cliente</h2>
               <div className="oc-customer">
                 <span className="oc-avatar" aria-hidden="true">{quote.customer.name.split(' ').slice(0, 2).map((p) => p[0]).join('')}</span>
                 <span className="oc-customer__text">
                   <span className="oc-customer__name">{quote.customer.name}</span>
-                  <span className="cl-muted">{[quote.customer.whatsapp ? `WhatsApp ${maskPhone(quote.customer.whatsapp)}` : null, quote.customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
+                  <span className="cl-muted">{[customerMobile(quote.customer) ? maskPhone(customerMobile(quote.customer)!) : null, quote.customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
                 </span>
               </div>
             </section>
@@ -306,8 +308,8 @@ function Editor({ quote }: { quote: Quote }) {
             <section className="cl-card" aria-labelledby="t-itens">
               <div className="cl-card__header">
                 <h2 id="t-itens" className="cl-card__title">Itens</h2>
-                <span className="cl-card__action cl-muted">{form.items.length === 1 ? '1 item' : `${form.items.length} itens`}</span>
-              </div>
+                </div>
+              <p className="zv-sub zv-sub--tight">{form.items.length === 1 ? '1 item' : `${form.items.length} itens`}</p>
 
               {form.items.length === 0 && <p className="cl-muted">Nenhum item ainda. Clique em "Adicionar item" para começar.</p>}
 
@@ -316,60 +318,61 @@ function Editor({ quote }: { quote: Quote }) {
                 const p = parseItem(item)
                 const isNew = item.key === focusKey && item.description === ''
                 return (
-                  <article key={item.key} className={`oc-item${isNew ? ' oc-item--new' : ''}`} aria-label={`Item ${index + 1}`} data-testid="item-orcamento">
-                    <div className="oc-item__head">
-                      <span className="oc-item__num">{index + 1}</span>
-                      <div className="oc-item__desc">
-                        <label htmlFor={`${item.key}-description`} className="sr-only">Descrição do item {index + 1}</label>
-                        <input autoComplete="off"
-                          id={`${item.key}-description`}
-                          className="cl-input oc-input-strong"
-                          placeholder="Descreva o item. Ex.: Box de vidro temperado 8 mm"
-                          value={item.description}
-                          maxLength={200}
-                          onChange={(e) => updateItem(item.key, { description: e.target.value })}
-                          aria-invalid={err(item.key, 'description') ? true : undefined}
-                          aria-describedby={err(item.key, 'description') ? `${item.key}-description-erro` : undefined}
-                          data-testid="item-descricao"
-                        />
-                        {err(item.key, 'description') && <p id={`${item.key}-description-erro`} className="field__error">{err(item.key, 'description')}</p>}
-                        {/* Sem medidas: a miniatura fica no formato padrão da peça, não muda ao digitar largura/altura */}
-                        {item.description.trim().length >= 3 && <PieceHint description={item.description} chargeType={item.chargeType} />}
-                      </div>
-                      <span className="oc-item__subtotal">
-                        <span className="oc-item__subtotal-label">Subtotal</span>
-                        <span className={`oc-item__subtotal-value${sub === 0 ? ' is-zero' : ''}`} data-testid="item-subtotal">{formatMoney(sub)}</span>
-                      </span>
-                      <button type="button" className="oc-icon-btn" aria-label={`Remover item ${index + 1}`} onClick={() => removeItem(item.key)}>
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M4 7h16" /><path d="M10 11v6" /><path d="M14 11v6" /><path d="M6 7l1 13h10l1-13" /><path d="M9 7V4h6v3" /></svg>
+                  <article key={item.key} className={`zv-item${isNew ? ' is-new' : ''}`} aria-label={`Item ${index + 1}`} data-testid="item-orcamento">
+                    <div className="zv-item__head">
+                      <b>Item {index + 1}</b>
+                      <button type="button" className="zv-btn zv-btn--sm zv-btn--danger" aria-label={`Remover item ${index + 1}`} onClick={() => removeItem(item.key)}>
+                        <Trash2 size={20} strokeWidth={1.8} aria-hidden="true" />Remover
                       </button>
                     </div>
 
-                    <div className="oc-item__fields oc-item__fields--area">
-                      <NumField id={`${item.key}-quantity`} label="Qtd. (peças)" value={item.quantity} inputMode="numeric"
+                    <div className="cl-field">
+                      <label htmlFor={`${item.key}-description`} className="oc-label">Descrição <span className="zv-req">*</span></label>
+                      <input autoComplete="off"
+                        id={`${item.key}-description`}
+                        className="cl-input"
+                        value={item.description}
+                        maxLength={200}
+                        onChange={(e) => updateItem(item.key, { description: e.target.value })}
+                        aria-invalid={err(item.key, 'description') ? true : undefined}
+                        aria-describedby={err(item.key, 'description') ? `${item.key}-description-erro` : undefined}
+                        data-testid="item-descricao"
+                      />
+                      {err(item.key, 'description') && <p id={`${item.key}-description-erro`} className="field__error">{err(item.key, 'description')}</p>}
+                    </div>
+
+                    <div className="cl-field">
+                      <label htmlFor={`${item.key}-details`} className="oc-label">Detalhes (opcional)</label>
+                      <input autoComplete="off" id={`${item.key}-details`} className="cl-input" value={item.details} maxLength={DETAILS_MAX}
+                        placeholder="Ex.: cor preta, vidro 4 mm"
+                        onChange={(e) => updateItem(item.key, { details: e.target.value })}
+                        aria-invalid={err(item.key, 'details') ? true : undefined}
+                        aria-describedby={`${item.key}-details-info`} data-testid="item-detalhes" />
+                      {err(item.key, 'details')
+                        ? <p id={`${item.key}-details-info`} className="field__error">{err(item.key, 'details')}</p>
+                        : <p id={`${item.key}-details-info`} className="zv-counter">{item.details.length}/{DETAILS_MAX}</p>}
+                    </div>
+
+                    <div className="zv-item__nums">
+                      <NumField id={`${item.key}-quantity`} label="Quantidade" value={item.quantity} inputMode="numeric"
                         onChange={(v) => updateItem(item.key, { quantity: v.replace(/\D/g, '').slice(0, 4) })} error={err(item.key, 'quantity')} />
 
-                      {/* Sempre m² (única opção) */}
-                      <div className="cl-field">
-                        <label htmlFor={`${item.key}-unit`} className="oc-label">Unid.</label>
-                        <select autoComplete="off" id={`${item.key}-unit`} className="cl-input oc-input-sm" value={AREA_OPTION} onChange={() => {}} data-testid="item-unidade">
-                          <option value={AREA_OPTION}>m²</option>
-                        </select>
-                      </div>
+                      {/* Medida da peça: só informa (sai no PDF). Não entra na conta do preço. */}
+                      <NumField id={`${item.key}-width`} label="Largura (m)" value={item.width} inputMode="decimal" placeholder="opcional"
+                        onChange={(v) => updateItem(item.key, { width: v.replace(/\./g, ',').replace(/[^\d,]/g, '') })}
+                        onBlur={() => updateItem(item.key, { width: normalizeMeters(item.width) })} error={err(item.key, 'width')} />
+                      <NumField id={`${item.key}-height`} label="Altura (m)" value={item.height} inputMode="decimal" placeholder="opcional"
+                        onChange={(v) => updateItem(item.key, { height: v.replace(/\./g, ',').replace(/[^\d,]/g, '') })}
+                        onBlur={() => updateItem(item.key, { height: normalizeMeters(item.height) })} error={err(item.key, 'height')} />
 
-                      <NumField id={`${item.key}-width`} label="Largura (m)" value={item.width} inputMode="decimal" placeholder="0,00"
-                        onChange={(v) => updateItem(item.key, { width: v.replace(/[^\d,]/g, '') })} error={err(item.key, 'width')} />
-                      <NumField id={`${item.key}-height`} label="Altura (m)" value={item.height} inputMode="decimal" placeholder="0,00"
-                        onChange={(v) => updateItem(item.key, { height: v.replace(/[^\d,]/g, '') })} error={err(item.key, 'height')} />
-
-                      <NumField id={`${item.key}-price`} label="Preço por m²" value={item.price} inputMode="numeric" placeholder="0,00" prefix="R$"
+                      <NumField id={`${item.key}-price`} label="Preço de cada" value={item.price} inputMode="numeric" placeholder="0,00" prefix="R$"
                         onChange={(v) => updateItem(item.key, { price: maskMoneyInput(v) })} error={err(item.key, 'price')} />
                     </div>
 
-                    {item.chargeType === 'AREA' && p.widthCm && p.heightCm && p.quantity ? (
-                      <p className="oc-item__calc" data-testid="item-area">
-                        {formatMeters(p.widthCm)} m × {formatMeters(p.heightCm)} m = <strong>{formatAreaM2(areaCm2(p.widthCm, p.heightCm))} m² por peça</strong>
-                        {' · '}{p.quantity} {p.quantity === 1 ? 'peça' : 'peças'} = <strong>{formatAreaM2(areaCm2(p.widthCm, p.heightCm) * p.quantity)} m²</strong>
+                    {p.quantity && p.priceCents ? (
+                      <p className="zv-item__calc" data-testid="item-conta">
+                        {p.widthCm && p.heightCm ? <>Medida {formatMeters(p.widthCm)} × {formatMeters(p.heightCm)} m · </> : null}
+                        {p.quantity} {item.unit} × {formatMoney(p.priceCents)} = <strong data-testid="item-subtotal">{formatMoney(sub)}</strong>
                       </p>
                     ) : null}
                   </article>
@@ -377,32 +380,23 @@ function Editor({ quote }: { quote: Quote }) {
               })}
 
               <button type="button" className="oc-add" onClick={addItem} data-testid="adicionar-item">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+                <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
                 Adicionar item
               </button>
             </section>
 
             <section className="cl-card" aria-labelledby="t-cond">
-              <h2 id="t-cond" className="cl-card__title">Condições</h2>
+              <h2 id="t-cond" className="cl-card__title">Observações</h2>
               <div className="cl-field">
-                <label htmlFor="pagamento" className="cl-field__label">Condições de pagamento</label>
-                <input autoComplete="off" id="pagamento" className="cl-input" value={form.paymentTerms} maxLength={TERMS_MAX} onChange={(e) => setForm((f) => ({ ...f, paymentTerms: e.target.value }))} placeholder="Ex.: 50% de entrada e 50% na entrega" />
-                <div className="oc-pills">
-                  {PAYMENT_SHORTCUTS.map((s) => (
-                    <button key={s} type="button" className="oc-pill" aria-pressed={form.paymentTerms === s} onClick={() => setForm((f) => ({ ...f, paymentTerms: s }))}>{s}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="cl-field">
-                <label htmlFor="observacoes" className="cl-field__label">Observações (aparecem no PDF)</label>
-                <textarea autoComplete="off" id="observacoes" className="cl-input cl-textarea" rows={3} maxLength={NOTES_MAX} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Ex.: Prazo de fabricação de 15 dias úteis após a aprovação." aria-describedby="obs-contador" />
-                <p id="obs-contador" className="cl-counter">{form.notes.length}/{NOTES_MAX}</p>
+                <label htmlFor="observacoes" className="oc-label">Observações (opcional)</label>
+                <textarea autoComplete="off" id="observacoes" className="cl-input cl-textarea" rows={4} maxLength={NOTES_MAX} value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Ex.: forma de pagamento, prazo, cor do alumínio, tipo de vidro…" aria-describedby="obs-contador" data-testid="observacoes" />
+                <p id="obs-contador" className="zv-counter">Aparece no PDF. Pode escrever a forma de pagamento e o prazo aqui.</p>
               </div>
             </section>
           </div>
 
-          <aside className="oc-summary" aria-labelledby="t-resumo">
-            <h2 id="t-resumo" className="cl-card__title">Resumo</h2>
+          <aside className="zv-card zv-card--side zv-summary" aria-labelledby="t-resumo">
+            <h2 id="t-resumo" className="zv-h2">Resumo</h2>
             <div className="oc-summary__row"><span>Subtotal ({form.items.length === 1 ? '1 item' : `${form.items.length} itens`})</span><span data-testid="resumo-subtotal">{formatMoney(subtotal)}</span></div>
 
             <div className="oc-discount">
@@ -443,17 +437,19 @@ function Editor({ quote }: { quote: Quote }) {
               </p>
             </div>
 
-            <div className="oc-summary__total">
-              <span className="cl-muted">Valor final</span>
-              <span className="oc-summary__value" data-testid="resumo-total">{formatMoney(total)}</span>
-            </div>
+            <dl className="zv-sum zv-sum--bigger">
+              {discount > 0 && <div><dt>Subtotal</dt><dd>{formatMoney(subtotal)}</dd></div>}
+              {discount > 0 && <div className="zv-sum__off"><dt>Desconto{form.discountType === 'PERCENT' ? ` (${form.discountValue}%)` : ''}</dt><dd>− {formatMoney(discount)}</dd></div>}
+              <div className="zv-sum__total"><dt>Total</dt><dd data-testid="resumo-total">{formatMoney(total)}</dd></div>
+            </dl>
 
             <Button type="submit" fullWidth loading={saving === 'review'} loadingText="Salvando…" disabled={!canReview || saving !== null} data-testid="revisar-orcamento">
-              Revisar orçamento
+              <ChevronRight size={20} strokeWidth={1.8} aria-hidden="true" />Conferir orçamento
             </Button>
-            <p className="oc-small cl-muted">
-              {canReview ? 'Os valores são conferidos pelo sistema ao salvar.' : 'Adicione pelo menos 1 item com preço para revisar.'}
-            </p>
+            <button type="button" className="zv-btn zv-btn--full" onClick={() => save('draft')} disabled={saving !== null} data-testid="salvar-rascunho">
+              {saving === 'draft' ? 'Salvando…' : 'Salvar rascunho'}
+            </button>
+            <p className="zv-lock"><Lock size={18} strokeWidth={1.8} aria-hidden="true" />{canReview ? 'Os valores são conferidos pelo sistema ao salvar.' : 'Adicione pelo menos 1 item com preço para conferir.'}</p>
           </aside>
         </form>
       </main>
@@ -466,13 +462,14 @@ type NumFieldProps = {
   label: string
   value: string
   onChange: (v: string) => void
+  onBlur?: () => void
   inputMode: 'numeric' | 'decimal'
   error?: string
   placeholder?: string
   prefix?: string
 }
 
-function NumField({ id, label, value, onChange, inputMode, error, placeholder, prefix }: NumFieldProps) {
+function NumField({ id, label, value, onChange, onBlur, inputMode, error, placeholder, prefix }: NumFieldProps) {
   return (
     <div className="cl-field">
       <label htmlFor={id} className="oc-label">{label}</label>
@@ -485,6 +482,7 @@ function NumField({ id, label, value, onChange, inputMode, error, placeholder, p
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
           aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-erro` : undefined}
         />
@@ -494,16 +492,3 @@ function NumField({ id, label, value, onChange, inputMode, error, placeholder, p
   )
 }
 
-// Dica: mostra qual desenho vai sair no PDF, a partir da descrição digitada
-function PieceHint({ description, chargeType, widthCm, heightCm }: { description: string; chargeType: ChargeType; widthCm?: number | null; heightCm?: number | null }) {
-  const kind = detectPiece(description)
-  const sliding = isSliding(kind)
-  return (
-    <p className="oc-piece-hint" data-testid="item-desenho">
-      <PieceDrawing className="oc-piece-hint__img" item={{ description, chargeType, widthCm: widthCm ?? null, heightCm: heightCm ?? null, unit: null }} />
-      {kind === 'GENERIC'
-        ? <span>No PDF sai um contorno simples. Comece pelo nome da peça (ex.: <em>janela de correr</em>, <em>porta</em>, <em>portão</em>, <em>box</em>, <em>grade</em>, <em>guarda-corpo</em>, <em>veneziana</em>, <em>cobertura</em>) para sair o desenho.</span>
-        : <span>Desenho no PDF: <strong>{PIECE_LABEL[kind]}{sliding ? ` · ${detectLeaves(description)} folhas` : ''}</strong></span>}
-    </p>
-  )
-}

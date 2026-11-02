@@ -1,12 +1,14 @@
 import { Outlet } from 'react-router-dom'
-import { AppHeader } from './AppHeader'
+import { Sidebar } from './Sidebar'
+import './AppLayout.css'
 
-// Moldura das telas internas: header fixo em cima, a página da rota embaixo (<Outlet />).
+// Moldura das telas internas v3: menu lateral azul + página da rota.
+// (O AppHeader antigo continua no projeto, mas não é mais usado aqui.)
 export function AppLayout() {
   return (
-    <>
-      <AppHeader />
-      <Outlet />
-    </>
+    <div className="zb-app">
+      <Sidebar />
+      <div className="zb-app__main"><Outlet /></div>
+    </div>
   )
 }

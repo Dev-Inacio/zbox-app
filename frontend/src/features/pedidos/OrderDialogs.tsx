@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { Alert } from '../../components/ui/Alert'
+import { AppIcon } from '../../components/ui/AppIcon'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { NoAutofill } from '../../components/ui/NoAutofill'
 import { ApiError } from '../auth/types'
 import { onlyDigits } from '../clientes/format'
 import { formatMoney, maskMoneyInput, parseDecimalToHundredths } from '../orcamentos/money'
@@ -211,18 +213,18 @@ export function PaymentDialog({ target, onCancel, onDone }: { target: PaymentTar
   }
 
   return (
-    <ConfirmDialog open title="Registrar pagamento" confirmLabel="Registrar" loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
+    <ConfirmDialog open title="Registrar pagamento" confirmLabel={cents > 0 ? `Registrar ${formatMoney(cents)}` : 'Registrar'} loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
         <p className="pd-lead">Pedido #{target.number} · {target.customerName}</p>
         <div className="pd-sum pd-sum--one"><div className="pd-sum__row"><span>Falta receber</span><strong>{formatMoney(target.remainingCents)}</strong></div></div>
         <MoneyField id="valor-pagamento" label="Valor recebido" value={amount} onChange={setAmount} error={errors.amountCents} />
-        <button type="button" className="oc-pill pd-self-start" onClick={() => setAmount(maskMoneyInput(String(target.remainingCents)))} data-testid="tudo-que-falta">
-          Tudo que falta · {formatMoney(target.remainingCents)}
+        <button type="button" className="zv-btn zv-btn--full" onClick={() => setAmount(maskMoneyInput(String(target.remainingCents)))} data-testid="tudo-que-falta">
+          Recebi o valor total ({formatMoney(target.remainingCents)})
         </button>
         <MethodPills value={method} onChange={setMethod} name="forma-pagamento" />
         {errors.method && <p className="field__error">{errors.method}</p>}
         <div className="pd-grid-2">
-          <DateField id="data-pagamento" label="Data" value={paidAt} max={today} onChange={setPaidAt} error={errors.paidAt} />
+          <DateField id="data-pagamento" label="Data do pagamento" value={paidAt} max={today} onChange={setPaidAt} error={errors.paidAt} />
           <div className="cl-field">
             <label htmlFor="obs-pagamento" className="cl-field__label">Observação (opcional)</label>
             <input autoComplete="off" id="obs-pagamento" className="cl-input" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: pago na loja" />
@@ -352,7 +354,7 @@ export function CancelOrderDialog({ order, onCancel, onDone }: { order: Order; o
     <ConfirmDialog open title="Cancelar este pedido?" confirmLabel="Cancelar pedido" cancelLabel="Voltar" variant="danger" loading={busy} loadingText="Cancelando…"
       confirmDisabled={reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
-        <p>Pedido cancelado não volta. Ele continua no histórico.</p>
+        <p>Pedido cancelado não volta. Ele continua no histórico, e o orçamento #{order.quote.number} fica como <strong>Recusado</strong>.</p>
         {order.paidCents > 0 && (
           <Alert variant="warning">Este pedido já recebeu {formatMoney(order.paidCents)}. Os pagamentos continuam registrados; a devolução do dinheiro, se houver, é feita fora do sistema.</Alert>
         )}
@@ -410,7 +412,7 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const digits = onlyDigits(phone)
-  const invalid = digits.length !== 11
+  const invalid = digits.length !== 10 && digits.length !== 11
 
   function send() {
     if (invalid || busy) return
@@ -429,11 +431,11 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
     <ConfirmDialog open title={`Cobrar ${target.customerName.split(' ')[0]}`} confirmLabel="Abrir WhatsApp" loading={busy} loadingText="Abrindo…"
       confirmDisabled={invalid || message.trim() === ''} onCancel={onCancel} onConfirm={send}>
       <div className="oc-dialog-fields">
-        <label className="cl-field">
+        <NoAutofill><label className="cl-field">
           <span className="cl-field__label">WhatsApp</span>
           <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" aria-invalid={phone && invalid ? true : undefined} />
-        </label>
-        {!registered && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para esta cobrança.</p>}
+        </label></NoAutofill>
+        {!registered && <p className="oc-small cl-muted">O cliente não tem celular cadastrado. Digite o número para esta cobrança.</p>}
         <label className="cl-field">
           <span className="cl-field__label">Mensagem (pode editar)</span>
           <textarea autoComplete="off" className="cl-input cl-textarea" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} data-testid="mensagem-cobranca" />
@@ -448,7 +450,9 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
 // ---------- HU27: lançar / corrigir gasto do serviço ----------
 export function ExpenseDialog({ order, expense, onCancel, onDone }: { order: Order; expense: OrderExpense | null; onCancel: () => void; onDone: (order: Order) => void }) {
   const today = todayIso()
-  const [type, setType] = useState<ExpenseType | null>(expense?.type ?? null)
+  // Regra do cliente (11/10): só se lança MATERIAL. A mão de obra é o que sobra (calculada sozinha).
+  // Gasto antigo do tipo "mão de obra" continua com o tipo dele ao ser corrigido.
+  const type: ExpenseType = expense?.type ?? 'MATERIAL'
   const [amount, setAmount] = useState(expense ? maskMoneyInput(String(expense.amountCents)) : '')
   const [date, setDate] = useState(expense?.date ?? today)
   const [busy, setBusy] = useState(false)
@@ -458,13 +462,12 @@ export function ExpenseDialog({ order, expense, onCancel, onDone }: { order: Ord
 
   async function submit() {
     const e: Record<string, string> = {}
-    if (!type) e.type = 'Escolha Material ou Mão de obra.'
     if (amountCents <= 0) e.amountCents = 'Informe um valor maior que zero.'
     if (!date) e.date = 'Informe a data do gasto.'
     else if (date > today) e.date = 'A data do gasto não pode ser no futuro.'
     setErrors(e)
     setGeneral(null)
-    if (Object.keys(e).length || busy || !type) return
+    if (Object.keys(e).length || busy) return
     setBusy(true)
     try {
       const body = { type, description: expense?.description ?? null, amountCents, date }
@@ -478,26 +481,52 @@ export function ExpenseDialog({ order, expense, onCancel, onDone }: { order: Ord
   }
 
   return (
-    <ConfirmDialog open title={expense ? 'Corrigir gasto' : 'Lançar gasto'} confirmLabel={expense ? 'Salvar' : 'Lançar gasto'} loading={busy} loadingText="Salvando…" onCancel={onCancel} onConfirm={() => void submit()}>
+    <ConfirmDialog open title={expense ? `Corrigir ${type === 'MATERIAL' ? 'material' : 'gasto'}` : 'Lançar material'} confirmLabel={expense ? 'Salvar' : 'Lançar material'} loading={busy} loadingText="Salvando…" onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
         <p className="pd-lead">Pedido #{order.number} · {order.customer.name}</p>
-        <fieldset className="pd-fieldset">
-          <legend className="cl-field__label">O que foi gasto?</legend>
-          <div className="pd-choices">
-            {(['MATERIAL', 'LABOR'] as ExpenseType[]).map((t) => (
-              <label key={t} className="pd-choice">
-                <input autoComplete="off" type="radio" name="tipo-gasto" checked={type === t} onChange={() => setType(t)} data-testid={`gasto-${t === 'MATERIAL' ? 'material' : 'mao-de-obra'}`} />
-                <span><strong>{EXPENSE_TYPE_LABEL[t]}</strong><span>{t === 'MATERIAL' ? 'Alumínio, vidro, ferragens…' : 'O que pagou para quem fez ou instalou'}</span></span>
-              </label>
-            ))}
-          </div>
-          {errors.type && <p className="field__error">{errors.type}</p>}
-        </fieldset>
+        <p className="oc-small cl-muted">
+          {type === 'MATERIAL'
+            ? 'Quanto gastou de material (alumínio, vidro, ferragens…). O que sobrar do valor do serviço é a sua mão de obra. Isto é o que você gastou: não muda o que o cliente deve.'
+            : 'Gasto antigo, lançado antes como mão de obra. Ele desconta do que sobra para você.'}
+        </p>
         <div className="pd-grid-2">
           <MoneyField id="gasto-valor" label="Valor" value={amount} onChange={setAmount} error={errors.amountCents} />
           <DateField id="gasto-data" label="Data" value={date} max={today} onChange={setDate} error={errors.date} />
         </div>
         {general && <Alert variant="error">{general}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+// Financeiro → Gastos e lucro: "Editar gastos" de um serviço sem sair da tela.
+// Lista os gastos do pedido; cada um abre a mesma janela de corrigir/excluir do pedido.
+export function ExpensesListDialog({ order, onCancel, onEdit, onDelete }: {
+  order: Order; onCancel: () => void; onEdit: (e: OrderExpense) => void; onDelete: (e: OrderExpense) => void
+}) {
+  const expenses = [...(order.expenses ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+  return (
+    <ConfirmDialog open title={`Gastos do pedido #${order.number}`} confirmLabel="Fechar" hideCancel onCancel={onCancel} onConfirm={onCancel}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">{order.customer.name} · serviço de <strong>{formatMoney(order.totalCents)}</strong></p>
+        {expenses.length === 0 ? (
+          <p className="oc-small cl-muted">Nenhum gasto lançado ainda.</p>
+        ) : (
+          <ul className="pd-payments pd-expenses" data-testid="lista-gastos-financeiro">
+            {expenses.map((e) => (
+              <li key={e.id}>
+                <span className="pd-payments__main">
+                  <span className="pd-payments__value">{formatMoney(e.amountCents)}</span>
+                  <span className="cl-muted oc-small"><i className={`pd-dot ${e.type === 'MATERIAL' ? 'is-material' : 'is-labor'}`} />{EXPENSE_TYPE_LABEL[e.type]} · {formatDay(e.date)}</span>
+                </span>
+                <span className="pd-payments__side">
+                  <button type="button" className="btn btn--secondary pd-expense-btn" onClick={() => onEdit(e)} aria-label={`Corrigir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="edit" size={24} />Corrigir</button>
+                  <button type="button" className="btn btn--secondary pd-expense-btn pd-expense-btn--danger" onClick={() => onDelete(e)} aria-label={`Excluir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="trash" size={24} />Excluir</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
     </ConfirmDialog>
   )

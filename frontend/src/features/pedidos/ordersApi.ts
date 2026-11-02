@@ -3,11 +3,12 @@ import type { FieldError } from '../auth/types'
 import { readMockSession } from '../auth/session'
 import type { Page } from '../clientes/types'
 import { formatMoney } from '../orcamentos/money'
-import { mockCreateApprovedQuote, mockMarkQuoteConverted, mockQuoteForConversion } from '../orcamentos/quotesApi'
+import { mockMarkQuoteConverted, mockMarkQuoteRejected, mockQuoteForConversion } from '../orcamentos/quotesApi'
 import type { Quote, QuoteItem } from '../orcamentos/types'
-import { addDaysIso, todayIso } from './dates'
+import { todayIso } from './dates'
 import { METHOD_LABEL, METHODS } from './labels'
 import type {
+  InvoiceRequest,
   ConvertToOrderRequest,
   ExpenseRequest,
   ExpenseType,
@@ -20,7 +21,6 @@ import type {
   OrderEvent,
   OrderStatus,
   OrderSummary,
-  PaymentMethod,
   PaymentRequest,
 } from './types'
 
@@ -35,7 +35,6 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const simulation = () => new URLSearchParams(window.location.search).get('simular')
 const userName = () => readMockSession()?.name ?? 'Usuário'
 const now = () => new Date().toISOString()
-const daysAgoIso = (days: number) => new Date(Date.now() - days * 86400000).toISOString()
 
 function normalize(text: string) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -63,18 +62,24 @@ function recompute(order: Order) {
           : 'UNPAID'
 }
 
-// HU27: lucro = total − gastos; sobrou no caixa = recebido − gastos. Sempre calculado aqui (no back).
+// HU27: quanto sobra do serviço. Sempre calculado aqui (no back).
+// Regras da PO (11/10):
+//   - Previsto = valor do serviço − gastos. Material lançado: o resto é a mão de obra de quem faz (o "sobrou para você").
+//   - O lucro só conta o que o cliente PAGOU: fica R$ 0,00 até receber e volta a zero se o pagamento for estornado.
+//   - Gastos maiores que o valor do serviço = prejuízo (saiu do bolso), mesmo sem ter recebido.
 export function computeProfit(order: Order): ProfitSummary {
   const expenses = order.expenses ?? []
   const sum = (t: ExpenseType) => expenses.filter((e) => e.type === t).reduce((acc, e) => acc + e.amountCents, 0)
   const materialCents = sum('MATERIAL')
   const laborCents = sum('LABOR')
   const expensesCents = materialCents + laborCents
-  const profitCents = order.totalCents - expensesCents
+  const expectedProfitCents = order.totalCents - expensesCents
+  const cashBalanceCents = order.paidCents - expensesCents
+  const profitCents = expectedProfitCents < 0 ? expectedProfitCents : Math.max(0, Math.min(cashBalanceCents, expectedProfitCents))
   return {
-    materialCents, laborCents, expensesCents, profitCents,
+    materialCents, laborCents, expensesCents, profitCents, expectedProfitCents,
     marginPercent: order.totalCents > 0 ? Math.round((profitCents / order.totalCents) * 1000) / 10 : 0,
-    cashBalanceCents: order.paidCents - expensesCents,
+    cashBalanceCents,
   }
 }
 
@@ -151,18 +156,19 @@ function fromQuote(quote: Quote, createdAt: string): Order {
     quote: { id: quote.id, number: quote.number, version: quote.version },
     customer: structuredClone(quote.customer),
     items: structuredClone(quote.items) as QuoteItem[],
-    subtotalCents: quote.subtotalCents, discountCents: quote.discountCents, totalCents: quote.totalCents,
+    subtotalCents: quote.subtotalCents, discountType: quote.discountType, discountValue: quote.discountValue, discountCents: quote.discountCents, totalCents: quote.totalCents,
     paidCents: 0, remainingCents: quote.totalCents,
     paymentTerms: quote.paymentTerms, notes: quote.notes,
     createdAt,
     deliveredAt: null, deliveredOn: null, receivedBy: null, deliveryNote: null, canceledAt: null, cancelReason: null,
-    payments: [], lastCollectionAt: null, events: [],
+    payments: [], lastCollectionAt: null, events: [], invoice: null,
     expenses: [], profit: null,
   }
 }
 
 function toSummary(o: Order): OrderSummary {
   return {
+    invoiceNumber: o.invoice?.number ?? null,
     id: o.id, number: o.number, customerName: o.customer.name, createdAt: o.createdAt, status: o.status, paymentStatus: o.paymentStatus,
     totalCents: o.totalCents, paidCents: o.paidCents, remainingCents: o.remainingCents, deliveredOn: o.deliveredOn,
   }
@@ -179,103 +185,6 @@ function byPriority(a: Order, b: Order): number {
   const bDay = b.deliveredOn ?? b.canceledAt ?? ''
   return bDay.localeCompare(aDay)
 }
-
-// ---------- Dados de exemplo (datas relativas a hoje) ----------
-type SeedPayment = { amountCents: number; method: PaymentMethod; daysAgo: number; note?: string }
-type SeedExpense = { type: ExpenseType; description: string; amountCents: number; daysAgo: number }
-type Seed = {
-  expenses?: SeedExpense[]
-  customerId: number; createdDaysAgo: number; status: OrderStatus
-  items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[]
-  payments?: SeedPayment[]; deliveredDaysAgo?: number; receivedBy?: string; collectedDaysAgo?: number; half?: boolean
-}
-
-function seed() {
-  const seeds: Seed[] = [
-    { customerId: 1, createdDaysAgo: 60, status: 'DELIVERED', deliveredDaysAgo: 40, receivedBy: 'Síndico Paulo', half: true,
-      expenses: [
-        { type: 'MATERIAL', description: 'Perfis de alumínio e vidro 6 mm', amountCents: 520000, daysAgo: 55 },
-        { type: 'LABOR', description: 'Instalação: equipe do Marcos', amountCents: 240000, daysAgo: 40 },
-      ],
-      items: [{ description: 'Janela de correr 2 folhas (fachada)', chargeType: 'AREA', quantity: 12, unit: null, widthCm: 150, heightCm: 120, unitPriceCents: 62000 }],
-      payments: [{ amountCents: 0, method: 'TRANSFER', daysAgo: 40, note: 'Restante na entrega' }] },
-    { customerId: 5, createdDaysAgo: 50, status: 'DELIVERED', deliveredDaysAgo: 35, receivedBy: 'Dra. Helena', collectedDaysAgo: 22, half: true,
-      expenses: [
-        { type: 'MATERIAL', description: 'Vidro temperado 8 mm e ferragens', amountCents: 210000, daysAgo: 45 },
-        { type: 'LABOR', description: 'Instalador João', amountCents: 80000, daysAgo: 35 },
-      ],
-      items: [
-        { description: 'Box de vidro temperado 8 mm', chargeType: 'AREA', quantity: 4, unit: null, widthCm: 120, heightCm: 190, unitPriceCents: 42000 },
-        { description: 'Espelho bisotê', chargeType: 'UNIT', quantity: 1, unit: 'un', widthCm: null, heightCm: null, unitPriceCents: 36960 },
-      ] },
-    { customerId: 6, createdDaysAgo: 30, status: 'DELIVERED', deliveredDaysAgo: 22, receivedBy: 'Roberto',
-      expenses: [
-        { type: 'MATERIAL', description: 'Chapas, tubos e motor', amountCents: 260000, daysAgo: 28 },
-        { type: 'LABOR', description: 'Soldador e instalação', amountCents: 120000, daysAgo: 22 },
-      ],
-      items: [{ description: 'Portão de garagem', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 300, heightCm: 220, unitPriceCents: 47000 }] },
-    { customerId: 4, createdDaysAgo: 20, status: 'IN_PRODUCTION', half: true,
-      expenses: [{ type: 'MATERIAL', description: 'Vidro laminado 10 mm', amountCents: 185000, daysAgo: 12 }],
-      items: [{ description: 'Fachada de vidro da loja', chargeType: 'UNIT', quantity: 1, unit: 'conj', widthCm: null, heightCm: null, unitPriceCents: 420000 }] },
-    { customerId: 8, createdDaysAgo: 10, status: 'READY',
-      items: [
-        { description: 'Porta de abrir alumínio', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 80, heightCm: 210, unitPriceCents: 70000 },
-        { description: 'Janela maxim-ar banheiro', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 60, heightCm: 60, unitPriceCents: 90000 },
-      ],
-      payments: [{ amountCents: -1, method: 'PIX', daysAgo: 1, note: 'À vista' }] },
-    { customerId: 10, createdDaysAgo: 2, status: 'NEW',
-      payments: [{ amountCents: 200000, method: 'CASH', daysAgo: 2, note: 'Entrada' }],
-      items: [
-        { description: 'Janela maxim-ar 60 × 60', chargeType: 'AREA', quantity: 6, unit: null, widthCm: 60, heightCm: 60, unitPriceCents: 90000 },
-        { description: 'Porta pivotante de alumínio', chargeType: 'UNIT', quantity: 1, unit: 'un', widthCm: null, heightCm: null, unitPriceCents: 459600 },
-      ] },
-  ]
-
-  for (const s of seeds) {
-    const quote = mockCreateApprovedQuote(s.customerId, s.items, s.createdDaysAgo + 2)
-    if (!quote) continue
-    const created = daysAgoIso(s.createdDaysAgo)
-    const order = fromQuote(quote, created)
-    event(order, 'CREATED', `${quote.number} v1`, created, 'Thayná')
-    const half = Math.round(order.totalCents / 2)
-    if (s.half) pushPayment(order, { amountCents: half, method: 'PIX', paidAt: addDaysIso(todayIso(), -s.createdDaysAgo), note: 'Entrada' }, created, 'Thayná')
-
-    const steps: OrderStatus[] = ['IN_PRODUCTION', 'READY', 'DELIVERED']
-    const target = steps.indexOf(s.status)
-    for (let i = 0; i < steps.length && i <= target; i++) {
-      const to = steps[i]
-      if (to === 'DELIVERED') {
-        const day = addDaysIso(todayIso(), -(s.deliveredDaysAgo ?? 0))
-        order.status = 'DELIVERED'
-        order.deliveredOn = day
-        order.deliveredAt = daysAgoIso(s.deliveredDaysAgo ?? 0)
-        order.receivedBy = s.receivedBy ?? null
-        event(order, 'DELIVERED', s.receivedBy ?? null, order.deliveredAt, 'Inácio')
-      } else {
-        const from = order.status
-        order.status = to
-        event(order, 'STATUS_CHANGED', `${from}→${to}`, daysAgoIso(Math.max(0, s.createdDaysAgo - (i + 1) * 3)), 'Inácio')
-      }
-    }
-    for (const p of s.payments ?? []) {
-      recompute(order)
-      const amount = p.amountCents <= 0 ? order.remainingCents : p.amountCents
-      pushPayment(order, { amountCents: amount, method: p.method, paidAt: addDaysIso(todayIso(), -p.daysAgo), note: p.note }, daysAgoIso(p.daysAgo), 'Thayná')
-    }
-    if (s.collectedDaysAgo !== undefined) {
-      order.lastCollectionAt = daysAgoIso(s.collectedDaysAgo)
-      event(order, 'COLLECTION', 'WHATSAPP', order.lastCollectionAt, 'Thayná')
-    }
-    for (const e of s.expenses ?? []) {
-      order.expenses!.push({ id: nextExpenseId++, type: e.type, description: null, amountCents: e.amountCents, date: addDaysIso(todayIso(), -e.daysAgo), userName: 'Thayná', createdAt: daysAgoIso(e.daysAgo) })
-    }
-    order.events.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    recompute(order)
-    store.set(order.id, order)
-    mockMarkQuoteConverted(quote.id, { id: order.id, number: order.number }, created)
-  }
-}
-seed()
 
 // Para o mock do Financeiro e do Início (no back real, são consultas no mesmo banco)
 export function mockAllOrders(): Order[] {
@@ -455,6 +364,7 @@ export async function cancelOrder(id: number, reason: string): Promise<Order> {
   order.canceledAt = now()
   order.cancelReason = reason.trim()
   event(order, 'CANCELED', order.cancelReason)
+  mockMarkQuoteRejected(order.quote.id, order.cancelReason) // o orçamento de origem fica "Recusado"
   return snapshot(order)
 }
 
@@ -489,6 +399,10 @@ export async function addExpense(id: number, request: ExpenseRequest): Promise<O
   const order = find(id)
   const r = validateExpense(request)
   order.expenses ??= []
+  // Regra do cliente: cada pedido tem UM valor de material. Mudou? Edita, não soma outro.
+  if (r.type === 'MATERIAL' && order.expenses.some((e) => e.type === 'MATERIAL')) {
+    throw new ApiError(409, 'MATERIAL_ALREADY_SET', 'Este pedido já tem material lançado. Use "Editar" para mudar o valor.')
+  }
   order.expenses.push({ id: nextExpenseId++, type: r.type, description: r.description, amountCents: r.amountCents, date: r.date, userName: userName(), createdAt: now() })
   return snapshot(order)
 }
@@ -512,4 +426,46 @@ export async function deleteExpense(id: number, expenseId: number): Promise<Orde
   findExpense(order, expenseId)
   order.expenses = order.expenses!.filter((e) => e.id !== expenseId)
   return snapshot(order)
+}
+
+// ---------- HU29: nota fiscal ----------
+const invoiceFiles = new Map<number, File>() // no back: arquivo guardado no servidor
+const INVOICE_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+
+// PUT /api/orders/{id}/invoice — só ADMIN e MANAGER
+export async function saveInvoice(id: number, request: InvoiceRequest): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  if (order.status === 'CANCELED') throw new ApiError(409, 'ORDER_CANCELLED', 'Pedido cancelado não recebe nota.')
+  const number = request.number.trim()
+  const errors: FieldError[] = []
+  if (!/^[\p{L}\p{N}]{1,20}$/u.test(number)) errors.push({ field: 'number', code: 'INVALID', message: 'Informe o número da nota.' })
+  if (!request.issuedAt) errors.push({ field: 'issuedAt', code: 'REQUIRED', message: 'Informe a data da nota.' })
+  else if (request.issuedAt > todayIso()) errors.push({ field: 'issuedAt', code: 'FUTURE', message: 'A data da nota não pode ser no futuro.' })
+  if (!['SERVICE', 'PRODUCT', 'BOTH'].includes(request.type)) errors.push({ field: 'type', code: 'INVALID', message: 'Escolha o tipo da nota.' })
+  if ((request.notes ?? '').length > 300) errors.push({ field: 'notes', code: 'SIZE', message: 'Máximo de 300 caracteres.' })
+  if (errors.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', errors)
+  order.invoice = { number, issuedAt: request.issuedAt, type: request.type, notes: request.notes?.trim() || null, hasFile: order.invoice?.hasFile ?? false, updatedBy: userName(), updatedAt: now() }
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/invoice/file (multipart "file")
+export async function uploadInvoiceFile(id: number, file: File): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  if (!order.invoice) throw new ApiError(409, 'INVOICE_NOT_FOUND', 'Anote a nota antes de enviar o arquivo.')
+  if (!INVOICE_FILE_TYPES.includes(file.type) || file.size > 5 * 1024 * 1024) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', [{ field: 'file', code: 'INVALID', message: 'Envie um PDF ou foto de até 5 MB.' }])
+  }
+  invoiceFiles.set(id, file)
+  order.invoice.hasFile = true
+  return snapshot(order)
+}
+
+// GET /api/orders/{id}/invoice/file
+export async function getInvoiceFile(id: number): Promise<File | null> {
+  await wait(200)
+  return invoiceFiles.get(id) ?? null
 }

@@ -1,23 +1,31 @@
 import { useCallback, useEffect, useState } from 'react'
+import { Calendar, MessageCircle, Plus } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Button } from '../../components/ui/Button'
+import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { AppIcon } from '../../components/ui/AppIcon'
 import { Pagination } from '../../components/ui/Pagination'
 import { Toast } from '../../components/ui/Toast'
+import { ListFilters, SegFilter, StatusTag } from '../../components/zbox'
+import { usePagedList } from '../../hooks/usePagedList'
 import { useRequest } from '../../hooks/useRequest'
 import { formatMoney } from '../orcamentos/money'
-import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from '../pedidos/dates'
-import { METHOD_LABEL, ORDER_STATUS_LABEL } from '../pedidos/labels'
-import { AlertIcon, PaymentStatusBadge } from '../pedidos/OrderBadges'
-import { CollectDialog, ExpenseDialog, PaymentDialog } from '../pedidos/OrderDialogs'
+import { formatDay, sinceText } from '../pedidos/dates'
+import { METHOD_LABEL } from '../pedidos/labels'
+import { OrderStatusBadge } from '../pedidos/OrderBadges'
+import { InvoiceTag } from '../pedidos/Invoice'
+import { CollectDialog, DeleteExpenseDialog, ExpenseDialog, ExpensesListDialog, PaymentDialog } from '../pedidos/OrderDialogs'
 import { getOrder } from '../pedidos/ordersApi'
-import type { Order } from '../pedidos/types'
-import { getFinancialSummary, getProfitReport, listReceivables, listReceivedPayments } from './financialApi'
-import type { ProfitReport, Receivable, ReceivableFilter } from './financialApi'
+import type { Order, OrderExpense } from '../pedidos/types'
+import { getFinancialSummary, getProfitByMonth, getProfitReport, listReceivables, listReceivedOrders } from './financialApi'
+import type { FinancialSummary, ProfitReport, ProfitRow, Receivable, ReceivableFilter, ReceivedPayment } from './financialApi'
 import { useAuth } from '../auth/useAuth'
 import { canSeeProfit } from '../pedidos/permissions'
 import { ORDER_STATUS_LABEL as STATUS } from '../pedidos/labels'
 import { PERIODS, periodRange, readPeriod } from './period'
+import { formatPercentBR, LABOR_GOOD_PERCENT, LABOR_MIN_PERCENT, profitHealth, profitView } from '../pedidos/profitHealth'
+import type { ProfitHealth, ProfitView } from '../pedidos/profitHealth'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
 import '../orcamentos/Orcamentos.css'
@@ -27,29 +35,39 @@ import './Financeiro.css'
 // HU24 — Financeiro (não é contabilidade): quanto tem para receber, quem está devendo, quanto entrou.
 // URL: ?aba=recebidos&periodo=LAST_30&filtro=OVERDUE&pagina=2
 
-const PAGE_SIZE = 20
+const PAGE_SIZE = 5
+const MONTH_NAME = new Intl.DateTimeFormat('pt-BR', { month: 'long' })
+const RECEIVABLE_PAGE_SIZE = 5 // design 25/10: "Falta receber" de 5 em 5
 const FILTERS: { value: ReceivableFilter; label: string }[] = [
   { value: 'ALL', label: 'Todos' },
-  { value: 'OVERDUE', label: 'Pagamento atrasado' },
-  { value: 'OPEN', label: 'Ainda não entregue' },
+  { value: 'OVERDUE', label: 'Atrasados' },
+  { value: 'OPEN', label: 'Ainda não entregues' },
 ]
 
-type Action = { kind: 'pay' | 'collect'; row: Receivable } | { kind: 'expense'; order: Order } | null
+type Action =
+  | { kind: 'pay'; row: Pick<Receivable, 'orderId' | 'number' | 'customerName' | 'remainingCents'> }
+  | { kind: 'collect'; row: Receivable }
+  | { kind: 'expense' | 'expenses'; order: Order }
+  | { kind: 'editExpense' | 'deleteExpense'; order: Order; expense: OrderExpense }
+  | null
 
 export function FinancialPage() {
   const [params, setParams] = useSearchParams()
   const { user } = useAuth()
   const showProfit = canSeeProfit(user?.role)
-  const aba = params.get('aba')
-  const tab = aba === 'recebidos' ? 'received' : aba === 'lucro' && showProfit ? 'profit' : 'receivable'
+  const aba = params.get('aba') // link antigo (?aba=recebidos, ?aba=lucro): rola até o bloco
   const period = readPeriod(params.get('periodo'))
   const filter = (FILTERS.find((f) => f.value === params.get('filtro'))?.value ?? 'ALL') as ReceivableFilter
   const page = Math.max(0, Number(params.get('pagina') ?? '1') - 1) || 0
   const range = periodRange(period)
+  const receivedPeriod = readPeriod(params.get('entrou'))
+  const receivedRange = periodRange(receivedPeriod)
+  const receivedPage = Math.max(0, Number(params.get('paginaEntrou') ?? '1') - 1) || 0
   const search = params.get('busca') ?? ''
   const [term, setTerm] = useState(search)
   const [version, setVersion] = useState(0) // muda depois de pagar/cobrar → recarrega
   const [action, setAction] = useState<Action>(null)
+  const [picking, setPicking] = useState(false) // botão do topo: primeiro escolhe o pedido
   const [toast, setToast] = useState<string | null>(null)
   const clearToast = useCallback(() => setToast(null), [])
 
@@ -64,9 +82,13 @@ export function FinancialPage() {
     })
   }, [setParams])
 
-  const summaryFetcher = useCallback(() => getFinancialSummary(range.from, range.to), [range.from, range.to])
-  const summary = useRequest(`sum|${range.from}|${range.to}|${version}`, summaryFetcher)
-  const recFetcher = useCallback(() => listReceivables(filter, search, page, PAGE_SIZE), [filter, search, page])
+  // Quadros do topo: fixos ("entrou este mês", "falta receber hoje"). O período escolhido vale só dentro das seções.
+  const month = periodRange('THIS_MONTH')
+  const summaryFetcher = useCallback(() => getFinancialSummary(month.from, month.to), [month.from, month.to])
+  const summary = useRequest(`sum|${month.from}|${month.to}|${version}`, summaryFetcher)
+  const periodFetcher = useCallback(() => getFinancialSummary(receivedRange.from, receivedRange.to), [receivedRange.from, receivedRange.to])
+  const periodSummary = useRequest(`per|${receivedRange.from}|${receivedRange.to}|${version}`, periodFetcher)
+  const recFetcher = useCallback(() => listReceivables(filter, search, page, RECEIVABLE_PAGE_SIZE), [filter, search, page])
   const receivables = useRequest(`rec|${filter}|${search}|${page}|${version}`, recFetcher)
 
   // Busca por cliente ou número do pedido: espera a pessoa parar de digitar (300 ms) e só busca com 2+ caracteres
@@ -78,14 +100,38 @@ export function FinancialPage() {
     }, 300)
     return () => clearTimeout(timer)
   }, [term, search, update])
-  const payFetcher = useCallback(() => listReceivedPayments(range.from, range.to, page, PAGE_SIZE), [range.from, range.to, page])
-  const received = useRequest(`pay|${range.from}|${range.to}|${page}|${version}`, payFetcher)
+  const payFetcher = useCallback(() => listReceivedOrders(receivedRange.from, receivedRange.to, receivedPage, PAGE_SIZE), [receivedRange.from, receivedRange.to, receivedPage])
+  const received = useRequest(`pay|${receivedRange.from}|${receivedRange.to}|${receivedPage}|${version}`, payFetcher)
 
-  const profitFetcher = useCallback(() => (showProfit && tab === 'profit' ? getProfitReport(range.from, range.to) : Promise.resolve(null)), [showProfit, tab, range.from, range.to])
-  const profit = useRequest(`lucro|${tab}|${range.from}|${range.to}|${version}`, profitFetcher)
+  const profitFetcher = useCallback(() => (showProfit ? getProfitReport(range.from, range.to) : Promise.resolve(null)), [showProfit, range.from, range.to])
+  const profit = useRequest(`lucro|${range.from}|${range.to}|${version}`, profitFetcher)
 
   const s = summary.data
-  const methods = s?.byMethod.map((m) => `${METHOD_LABEL[m.method]} ${formatMoney(m.amountCents)}`).join(' · ')
+  const byMonthFetcher = useCallback(() => (showProfit ? getProfitByMonth(month.to) : Promise.resolve(null)), [showProfit, month.to])
+  const profitByMonth = useRequest(`meses|${month.to}|${version}`, byMonthFetcher)
+  // Quadro "Como foi o mês": mesma conta da seção (só serviços com material lançado)
+  const monthProfitFetcher = useCallback(() => (showProfit ? getProfitReport(month.from, month.to) : Promise.resolve(null)), [showProfit, month.from, month.to])
+  const monthProfit = useRequest(`mes|${month.from}|${month.to}|${version}`, monthProfitFetcher)
+  const monthRated = monthProfit.data?.orders.filter((o) => o.status !== 'CANCELED' && (o.materialCents > 0 || o.expectedProfitCents < 0)) ?? []
+  const monthLeft = monthRated.length > 0 ? monthRated.reduce((sum, o) => sum + o.expectedProfitCents, 0) : null
+  const monthBase = monthRated.reduce((sum, o) => sum + o.totalCents, 0)
+  const monthPercent = monthLeft !== null && monthBase > 0 ? Math.round((monthLeft / monthBase) * 100) : null
+  const monthTitle = new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(`${month.from}T12:00:00`)).replace(/^./, (c) => c.toUpperCase())
+  const monthName = MONTH_NAME.format(new Date(`${month.from}T12:00:00`))
+
+  // Lançar ou editar gasto: busca o pedido (com os gastos atuais) e abre a janela
+  function openOrder(id: number, kind: 'expense' | 'expenses') {
+    getOrder(id).then((order) => {
+      // Só um gasto (o material): "Editar" já abre a edição dele
+      const only = kind === 'expenses' && order.expenses?.length === 1 ? order.expenses[0] : null
+      setAction(only ? { kind: 'editExpense', order, expense: only } : { kind, order })
+    }).catch(() => setToast('Não foi possível abrir o pedido. Tente de novo.'))
+  }
+
+  useEffect(() => {
+    const target = aba === 'recebidos' ? 'entrou' : aba === 'lucro' ? 'resumo' : null
+    if (target) document.getElementById(target)?.scrollIntoView()
+  }, [aba])
 
   function finished(message: string) {
     setAction(null)
@@ -95,127 +141,127 @@ export function FinancialPage() {
 
   return (
     <>
-      <PageHero
-        eyebrow="Financeiro"
-        title="Financeiro"
-        subtitle="Quanto tem para receber, quem está devendo e quanto entrou."
-        actions={
-          <label className="fn-period">
-            <span>Período</span>
-            <select autoComplete="off" value={period} onChange={(e) => update({ periodo: e.target.value === 'THIS_MONTH' ? null : e.target.value, pagina: null })} data-testid="periodo">
-              {PERIODS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-            </select>
-          </label>
-        }
-      />
+      <PageHero title="Financeiro" subtitle="Quanto falta receber, o que entrou e quanto sobrou no mês."
+        actions={<>
+          <span className="zv-btn zv-static"><Calendar size={20} strokeWidth={1.8} aria-hidden="true" />{monthTitle}</span>
+          <Button onClick={() => setPicking(true)} data-testid="registrar-pagamento"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Registrar pagamento</Button>
+        </>} />
 
-      <main className="page-body">
-        <section className="cl-card cl-card--elevated" aria-label="Resumo do financeiro">
-          {summary.loading && <div className="fn-tiles">{[0, 1, 2].map((i) => <div key={i} className="fn-tile fn-tile--loading" aria-hidden="true" />)}</div>}
-          {!summary.loading && Boolean(summary.error) && (
-            <div className="cl-state" role="alert">
-              <p className="cl-state__title">Não foi possível carregar o resumo.</p>
-              <Button className="btn--secondary" onClick={() => setVersion((n) => n + 1)}>Tentar novamente</Button>
-            </div>
-          )}
-          {s && (
-            <div className="fn-tiles">
-              <div className="fn-tile" data-testid="total-a-receber">
-                <span className="fn-tile__label">A receber</span>
-                <span className="fn-tile__value">{formatMoney(s.receivableCents)}</span>
-                <span className="fn-tile__hint">{s.receivableOrders === 1 ? 'em 1 pedido' : `em ${s.receivableOrders} pedidos`}</span>
-              </div>
-              <button type="button" className={`fn-tile fn-tile--button${s.overdueOrders > 0 ? ' fn-tile--bad' : ''}`} onClick={() => update({ aba: null, filtro: 'OVERDUE', pagina: null })} data-testid="total-atrasado">
-                <span className="fn-tile__label">{s.overdueOrders > 0 && <AlertIcon size={14} />}Pagamento atrasado</span>
-                <span className="fn-tile__value">{formatMoney(s.overdueCents)}</span>
-                <span className="fn-tile__hint">{s.overdueOrders === 0 ? 'ninguém devendo depois da entrega' : s.overdueOrders === 1 ? '1 pedido entregue e não pago' : `${s.overdueOrders} pedidos entregues e não pagos`}</span>
-              </button>
-              <div className="fn-tile" data-testid="total-recebido">
-                <span className="fn-tile__label">Recebido {range.label}</span>
-                <span className="fn-tile__value">{formatMoney(s.receivedCents)}</span>
-                <span className="fn-tile__hint">{s.receivedPayments === 1 ? '1 pagamento' : `${s.receivedPayments} pagamentos`}{methods ? ` · ${methods}` : ''}</span>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <section className="cl-card" aria-label="Detalhes do financeiro">
-          <div className="fn-tabs" role="tablist" aria-label="Financeiro">
-            <button type="button" role="tab" aria-selected={tab === 'receivable'} className="fn-tab" onClick={() => update({ aba: null, pagina: null })} data-testid="aba-a-receber">
-              A receber{receivables.data ? ` · ${receivables.data.totalElements}` : ''}
-            </button>
-            <button type="button" role="tab" aria-selected={tab === 'received'} className="fn-tab" onClick={() => update({ aba: 'recebidos', pagina: null })} data-testid="aba-recebidos">
-              Recebidos{s ? ` · ${s.receivedPayments}` : ''}
-            </button>
-            {showProfit && (
-              <button type="button" role="tab" aria-selected={tab === 'profit'} className="fn-tab" onClick={() => update({ aba: 'lucro', pagina: null })} data-testid="aba-lucro">
-                Gastos e lucro
-              </button>
-            )}
+      <main className="page-body fn-page">
+        {/* Os quadros SÃO o menu: cada um abre a sua lista logo abaixo */}
+        {summary.loading && <div className="fn-cards">{[0, 1, 2].map((i) => <div key={i} className="fn-card fn-card--loading" aria-hidden="true" />)}</div>}
+        {!summary.loading && Boolean(summary.error) && (
+          <div className="cl-state" role="alert">
+            <p className="cl-state__title">Não foi possível carregar o resumo.</p>
+            <Button className="btn--secondary" onClick={() => setVersion((n) => n + 1)}>Tentar novamente</Button>
           </div>
+        )}
+        {s && (
+          <FinanceHero s={s} monthName={monthName} showProfit={showProfit} monthLeft={monthLeft} monthPercent={monthPercent} />
+        )}
 
-          {tab === 'profit' ? (
-            <>
-              <ListState loading={profit.loading} error={profit.error} empty={false} emptyTitle="" emptyText="" onRetry={() => setVersion((n) => n + 1)} />
-              {profit.data && <ProfitTab report={profit.data} label={range.label} from={range.from} to={range.to} onAddExpense={(id) => { void getOrder(id).then((order) => setAction({ kind: 'expense', order })).catch(() => setToast('Não foi possível abrir o pedido. Tente de novo.')) }} />}
-            </>
-          ) : tab === 'receivable' ? (
-            <>
-              <div className="oc-chips" role="group" aria-label="Filtrar">
-                {FILTERS.map((f) => (
-                  <button key={f.value} type="button" className="oc-chip" aria-pressed={filter === f.value} onClick={() => update({ filtro: f.value === 'ALL' ? null : f.value, pagina: null })}>{f.label}</button>
-                ))}
-              </div>
-              <div role="search" className="cl-field fn-search">
-                <label htmlFor="busca-financeiro" className="cl-field__label">Buscar</label>
-                <div className="cl-search">
-                  <svg className="cl-search__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
-                  <input id="busca-financeiro" type="search" className="cl-input cl-search__input" placeholder="Nome do cliente ou número do pedido" value={term}
-                    onChange={(e) => setTerm(e.target.value)} autoComplete="off" aria-describedby="busca-fin-dica" data-testid="busca-financeiro" />
-                </div>
-                <p id="busca-fin-dica" className="cl-field__hint" aria-live="polite">{term.trim().length === 1 ? 'Digite pelo menos 2 caracteres para buscar.' : ''}</p>
-              </div>
+        {/* Atalhos: a página é uma só (design 13) */}
+        <nav className="fn-jump" aria-label="Ir para">
+          <a href="#falta">Falta receber</a>
+          <a href="#entrou">O que entrou</a>
+          {showProfit && <a href="#resumo">Resumo do mês</a>}
+        </nav>
+
+        <section id="falta" className="zv-card fn-section" aria-labelledby="t-falta-receber">
+          <div className="fn-section__head">
+            <h2 id="t-falta-receber" className="fn-section__title">Falta receber</h2>
+            {s && <span className="cl-muted">{s.receivableOrders === 1 ? '1 pedido' : `${s.receivableOrders} pedidos`} · {formatMoney(s.receivableCents)} · os atrasados aparecem primeiro</span>}
+          </div>
+          <ListFilters value={term} onChange={setTerm} placeholder="Buscar cliente ou pedido" testId="busca-financeiro"
+                hint={term.trim().length === 1 ? 'Digite pelo menos 2 caracteres para buscar.' : undefined}>
+                <SegFilter label="Mostrar" options={FILTERS} value={filter} onChange={(v) => update({ filtro: v === 'ALL' ? null : v, pagina: null })} />
+              </ListFilters>
               <ListState loading={receivables.loading} error={receivables.error} empty={receivables.data?.totalElements === 0}
                 emptyTitle={search ? `Nada a receber para "${search}".` : filter === 'OVERDUE' ? 'Ninguém devendo depois da entrega.' : 'Nada a receber.'} emptyText={search ? 'Confira o nome ou o número do pedido.' : 'Quando um pedido tiver valor em aberto, ele aparece aqui.'}
                 onRetry={() => setVersion((n) => n + 1)} />
               {receivables.data && receivables.data.content.length > 0 && (
                 <>
-                  <ul className="fn-list" data-testid="lista-a-receber">
-                    {receivables.data.content.map((r) => <ReceivableRow key={r.orderId} r={r} onPay={() => setAction({ kind: 'pay', row: r })} onCollect={() => setAction({ kind: 'collect', row: r })} />)}
-                  </ul>
+                  <div className="zv-table-wrap">
+                    <table className="zv-table" data-testid="lista-a-receber">
+                      <thead><tr><th scope="col">Cliente</th><th scope="col">Situação</th><th scope="col">Falta receber</th><th scope="col"><span className="sr-only">Ações</span></th></tr></thead>
+                      <tbody>
+                        {receivables.data.content.map((r) => <ReceivableRow key={r.orderId} r={r} onPay={() => setAction({ kind: 'pay', row: r })} onCollect={() => setAction({ kind: 'collect', row: r })} />)}
+                      </tbody>
+                    </table>
+                  </div>
                   <Pagination page={receivables.data.page} totalPages={receivables.data.totalPages} size={receivables.data.size} total={receivables.data.totalElements} shown={receivables.data.content.length}
                     onChange={(p) => update({ pagina: p === 0 ? null : String(p + 1) })} />
                 </>
               )}
-            </>
-          ) : (
-            <>
-              <p className="oc-small cl-muted">Pagamentos registrados {range.label} ({formatDay(range.from)} a {formatDay(range.to)}). Estornados não entram.</p>
-              <ListState loading={received.loading} error={received.error} empty={received.data?.totalElements === 0}
-                emptyTitle="Nenhum pagamento no período." emptyText="Escolha outro período no topo da página." onRetry={() => setVersion((n) => n + 1)} />
+        </section>
+
+        <section id="entrou" className="zv-card fn-section" aria-labelledby="t-entrou">
+          <div className="fn-section__head">
+            <h2 id="t-entrou" className="fn-section__title">O que entrou {receivedRange.label}</h2>
+            {periodSummary.data && periodSummary.data.receivedPayments > 0 && (
+              <span className="fn-section__chips">
+                <span className="fn-chip fn-chip--good">Total <strong>{formatMoney(periodSummary.data.receivedCents)}</strong></span>
+                {periodSummary.data.byMethod.map((m) => <span key={m.method} className="fn-chip">{METHOD_LABEL[m.method]} <strong>{formatMoney(m.amountCents)}</strong></span>)}
+              </span>
+            )}
+          </div>
+          <div className="fn-periods" role="group" aria-label="Período">
+            {PERIODS.map((p) => (
+              <button key={p.value} type="button" className="fn-periods__btn" aria-pressed={receivedPeriod === p.value}
+                onClick={() => update({ entrou: p.value === 'THIS_MONTH' ? null : p.value, paginaEntrou: null })} data-testid={`entrou-${p.value}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <ListState loading={received.loading} error={received.error} empty={received.data?.totalElements === 0}
+                emptyTitle="Nenhum pagamento neste período." emptyText="Escolha outro período." onRetry={() => setVersion((n) => n + 1)} />
               {received.data && received.data.content.length > 0 && (
                 <>
-                  <table className="cl-table fn-table" data-testid="lista-recebidos">
-                    <thead><tr><th scope="col">Data</th><th scope="col">Cliente</th><th scope="col">Pedido</th><th scope="col">Forma</th><th scope="col" className="oc-num">Valor</th></tr></thead>
-                    <tbody>
-                      {received.data.content.map((p) => (
-                        <tr key={p.id}>
-                          <td className="fn-table__date">{formatDay(p.paidAt)}</td>
-                          <td className="fn-table__customer">{p.customerName}</td>
-                          <td className="fn-table__order"><Link to={`/pedidos/${p.orderId}`}>#{p.orderNumber}</Link></td>
-                          <td className="fn-table__method">{METHOD_LABEL[p.method]}</td>
-                          <td className="oc-num fn-table__value">{formatMoney(p.amountCents)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                  {/* Cada pagamento é um cartão: quem pagou e quanto em destaque; o resto em letra menor */}
+                  <ul className="fn-pays" data-testid="lista-recebidos">
+                    {received.data.content.map((p) => (
+                      <li key={p.orderId} className="fn-pay">
+                        <div className="fn-pay__top">
+                          <span className="fn-pay__who">
+                            <span className="fn-pay__name">{p.customerName}</span>
+                            <span className="fn-pay__meta">{p.payments.length === 1 ? `${formatDay(p.lastPaidAt)} · ${METHOD_LABEL[p.payments[0].method]}` : `${p.payments.length} pagamentos`} · <Link to={`/pedidos/${p.orderId}`}>Pedido #{p.orderNumber}</Link></span>
+                          </span>
+                          <strong className="fn-pay__value">+ {formatMoney(p.amountCents)}</strong>
+                        </div>
+                        {p.payments.length > 1 && (
+                          <ul className="fn-pay__parts" data-testid="partes-pagamento">
+                            {p.payments.map((part) => <li key={part.id}><span>{formatDay(part.paidAt)} · {METHOD_LABEL[part.method]}</span><span>{formatMoney(part.amountCents)}</span></li>)}
+                          </ul>
+                        )}
+                        {p.split && <PaymentSplit split={p.split} onAddExpense={() => openOrder(p.orderId, 'expense')} onEditExpenses={() => openOrder(p.orderId, 'expenses')} />}
+                      </li>
+                    ))}
+                  </ul>
                   <Pagination page={received.data.page} totalPages={received.data.totalPages} size={received.data.size} total={received.data.totalElements} shown={received.data.content.length}
-                    onChange={(p) => update({ pagina: p === 0 ? null : String(p + 1) })} />
+                    onChange={(p) => update({ paginaEntrou: p === 0 ? null : String(p + 1) })} />
                 </>
               )}
-            </>
-          )}
         </section>
+
+        {showProfit && (
+          <section id="resumo" className="zv-card fn-section" aria-labelledby="t-resumo">
+            <div className="fn-section__head">
+              <h2 id="t-resumo" className="fn-section__title">Resumo do mês</h2>
+              <span className="cl-muted">Como foi {range.label}. Só Admin e Gerente veem.</span>
+            </div>
+            <div className="fn-periods" role="group" aria-label="Período">
+            {PERIODS.map((p) => (
+              <button key={p.value} type="button" className="fn-periods__btn" aria-pressed={period === p.value}
+                onClick={() => update({ periodo: p.value === 'THIS_MONTH' ? null : p.value })} data-testid={`periodo-${p.value}`}>
+                {p.label}
+              </button>
+            ))}
+          </div>
+            <ListState loading={profit.loading} error={profit.error} empty={false} emptyTitle="" emptyText="" onRetry={() => setVersion((n) => n + 1)} />
+              {profit.data && <ProfitTab report={profit.data} byMonth={profitByMonth.data ?? null} label={range.label} onAddExpense={(id) => openOrder(id, 'expense')}
+                onPay={(o) => setAction({ kind: 'pay', row: { orderId: o.orderId, number: o.number, customerName: o.customerName, remainingCents: o.totalCents - o.paidCents } })} />}
+          </section>
+        )}
       </main>
 
       {action?.kind === 'pay' && (
@@ -227,92 +273,363 @@ export function FinancialPage() {
           onCancel={() => setAction(null)} onDone={() => finished('WhatsApp aberto. Confira a mensagem e envie por lá.')} />
       )}
       {action?.kind === 'expense' && (
-        <ExpenseDialog order={action.order} expense={null} onCancel={() => setAction(null)} onDone={(o) => finished(`Gasto lançado no pedido #${o.number}.`)} />
+        <ExpenseDialog order={action.order} expense={null} onCancel={() => setAction(null)} onDone={(o) => finished(`Material lançado no pedido #${o.number}. O que o cliente deve não muda: para isso, use "Recebi pagamento".`)} />
       )}
+      {action?.kind === 'expenses' && (
+        <ExpensesListDialog order={action.order} onCancel={() => setAction(null)}
+          onEdit={(expense) => setAction({ kind: 'editExpense', order: action.order, expense })}
+          onDelete={(expense) => setAction({ kind: 'deleteExpense', order: action.order, expense })} />
+      )}
+      {action?.kind === 'editExpense' && (
+        <ExpenseDialog order={action.order} expense={action.expense} onCancel={() => setAction({ kind: 'expenses', order: action.order })}
+          onDone={(o) => finished(`Gasto corrigido no pedido #${o.number}.`)} />
+      )}
+      {action?.kind === 'deleteExpense' && (
+        <DeleteExpenseDialog order={action.order} expense={action.expense} onCancel={() => setAction({ kind: 'expenses', order: action.order })}
+          onDone={(o) => finished(`Gasto excluído do pedido #${o.number}.`)} />
+      )}
+      {picking && <PickOrderDialog onCancel={() => setPicking(false)} onPick={(row) => { setPicking(false); setAction({ kind: 'pay', row }) }} />}
       <Toast message={toast} onClose={clearToast} />
     </>
   )
 }
 
 // HU27 — Gastos e lucro do período (só ADMIN e MANAGER)
-function ProfitTab({ report, label, from, to, onAddExpense }: { report: ProfitReport; label: string; from: string; to: string; onAddExpense: (orderId: number) => void }) {
-  const neg = report.cashCents < 0
-  const missing = report.orders.filter((o) => !o.hasExpenses || o.materialCents === 0 || o.laborCents === 0).length
+// Recebidos: de onde vem e para onde vai cada pagamento, em linguagem simples
+// Também lança/corrige o material dali mesmo: quem esqueceu de lançar no pedido resolve em Recebidos.
+function PaymentSplit({ split: s, onAddExpense, onEditExpenses }: {
+  split: NonNullable<ReceivedPayment['split']>; onAddExpense: () => void; onEditExpenses: () => void
+}) {
+  const noMaterial = s.orderMaterialCents === 0 && s.orderOtherCents === 0
+  // Etiquetas curtas no lugar de frases: dá para entender batendo o olho
   return (
-    <div className="fn-profit">
-      <p className="oc-small cl-muted">Dinheiro que entrou e saiu {label} ({formatDay(from)} a {formatDay(to)}).</p>
-      <div className="fn-cash" data-testid="resumo-lucro">
-        <div className="fn-cash__item"><span>Recebido</span><strong className="pd-plus">{formatMoney(report.receivedCents)}</strong></div>
-        <span className="fn-cash__op" aria-hidden="true">−</span>
-        <div className="fn-cash__item">
-          <span>Gastos</span><strong>{formatMoney(report.expensesCents)}</strong>
-          <span className="oc-small cl-muted"><i className="pd-dot is-material" />Material {formatMoney(report.materialCents)} · <i className="pd-dot is-labor" />Mão de obra {formatMoney(report.laborCents)}</span>
+    <div className="fn-split" data-testid="detalhe-pagamento">
+      <span className="fn-split__chips">
+        {noMaterial ? (
+          <span className="fn-chip fn-chip--warn">Sem material lançado</span>
+        ) : (
+          <>
+            <span className="fn-chip"><i className="pd-dot is-material" />Material do pedido <strong>{formatMoney(s.orderMaterialCents + s.orderOtherCents)}</strong></span>
+            <span className={`fn-chip ${s.orderLaborCents < 0 ? 'fn-chip--bad' : 'fn-chip--good'}`}><i className="pd-dot is-labor" />{s.orderLaborCents < 0 ? 'Prejuízo' : 'Sua mão de obra'} <strong>{formatMoney(s.orderLaborCents)}</strong></span>
+          </>
+        )}
+        {s.orderRemainingCents > 0
+          ? <span className="fn-chip fn-chip--muted">Falta receber <strong>{formatMoney(s.orderRemainingCents)}</strong></span>
+          : <span className="fn-chip fn-chip--muted"><AppIcon name="check" size={16} />Pedido pago</span>}
+      </span>
+      <span className="fn-split__actions">
+        {/* Um valor de material por pedido: depois de lançado, só editar */}
+        {noMaterial
+          ? <button type="button" className="btn btn--primary fn-add" onClick={onAddExpense} data-testid="lancar-material-recebido"><AppIcon name="plus" size={24} onAccent={noMaterial} />Lançar material</button>
+          : <button type="button" className="btn btn--secondary fn-add" onClick={onEditExpenses} data-testid="editar-gastos-recebido"><AppIcon name="edit" size={24} />Editar material</button>}
+      </span>
+    </div>
+  )
+}
+
+const HEALTH_TAG: Record<ProfitHealth, string> = { OUT_OF_POCKET: 'Prejuízo', LOW: 'Prejuízo', NORMAL: 'Normal', GREAT: 'Ótimo' }
+
+// "Gastos e lucro" virou um painel: em poucos segundos, o mês foi bom ou ruim?
+// O detalhe de cada pagamento (material × mão de obra) e a correção do material ficam em Recebidos.
+const VERDICT: Record<ProfitHealth, { title: string; tone: 'bad' | 'ok' | 'great' }> = {
+  OUT_OF_POCKET: { title: 'Mês ruim: teve prejuízo', tone: 'bad' },
+  LOW: { title: 'Mês ruim: sobrou pouco', tone: 'bad' },
+  NORMAL: { title: 'Mês bom', tone: 'ok' },
+  GREAT: { title: 'Mês ótimo', tone: 'great' },
+}
+
+type ServiceRow = { o: ProfitRow; view: ProfitView }
+
+function ProfitTab({ report, byMonth, label, onAddExpense, onPay }: {
+  byMonth: { month: string; leftCents: number; percent: number | null }[] | null
+  report: ProfitReport; label: string; onAddExpense: (orderId: number) => void; onPay: (o: ProfitRow) => void
+}) {
+  const active = report.orders.filter((o) => o.status !== 'CANCELED')
+  // Cada serviço com a MESMA conta do pedido (profitView): régua, selo e mão de obra
+  const rows: ServiceRow[] = active.map((o) => ({
+    o,
+    view: profitView({
+      totalCents: o.totalCents, materialCents: o.materialCents, expectedProfitCents: o.expectedProfitCents,
+    }),
+  }))
+  const rated = rows.filter((r) => r.view.rate !== null)     // já tem material: dá para medir
+  const missing = rows.filter((r) => r.o.materialCents === 0) // sem material: falta lançar
+  const sum = (list: ServiceRow[], f: (o: ProfitRow) => number) => list.reduce((s, r) => s + f(r.o), 0)
+
+  // Veredito do mês: a régua aplicada à soma dos serviços que já têm material
+  const ratedTotal = sum(rated, (o) => o.totalCents)
+  const ratedLabor = sum(rated, (o) => o.expectedProfitCents)
+  const month = rated.length > 0 ? profitHealth(ratedTotal, ratedLabor) : null
+  const verdict = month ? VERDICT[month.health] : null
+
+  const servicesCents = sum(rows, (o) => o.totalCents)
+  const materialCents = sum(rows, (o) => o.materialCents + o.laborCents)
+  const toReceiveCents = sum(rows, (o) => Math.max(0, o.totalCents - o.paidCents))
+
+  const byPercent = [...rated].sort((a, b) => b.view.rate!.percent - a.view.rate!.percent)
+  const best = byPercent[0]
+  const worst = byPercent.length > 1 ? byPercent[byPercent.length - 1] : null
+  // Listas de 5 em 5 (design 25/10). Os números de cima continuam do resumo inteiro.
+  const missingPage = usePagedList(missing, 5)
+  const servicesPage = usePagedList(byPercent, 5)
+
+  if (active.length === 0) {
+    return <div className="cl-state"><p className="cl-state__title">Nenhum serviço com movimento {label}.</p><p className="cl-state__text">Escolha outro período acima.</p></div>
+  }
+
+  return (
+    <div className="fn-profit" data-testid="resumo-lucro">
+      {/* 1. O veredito */}
+      <section className={`fn-verdict fn-verdict--${verdict?.tone ?? 'none'}`} aria-labelledby="t-veredito">
+        <h3 id="t-veredito" className="fn-verdict__title"><AppIcon name={!verdict ? 'chart' : verdict.tone === 'bad' ? 'alert' : 'check'} size={44} />{verdict ? verdict.title : 'Ainda não dá para saber'}</h3>
+        {month ? (
+          <>
+            <p className="fn-verdict__text">
+              {rated.length === 1 ? 'No serviço' : `Nos ${rated.length} serviços`} com material lançado, sobrou <strong>{formatPercentBR(month.percent)}</strong> para a sua mão de obra.
+              {' '}O normal é de {LABOR_MIN_PERCENT}% a {LABOR_GOOD_PERCENT}%.
+              {month.health === 'LOW' && <> Para chegar em {LABOR_MIN_PERCENT}%, faltaram <strong>{formatMoney(month.missingCents)}</strong>.</>}
+              {month.health === 'OUT_OF_POCKET' && <> Os gastos passaram o valor dos serviços: <strong>{formatMoney(-ratedLabor)}</strong> saíram do seu bolso.</>}
+            </p>
+            <MonthGauge percent={month.percent} />
+          </>
+        ) : (
+          <p className="fn-verdict__text">Nenhum serviço deste período tem material lançado. Lance o material (aqui embaixo ou em Recebidos) para ver se o mês foi bom.</p>
+        )}
+      </section>
+
+      {/* 2. Os números do mês */}
+      <dl className="fn-kpis">
+        <div className="fn-kpi"><dt>Serviços</dt><dd>{formatMoney(servicesCents)}</dd><span>{active.length === 1 ? '1 serviço' : `${active.length} serviços`}</span></div>
+        <div className="fn-kpi"><dt><i className="pd-dot is-material" />Material</dt><dd>− {formatMoney(materialCents)}</dd><span>{missing.length > 0 ? `${missing.length} sem material lançado` : 'todos lançados'}</span></div>
+        <div className="fn-kpi fn-kpi--mine"><dt><i className="pd-dot is-labor" />Sua mão de obra</dt><dd className={ratedLabor < 0 ? 'fn-neg' : 'fn-pos'} data-testid="mao-de-obra-periodo">{formatMoney(ratedLabor)}</dd><span>{missing.length > 0 ? 'só dos serviços com material' : 'serviços − material'}</span></div>
+        <div className="fn-kpi"><dt>Falta receber</dt><dd>{formatMoney(toReceiveCents)}</dd><span>{toReceiveCents > 0 ? 'destes serviços' : 'tudo recebido'}</span></div>
+      </dl>
+
+      {/* 3. Melhor e pior serviço */}
+      {best && (
+        <div className="fn-duo">
+          {/* Com 1 serviço só, não é "melhor" nem "pior": é "o serviço do mês" */}
+          <ServiceHighlight label={worst ? 'Melhor serviço' : 'Serviço do mês'} row={best} />
+          {worst && <ServiceHighlight label="Pior serviço" row={worst} />}
         </div>
-        <span className="fn-cash__op" aria-hidden="true">=</span>
-        <div className={`fn-cash__item fn-cash__result${neg ? ' is-neg' : ''}`}><span>Sobrou {label}</span><strong data-testid="sobrou-periodo">{formatMoney(report.cashCents)}</strong></div>
+      )}
+
+      <div className="fn-two">
+      {byMonth && <LeftByMonth rows={byMonth} />}
+      {/* 4. O que falta fazer */}
+      {missing.length > 0 && (
+        <section className="fn-todo" aria-labelledby="t-falta">
+          <h3 id="t-falta" className="fn-subtitle fn-subtitle--icon"><AppIcon name="material" size={32} />Falta lançar o material ({missing.length === 1 ? '1 serviço' : `${missing.length} serviços`})</h3>
+          <p className="oc-small cl-muted">Sem o material, não dá para saber quanto estes serviços deixaram para você.</p>
+          <ul className="fn-mini">
+            {missingPage.content.map(({ o }) => (
+              <li key={o.orderId}>
+                <span><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link><span className="cl-muted oc-small"> · #{o.number} · {formatMoney(o.totalCents)}</span></span>
+                <span className="fn-mini__right">
+                  {o.totalCents > o.paidCents && <button type="button" className="btn btn--secondary fn-add" onClick={() => onPay(o)} data-testid="receber-falta-material">Recebi pagamento</button>}
+                  <button type="button" className="btn btn--secondary fn-add" onClick={() => onAddExpense(o.orderId)} data-testid="lancar-gasto-linha"><AppIcon name="plus" size={24} />Lançar material</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+          {missingPage.needsPages && <Pagination page={missingPage.page} totalPages={missingPage.totalPages} size={missingPage.size} total={missingPage.total} shown={missingPage.content.length} onChange={missingPage.setPage} />}
+        </section>
+      )}
+
       </div>
 
-      <h3 className="fn-subtitle">Quanto cada serviço deu</h3>
-      {report.orders.length === 0 ? (
-        <div className="cl-state"><p className="cl-state__title">Nenhum serviço com movimento no período.</p><p className="cl-state__text">Escolha outro período no topo da página.</p></div>
-      ) : (
-        <>
-          {missing > 0 && <p className="fn-warn" role="note">{missing === 1 ? '1 serviço ainda não tem' : `${missing} serviços ainda não têm`} material e mão de obra lançados. Lance os dois para o lucro ficar certo.</p>}
-          <ul className="fn-list" data-testid="lista-lucro">
-            {report.orders.map((o) => {
-              const loss = o.profitCents < 0
-              const missing = !o.hasExpenses ? null : o.materialCents === 0 ? 'Falta lançar material' : o.laborCents === 0 ? 'Falta lançar mão de obra' : null
-              const pct = o.totalCents > 0 ? Math.min(100, Math.max(0, (o.expensesCents / o.totalCents) * 100)) : 100
-              return (
-                <li key={o.orderId} className="fn-prow">
-                  <span className="fn-row__who">
-                    <span className="fn-row__title"><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link></span>
-                    <span className="cl-muted oc-small">Pedido #{o.number} · {STATUS[o.status]}</span>
-                  </span>
-                  <span className={`fn-prow__bar${o.hasExpenses ? '' : ' is-empty'}`} aria-hidden="true">{o.hasExpenses && <span style={{ width: `${pct}%` }} className={loss ? 'is-loss' : ''} />}</span>
-                  <span className="fn-prow__nums cl-muted oc-small"><span>Serviço {formatMoney(o.totalCents)}</span><span>Gastos {formatMoney(o.expensesCents)}</span></span>
-                  <span className="fn-row__rest">
-                    {o.hasExpenses ? (
-                      <>
-                        <span className={missing && !loss ? 'fn-pending oc-small' : 'cl-muted oc-small'}>{loss ? 'Prejuízo' : missing ?? `Lucro · ${String(o.marginPercent).replace('.', ',')}%`}</span>
-                        <strong className={loss ? 'fn-neg' : missing ? '' : 'fn-pos'}>{formatMoney(o.profitCents)}</strong>
-                      </>
-                    ) : (
-                      <span className="cl-muted oc-small">Sem gastos lançados</span>
-                    )}
-                  </span>
-                  <button type="button" className="btn btn--secondary fn-add" onClick={() => onAddExpense(o.orderId)} aria-label={`Lançar gasto no pedido ${o.number} de ${o.customerName}`} data-testid="lancar-gasto-linha">+ Lançar gasto</button>
-                </li>
-              )
-            })}
+      {/* 5. Todos os serviços, resumidos */}
+      {rated.length > 0 && (
+        <section aria-labelledby="t-todos">
+          <h3 id="t-todos" className="fn-subtitle">Como foi cada serviço ({rated.length === 1 ? '1 serviço' : `${rated.length} serviços`})</h3>
+          <ul className="fn-mini" data-testid="lista-lucro">
+            {servicesPage.content.map(({ o, view }) => (
+              <li key={o.orderId}>
+                <span><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link><span className="cl-muted oc-small"> · #{o.number} · {STATUS[o.status]}</span></span>
+                <span className="fn-mini__right">
+                  <span className={`pd-health__tag fn-tag pd-health--${view.rate!.health.toLowerCase()}`}>{HEALTH_TAG[view.rate!.health]} · {formatPercentBR(view.rate!.percent)}</span>
+                  <strong className={view.tone === 'loss' ? 'fn-neg' : 'fn-pos'} data-testid="lucro-servico">{formatMoney(view.valueCents)}</strong>
+                  {o.totalCents > o.paidCents && <button type="button" className="btn btn--secondary fn-add" onClick={() => onPay(o)} data-testid="receber-servico">Recebi pagamento</button>}
+                </span>
+              </li>
+            ))}
           </ul>
-        </>
+          {servicesPage.needsPages && <Pagination page={servicesPage.page} totalPages={servicesPage.totalPages} size={servicesPage.size} total={servicesPage.total} shown={servicesPage.content.length} onChange={servicesPage.setPage} />}
+        </section>
       )}
     </div>
   )
 }
 
-function ReceivableRow({ r, onPay, onCollect }: { r: Receivable; onPay: () => void; onCollect: () => void }) {
-  const overdue = r.paymentStatus === 'OVERDUE'
-  let situation: string
-  if (r.status === 'DELIVERED' && r.deliveredOn) situation = `Entregue ${sinceText(r.deliveredOn)}`
-  else {
-    situation = `${ORDER_STATUS_LABEL[r.status]} · pedido de ${formatDayShort(isoDateTimeToDay(r.createdAt))}`
-  }
-  const collected = r.lastCollectionAt ? `cobrado ${formatDayShort(isoDateTimeToDay(r.lastCollectionAt))}` : overdue ? 'nunca cobrado' : null
+function ServiceHighlight({ label, row: { o, view } }: { label: string; row: ServiceRow }) {
+  const loss = view.tone === 'loss'
   return (
-    <li className={`fn-row${overdue ? ' fn-row--overdue' : ''}`}>
-      <span className="fn-row__who">
-        <span className="fn-row__title"><Link to={`/pedidos/${r.orderId}`}>{r.customerName}</Link><PaymentStatusBadge status={r.paymentStatus} /></span>
-        <span className="cl-muted oc-small">Pedido #{r.number} · {situation}{collected ? ` · ${collected}` : ''}</span>
+    <div className={`fn-highlight${loss ? ' is-loss' : ''}`}>
+      <span className="fn-highlight__label">{label}</span>
+      <Link to={`/pedidos/${o.orderId}`} className="fn-highlight__name">{o.customerName}</Link>
+      <span className="cl-muted oc-small">Pedido #{o.number} · serviço de {formatMoney(o.totalCents)}</span>
+      <span className="fn-highlight__value">
+        <strong className={loss ? 'fn-neg' : 'fn-pos'}>{formatMoney(view.valueCents)}</strong>
+        <span className={`pd-health__tag fn-tag pd-health--${view.rate!.health.toLowerCase()}`}>{HEALTH_TAG[view.rate!.health]} · {formatPercentBR(view.rate!.percent)}</span>
       </span>
-      <span className="fn-row__money cl-muted oc-small"><span>Total {formatMoney(r.totalCents)}</span><span>Recebido {formatMoney(r.paidCents)}</span></span>
-      <span className="fn-row__rest"><span className="cl-muted oc-small">Falta</span><strong>{formatMoney(r.remainingCents)}</strong></span>
-      <span className="fn-row__actions">
-        <Button className="btn--secondary" onClick={onCollect} data-testid="cobrar-linha">Cobrar</Button>
-        <Button className={overdue ? undefined : 'btn--secondary'} onClick={onPay} data-testid="pagar-linha">Registrar pagamento</Button>
-      </span>
-    </li>
+    </div>
+  )
+}
+
+// Régua do mês: onde caiu a média, com a faixa normal (30% a 45%) marcada
+function MonthGauge({ percent }: { percent: number }) {
+  const scale = 60
+  const pos = (n: number) => `${Math.min(100, Math.max(0, (n / scale) * 100))}%`
+  return (
+    <div className="fn-gauge" role="img" aria-label={`${formatPercentBR(percent)} de mão de obra. Normal de ${LABOR_MIN_PERCENT}% a ${LABOR_GOOD_PERCENT}%.`}>
+      <div className="pd-health__track">
+        <span className="pd-health__ok" style={{ left: pos(LABOR_MIN_PERCENT), width: `calc(${pos(LABOR_GOOD_PERCENT)} - ${pos(LABOR_MIN_PERCENT)})` }} />
+        <span className="pd-health__great" style={{ left: pos(LABOR_GOOD_PERCENT), right: 0 }} />
+        <span className="pd-health__mark" style={{ left: pos(percent) }} />
+      </div>
+      <div className="pd-health__scale" aria-hidden="true">
+        <span>0%</span><span style={{ left: pos(LABOR_MIN_PERCENT) }}>{LABOR_MIN_PERCENT}%</span><span style={{ left: pos(LABOR_GOOD_PERCENT) }}>{LABOR_GOOD_PERCENT}%</span>
+      </div>
+    </div>
+  )
+}
+
+const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('')
+const shortMoney = (cents: number) => (cents >= 100000 ? `R$ ${(cents / 100000).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mil` : formatMoney(cents))
+const monthShort = (month: string) => {
+  const name = new Intl.DateTimeFormat('pt-BR', { month: 'short' }).format(new Date(`${month}-15T12:00:00`)).replace('.', '')
+  return name.charAt(0).toUpperCase() + name.slice(1)
+}
+const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`)
+
+function FinanceHero({ s, monthName, showProfit, monthLeft, monthPercent }: { s: FinancialSummary; monthName: string; showProfit: boolean; monthLeft: number | null; monthPercent: number | null }) {
+  const sold = s.receivedCents + s.receivableCents
+  const percent = sold > 0 ? Math.round((s.receivedCents / sold) * 100) : 0
+  return (
+    <section className="fn-hero" aria-label="Resumo do mês">
+      <div data-testid="total-a-receber">
+        <span className="fn-hero__label">Falta receber</span>
+        <b className="fn-hero__value">{formatMoney(s.receivableCents)}</b>
+        <span>
+          {s.receivableOrders === 0 ? 'Ninguém devendo' : `em ${plural(s.receivableOrders, 'pedido', 'pedidos')}`}
+          {s.overdueOrders > 0 && <> · <strong className="fn-hero__late" data-testid="total-atrasado">{plural(s.overdueOrders, 'atrasado', 'atrasados')} ({formatMoney(s.overdueCents)})</strong></>}
+        </span>
+        <div className="fn-hero__progress">
+          <div className="fn-hero__row"><span>Recebido de tudo que foi vendido em {monthName}</span><strong>{percent}%</strong></div>
+          <div className="fn-hero__bar"><i style={{ width: `${percent}%` }} /></div>
+          <div className="fn-hero__row"><span>{formatMoney(s.receivedCents)} recebidos</span><span>de {formatMoney(sold)}</span></div>
+        </div>
+      </div>
+      <div className="fn-hero__tiles">
+        <div className="fn-hero__tile" data-testid="total-recebido">
+          <span>Entrou em {monthName}</span><b className="is-good">{shortMoney(s.receivedCents)}</b>
+          <span>{s.receivedPayments === 0 ? 'Nenhum pagamento' : plural(s.receivedPayments, 'pagamento', 'pagamentos')}</span>
+        </div>
+        <div className="fn-hero__tile">
+          <span>Atrasado</span><b className={s.overdueCents > 0 ? 'is-bad' : undefined}>{shortMoney(s.overdueCents)}</b>
+          <span>{plural(s.overdueCustomers, 'cliente', 'clientes')}</span>
+        </div>
+        <div className="fn-hero__tile">
+          <span>Ainda não entregue</span><b>{shortMoney(s.notDeliveredCents)}</b>
+          <span>{plural(s.notDeliveredOrders, 'pedido', 'pedidos')}</span>
+        </div>
+        {showProfit && (
+          <div className="fn-hero__tile" data-testid="aba-lucro">
+            <span>Sobrou para você</span><b>{shortMoney(monthLeft ?? 0)}</b>
+            <span>{monthPercent === null ? 'Lance o material para ver' : `${monthPercent}% dos serviços`}</span>
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function LeftByMonth({ rows }: { rows: { month: string; leftCents: number; percent: number | null }[] }) {
+  const max = Math.max(1, ...rows.map((r) => r.leftCents))
+  return (
+    <section className="zv-card fn-panel" aria-labelledby="t-sobrou-mes">
+      <h3 id="t-sobrou-mes" className="fn-panel__title">Quanto sobrou por mês</h3>
+      <p className="fn-panel__sub">Em reais e a % de cada mês.</p>
+      <ol className="fn-bars fn-bars--green" data-testid="grafico-sobrou">
+        {rows.map((r, i) => (
+          <li key={r.month} className={i === rows.length - 1 ? 'is-now' : undefined}>
+            <span>{shortMoney(Math.max(0, r.leftCents))}</span>
+            <i style={{ height: `${Math.round((Math.max(0, r.leftCents) / max) * 70)}%` }} />
+            <span>{monthShort(r.month)}{r.percent !== null && <><br />{r.percent}%</>}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+  )
+}
+
+// Botão "Registrar pagamento" do topo: escolhe o pedido e segue para a janela de pagamento que já existe
+function PickOrderDialog({ onCancel, onPick }: { onCancel: () => void; onPick: (row: Receivable) => void }) {
+  const [term, setTerm] = useState('')
+  const [query, setQuery] = useState('')
+  const [selected, setSelected] = useState<Receivable | null>(null)
+  useEffect(() => {
+    const timer = setTimeout(() => setQuery(term.trim().length >= 2 ? term.trim() : ''), 300)
+    return () => clearTimeout(timer)
+  }, [term])
+  const fetcher = useCallback(() => listReceivables('ALL', query, 0, 100), [query])
+  const list = useRequest(`pick|${query}`, fetcher)
+  return (
+    <ConfirmDialog open title="Registrar pagamento" confirmLabel="Continuar" confirmDisabled={!selected} onCancel={onCancel} onConfirm={() => { if (selected) onPick(selected) }}>
+      <div className="fn-pick">
+        <label className="cl-field">
+          <span className="cl-field__label">De quem é o pagamento?</span>
+          <input autoComplete="off" className="cl-input" type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Cliente ou número do pedido" data-testid="registrar-busca" />
+        </label>
+        {list.loading && <p className="cl-muted">Buscando…</p>}
+        {Boolean(list.error) && <p className="field__error">Não foi possível buscar. Tente de novo.</p>}
+        {list.data?.content.length === 0 && <p className="cl-muted">{query ? `Nenhum pedido com valor em aberto para "${query}".` : 'Nenhum pedido com valor em aberto.'}</p>}
+        {list.data && list.data.content.length > 0 && (
+          <ul className="fn-pick__list">
+            {/* Para achar pelo nome: em ordem alfabética */}
+            {[...list.data.content].sort((a, b) => a.customerName.localeCompare(b.customerName, 'pt-BR') || a.number.localeCompare(b.number)).map((r) => (
+              <li key={r.orderId}>
+                <label className="fn-pick__opt">
+                  <input type="radio" name="pedido-pagamento" checked={selected?.orderId === r.orderId} onChange={() => setSelected(r)} />
+                  <span>{r.customerName}<small>Pedido nº {r.number}</small></span>
+                  <strong>{formatMoney(r.remainingCents)}</strong>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+function ReceivableRow({ r, onPay, onCollect }: { r: Receivable; onPay: () => void; onCollect: () => void }) {
+  const percent = r.totalCents > 0 ? Math.round((r.paidCents / r.totalCents) * 100) : 0
+  return (
+    <tr>
+      <td><span className="fn-who"><span className="fn-avatar" aria-hidden="true">{initials(r.customerName)}</span><span className="zv-two"><Link to={`/pedidos/${r.orderId}`}>{r.customerName}</Link><span>Pedido nº {r.number}</span></span></span></td>
+      <td>
+        <span className="inv-stack">
+          {r.paymentStatus === 'OVERDUE' && r.deliveredOn
+          ? <StatusTag tone="danger">Atrasado · {sinceText(r.deliveredOn).replace('há ', '')}</StatusTag>
+          : <OrderStatusBadge status={r.status} />}
+          {r.status === 'DELIVERED' && <InvoiceTag number={r.invoiceNumber} />}
+        </span>
+      </td>
+      <td>
+        <span className="fn-paid">
+          <span className="fn-paid__row"><b>{formatMoney(r.remainingCents)}</b><span>de {formatMoney(r.totalCents)}</span></span>
+          <span className="fn-paid__bar"><i style={{ width: `${percent}%` }} /></span>
+          <small>{percent}% já pago</small>
+        </span>
+      </td>
+      <td className="zv-r zv-actions">
+        <span>
+          <button type="button" className="zv-btn zv-btn--sm" onClick={onCollect} data-testid="cobrar-linha"><MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" />Cobrar</button>
+          <button type="button" className="zv-btn zv-btn--sm" onClick={onPay} data-testid="pagar-linha"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Pagamento</button>
+        </span>
+      </td>
+    </tr>
   )
 }
 

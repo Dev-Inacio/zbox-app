@@ -1,0 +1,4 @@
+.zb-app { display: flex; min-height: 100vh; background: var(--color-bg); }
+.zb-app__main { flex: 1; min-width: 0; padding: 32px var(--page-gutter) 48px; }
+.zb-app__main > * { max-width: var(--page-max); margin-inline: auto; }
+@media (max-width: 1024px) { .zb-app { display: block; } .zb-app__main { padding-top: 24px; } }

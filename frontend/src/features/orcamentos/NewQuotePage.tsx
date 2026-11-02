@@ -2,17 +2,21 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
+import { Pagination } from '../../components/ui/Pagination'
 import { useRequest } from '../../hooks/useRequest'
 import { ApiError } from '../auth/types'
 import { listCustomers } from '../clientes/customersApi'
 import { maskPhone } from '../clientes/format'
 import type { CustomerSummary } from '../clientes/types'
 import { createQuote } from './quotesApi'
+import { AppIcon } from '../../components/ui/AppIcon'
 import '../clientes/Clientes.css'
 import './Orcamentos.css'
 
 // HU14 (início) — Novo orçamento: primeiro escolhe o cliente.
 // Vindo do detalhe do cliente (?cliente=12), cria direto com ele.
+
+const PAGE_SIZE = 8
 
 function initials(name: string) {
   return name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('')
@@ -24,17 +28,21 @@ export function NewQuotePage() {
   const presetId = Number(params.get('cliente')) || null
   const [term, setTerm] = useState('')
   const [debounced, setDebounced] = useState('')
+  const [page, setPage] = useState(0)
   const [creating, setCreating] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const startedPreset = useRef(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setDebounced(term.trim().length >= 2 ? term.trim() : ''), 300)
+    const t = setTimeout(() => {
+      setDebounced(term.trim().length >= 2 ? term.trim() : '')
+      setPage(0)
+    }, 300)
     return () => clearTimeout(t)
   }, [term])
 
-  const fetcher = useCallback(() => listCustomers({ search: debounced, status: 'ACTIVE', type: 'ALL', page: 0, size: 8 }), [debounced])
-  const customers = useRequest(`clientes|${debounced}`, fetcher)
+  const fetcher = useCallback(() => listCustomers({ search: debounced, status: 'ACTIVE', type: 'ALL', page, size: PAGE_SIZE }), [debounced, page])
+  const customers = useRequest(`clientes|${debounced}|${page}`, fetcher)
 
   const choose = useCallback(
     async (customerId: number) => {
@@ -74,7 +82,7 @@ export function NewQuotePage() {
             {error && <Alert variant="error">{error}</Alert>}
             <div className="cl-search">
               <label htmlFor="busca-cliente-orc" className="sr-only">Buscar cliente</label>
-              <svg className="cl-search__icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></svg>
+              <AppIcon name="search" size={24} className="cl-search__icon" />
               <input
                 id="busca-cliente-orc"
                 type="search"
@@ -88,9 +96,12 @@ export function NewQuotePage() {
             </div>
 
             <CustomerChoices state={customers} creating={creating} onChoose={choose} />
+            {customers.data && customers.data.totalPages > 1 && (
+              <Pagination page={customers.data.page} totalPages={customers.data.totalPages} size={customers.data.size} total={customers.data.totalElements} shown={customers.data.content.length} onChange={setPage} />
+            )}
 
             <Link to="/clientes/novo" className="oc-link-add">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14" /><path d="M5 12h14" /></svg>
+              <AppIcon name="plus" size={24} />
               Cadastrar novo cliente
             </Link>
             <p className="cl-muted oc-small">Só aparecem clientes ativos. Depois de cadastrar, use "Novo orçamento" no detalhe do cliente.</p>
@@ -100,9 +111,9 @@ export function NewQuotePage() {
             <span className="oc-step-num oc-step-num--off" aria-hidden="true">2</span>
             <div><h2 className="oc-step-locked__title">Itens</h2><span>Libera depois de escolher o cliente.</span></div>
           </section>
-          <section className="oc-step-locked" aria-label="Condições: libera depois de escolher o cliente">
+          <section className="oc-step-locked" aria-label="Observações: libera depois de escolher o cliente">
             <span className="oc-step-num oc-step-num--off" aria-hidden="true">3</span>
-            <div><h2 className="oc-step-locked__title">Condições</h2><span>Pagamento e observações.</span></div>
+            <div><h2 className="oc-step-locked__title">Observações</h2><span>Pagamento, prazo e detalhes.</span></div>
           </section>
         </div>
       </main>

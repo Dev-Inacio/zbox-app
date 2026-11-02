@@ -1,18 +1,23 @@
 import { useCallback, useState } from 'react'
+import { CircleCheck, Copy, FileDown, Printer, Trash2, X } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { PagedList } from '../../components/ui/PagedList'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { NoAutofill } from '../../components/ui/NoAutofill'
 import { Toast } from '../../components/ui/Toast'
+import { ItemsCard } from '../../components/zbox'
 import { useFlashMessage } from '../../hooks/useFlashMessage'
 import { useRequest } from '../../hooks/useRequest'
 import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { ApiError } from '../auth/types'
-import { formatDateTime, onlyDigits } from '../clientes/format'
+import { customerMobile, formatDateTime, onlyDigits } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
 import { APPROVAL_LABEL, REJECTION_LABEL, STATUS_LABEL } from './labels'
-import { formatAreaM2, formatMeters, formatMoney, formatPercent } from './money'
+import { discountLabel, toItemView } from './itemView'
+import { formatMoney } from './money'
 import {
   approveQuote, backToDraft, cancelQuote, createVersion, getQuote, registerDispatch, rejectQuote,
 } from './quotesApi'
@@ -20,6 +25,8 @@ import { canShareFiles, canSharePdf, downloadFile, generateQuotePdf } from './qu
 import { QuoteStatusBadge } from './QuoteStatusBadge'
 import { ConvertToOrderDialog } from '../pedidos/OrderDialogs'
 import type { ApprovalMethod, Quote, QuoteEvent, RejectionReason } from './types'
+import { AppIcon } from '../../components/ui/AppIcon'
+import type { AppIconName } from '../../components/ui/AppIcon'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
 import './Orcamentos.css'
@@ -60,7 +67,8 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
 
   const quote = q
   const isLatest = quote.version === quote.latestVersion
-  const canSend = isLatest && (quote.status === 'CONFIRMED' || quote.status === 'SENT')
+  // Depois de aprovado (e do pedido entregue) o orçamento continua podendo ser reenviado e impresso
+  const canResend = isLatest && (quote.status === 'SENT' || quote.status === 'APPROVED')
 
   function open(kind: DialogKind) {
     setDialogError(null)
@@ -90,10 +98,12 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
     }
   }
 
-  // Impressão: abre a página de impressão numa aba nova JÁ no clique (senão o navegador bloqueia)
-  function openPrint() {
-    window.open(`/orcamentos/${quote.id}/imprimir?versao=${quote.version}&imprimir=1`, '_blank', 'noopener')
-    void run(() => registerDispatch(quote.id, 'PRINT'), 'Impressão aberta em outra aba.')
+  // Impressão: abre a página de impressão NESTA aba e a janela de imprimir já aparece.
+  // (Em aba nova, o orçamento não aparecia: a aba nova começa do zero, sem os dados desta.)
+  async function openPrint() {
+    if (busy) return
+    await run(() => registerDispatch(quote.id, 'PRINT'), 'Impressão aberta.')
+    navigate(`/orcamentos/${quote.id}/imprimir?versao=${quote.version}&imprimir=1`)
   }
 
   // Baixar PDF: gera o arquivo e baixa direto (sem passar pela tela de impressão)
@@ -126,19 +136,19 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
   return (
     <>
       <PageHero
-        title={`Orçamento #${quote.number}`}
+        title={`Orçamento nº ${quote.number}`}
         back={{ to: '/orcamentos', label: 'Voltar para orçamentos' }}
-        badge={<><QuoteStatusBadge status={quote.status} /><span className="oc-hero-badge oc-hero-badge--outline">v{quote.version}</span></>}
+        badge={<QuoteStatusBadge status={quote.status} />}
         subtitle={subtitleFor(quote)}
         actions={
-          // Confirmado: os botões de envio ficam no painel. Enviado: ficam no topo para reenviar.
-          canSend && quote.status === 'SENT' ? (
+          // Confirmado: os botões de envio ficam no painel. Enviado ou aprovado: ficam no topo para reenviar.
+          canResend ? (
             <>
               <button type="button" className="cl-hero-btn" onClick={() => open('whatsapp')} data-testid="acao-whatsapp">
                 <WhatsIcon />WhatsApp
               </button>
-              <button type="button" className="cl-hero-btn" onClick={() => void downloadPdf()} disabled={pdfBusy} aria-busy={pdfBusy} data-testid="acao-pdf">{pdfBusy ? 'Gerando PDF…' : 'Baixar PDF'}</button>
-              <button type="button" className="cl-hero-btn" onClick={openPrint} data-testid="acao-imprimir">Imprimir</button>
+              <button type="button" className="cl-hero-btn" onClick={() => void downloadPdf()} disabled={pdfBusy} aria-busy={pdfBusy} data-testid="acao-pdf"><FileDown size={20} strokeWidth={1.8} aria-hidden="true" />{pdfBusy ? 'Gerando PDF…' : 'Baixar PDF'}</button>
+              <button type="button" className="cl-hero-btn" onClick={openPrint} data-testid="acao-imprimir"><Printer size={20} strokeWidth={1.8} aria-hidden="true" />Imprimir</button>
             </>
           ) : quote.status === 'DRAFT' && isLatest ? (
             <Link to={`/orcamentos/${quote.id}/editar`} className="cl-cta">Continuar editando</Link>
@@ -146,7 +156,7 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
         }
       />
 
-      <main className="page-body oc-layout">
+      <main className="page-body oc-layout oc-layout--detail">
         <div className="oc-layout__main">
           {!isLatest && (
             <Alert variant="info">
@@ -154,7 +164,7 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
             </Alert>
           )}
 
-          <section className="cl-card cl-card--elevated" aria-label="Situação do orçamento">
+          <section className="zv-card" aria-label="Situação do orçamento">
             {isLatest && <Stepper quote={quote} />}
             <StatusPanel
               quote={quote}
@@ -171,60 +181,38 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
             />
           </section>
 
-          <section className="cl-card" aria-labelledby="t-itens-det">
-            <h2 id="t-itens-det" className="cl-card__title">Itens</h2>
-            <table className="oc-items-table">
-              <tbody>
-                {quote.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <span className="oc-items-table__name">{item.description}</span>
-                      {item.chargeType === 'AREA' && item.widthCm && item.heightCm && (
-                        <span className="cl-muted oc-small">{item.quantity} {item.quantity === 1 ? 'peça' : 'peças'} de {formatMeters(item.widthCm)} × {formatMeters(item.heightCm)} m</span>
-                      )}
-                    </td>
-                    <td className="cl-muted">
-                      {item.chargeType === 'AREA'
-                        ? `${formatAreaM2((item.areaPerPieceCm2 ?? 0) * item.quantity)} m² × ${formatMoney(item.unitPriceCents)}`
-                        : `${item.quantity} ${item.unit ?? 'un'} × ${formatMoney(item.unitPriceCents)}`}
-                    </td>
-                    <td className="oc-num oc-strong">{formatMoney(item.subtotalCents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {quote.items.length === 0 && <p className="cl-muted">Nenhum item.</p>}
-          </section>
+          {quote.items.length > 0
+            ? <ItemsCard items={quote.items.map(toItemView)} versionLabel={`${quote.version}ª proposta`} />
+            : <section className="cl-card" aria-label="Itens"><p className="cl-muted">Nenhum item.</p></section>}
 
           <section className="cl-card" aria-labelledby="t-hist-orc">
             <h2 id="t-hist-orc" className="cl-card__title">Histórico</h2>
+            <PagedList items={quote.events} noun="registros" render={(events) => (
             <ol className="oc-events">
-              {quote.events.map((ev) => (
+              {events.map((ev) => (
                 <li key={ev.id} className="oc-event">
                   <span className="oc-event__icon" aria-hidden="true">{eventIcon(ev)}</span>
                   <span className="oc-event__text">
                     <span className="oc-event__title">{eventText(ev)}</span>
-                    <span className="cl-muted oc-small">por {ev.userName} · v{ev.version}</span>
+                    <span className="cl-muted oc-small">por {ev.userName} · {ev.version}ª proposta</span>
                   </span>
                   <time className="cl-muted oc-small" dateTime={ev.createdAt}>{formatDateTime(ev.createdAt)}</time>
                 </li>
               ))}
             </ol>
+            )} />
           </section>
         </div>
 
         <aside className="oc-aside">
-          <section className="oc-summary" aria-labelledby="t-valores">
-            <h2 id="t-valores" className="cl-card__title">Valores</h2>
-            <div className="oc-summary__row"><span>Subtotal</span><span>{formatMoney(quote.subtotalCents)}</span></div>
-            {quote.discountCents > 0 && (
-              <div className="oc-summary__row">
-                <span>Desconto{quote.discountType === 'PERCENT' && quote.discountValue ? ` (${formatPercent(quote.discountValue)}%)` : ''}</span>
-                <span className="oc-minus">− {formatMoney(quote.discountCents)}</span>
-              </div>
-            )}
-            <div className="oc-summary__total"><span className="cl-muted">Valor final</span><span className="oc-summary__value" data-testid="detalhe-total">{formatMoney(quote.totalCents)}</span></div>
-            {quote.paymentTerms && <p className="oc-small cl-muted">Pagamento: {quote.paymentTerms}</p>}
+          <section className="zv-card" aria-labelledby="t-valores">
+            <h2 id="t-valores" className="zv-h2">Valores</h2>
+            <dl className="zv-sum zv-sum--big">
+              {quote.discountCents > 0 && <div><dt>Subtotal</dt><dd>{formatMoney(quote.subtotalCents)}</dd></div>}
+              {quote.discountCents > 0 && <div className="zv-sum__off"><dt>Desconto{discountLabel(quote.discountType, quote.discountValue) ? ` (${discountLabel(quote.discountType, quote.discountValue)})` : ''}</dt><dd>− {formatMoney(quote.discountCents)}</dd></div>}
+              <div className="zv-sum__total" data-testid="total"><dt>Total</dt><dd>{formatMoney(quote.totalCents)}</dd></div>
+            </dl>
+            {(quote.paymentTerms || quote.notes) && <p className="zv-obs"><b>Observações:</b> {[quote.paymentTerms, quote.notes].filter(Boolean).join(' ')}</p>}
           </section>
 
           {quote.latestVersion > 1 && (
@@ -247,13 +235,13 @@ function QuoteDetail({ id, version }: { id: number; version?: number }) {
           {isLatest && (quote.status === 'SENT' || quote.status === 'REJECTED') && (
             <section className="cl-card oc-card-sm" aria-labelledby="t-mudanca">
               <h2 id="t-mudanca" className="cl-card__title">O cliente pediu mudança?</h2>
-              <p className="oc-small cl-muted">A v{quote.version} enviada fica guardada como está. A mudança vira a v{quote.version + 1}.</p>
-              <Button className="btn--secondary" fullWidth onClick={() => open('version')} data-testid="nova-versao">Criar nova versão</Button>
+              <p className="zv-obs">A proposta enviada fica guardada como está. A mudança vira a <b>{quote.version + 1}ª proposta</b>.</p>
+              <Button className="btn--secondary" fullWidth onClick={() => open('version')} data-testid="nova-versao"><Copy size={20} strokeWidth={1.8} aria-hidden="true" />Mudar o orçamento</Button>
             </section>
           )}
 
           {isLatest && ['DRAFT', 'CONFIRMED', 'SENT'].includes(quote.status) && (
-            <Button className="btn--danger-outline" fullWidth onClick={() => open('cancel')} data-testid="cancelar-orcamento">Cancelar orçamento</Button>
+            <Button className="btn--danger-outline" fullWidth onClick={() => open('cancel')} data-testid="cancelar-orcamento"><Trash2 size={20} strokeWidth={1.8} aria-hidden="true" />Cancelar orçamento</Button>
           )}
         </aside>
       </main>
@@ -366,7 +354,7 @@ function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onA
       return (
         <div className="oc-send">
           <p className="oc-send__lead">Conferido e pronto. Escolha como mandar para o cliente:</p>
-          <Button onClick={onWhatsapp} data-testid="enviar-whatsapp"><WhatsIcon />Enviar pelo WhatsApp</Button>
+          <Button onClick={onWhatsapp} data-testid="enviar-whatsapp"><WhatsIcon onAccent />Enviar pelo WhatsApp</Button>
           <div className="oc-send__row">
             <Button className="btn--secondary" onClick={onPdf} loading={pdfBusy} loadingText="Gerando PDF…">Baixar PDF</Button>
             <Button className="btn--secondary" onClick={onPrint}>Imprimir</Button>
@@ -382,8 +370,8 @@ function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onA
             <p>Quando {quote.customer.name.split(' ')[0]} responder pelo WhatsApp ou pessoalmente, registre aqui.</p>
           </div>
           <div className="oc-panel__actions">
-            <Button className="btn--secondary" onClick={onReject} data-testid="recusou">Recusou</Button>
-            <Button onClick={onApprove} data-testid="aprovou">Aprovou</Button>
+            <Button className="btn--secondary" onClick={onReject} data-testid="recusou"><X size={20} strokeWidth={1.8} aria-hidden="true" />Recusou</Button>
+            <Button className="zv-approve" onClick={onApprove} data-testid="aprovou"><CircleCheck size={20} strokeWidth={1.8} aria-hidden="true" />Aprovou</Button>
           </div>
         </div>
       )
@@ -408,7 +396,9 @@ function StatusPanel({ quote, isLatest, onWhatsapp, onPdf, pdfBusy, onPrint, onA
             <strong>Recusado{quote.rejectionReason ? `: ${REJECTION_LABEL[quote.rejectionReason]}` : ''}</strong>
             {quote.decisionNote && <span>{quote.decisionNote}</span>}
           </div>
-          <Button className="btn--secondary" onClick={onNewVersion}>Fazer nova proposta</Button>
+          {quote.order
+            ? <Link to={`/pedidos/${quote.order.id}`} className="btn btn--secondary oc-btn-link">Ver pedido cancelado #{quote.order.number}</Link>
+            : <Button className="btn--secondary" onClick={onNewVersion}>Fazer nova proposta</Button>}
         </div>
       )
     case 'CANCELED':
@@ -446,7 +436,7 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
 }) {
   const firstName = quote.customer.name.split(' ')[0]
   // Número já preenchido com o WhatsApp ATUAL do cadastro do cliente
-  const { phone, setPhone, registered } = useCustomerWhatsapp(quote.customer.id, quote.customer.whatsapp)
+  const { phone, setPhone, registered } = useCustomerWhatsapp(quote.customer.id, customerMobile(quote.customer))
   const [message, setMessage] = useState(defaultWhatsAppMessage(quote))
   const [shareError, setShareError] = useState<string | null>(null)
 
@@ -458,7 +448,7 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
   const share = file ? canSharePdf(file) : false
 
   const digits = onlyDigits(phone)
-  const phoneInvalid = digits.length !== 11
+  const phoneInvalid = digits.length !== 10 && digits.length !== 11
 
   // Computador com Chrome/Edge: o "Compartilhar" do sistema manda o PDF para o APLICATIVO do WhatsApp.
   // O site não consegue saber se o aplicativo está instalado, então o WhatsApp Web fica como alternativa.
@@ -468,13 +458,16 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
   async function shareFile() {
     if (!file) return
     // No Windows, o app do WhatsApp às vezes recebe o PDF mas ignora o texto: deixamos a mensagem copiada
-    await navigator.clipboard?.writeText(message).catch(() => {})
+    // Sem esperar: o navegador só libera o Compartilhar logo depois do clique
+    void navigator.clipboard?.writeText(message).catch(() => {})
     try {
       await navigator.share({ files: [file], text: message })
       onSent('Pronto! Confira no WhatsApp se a mensagem e o PDF foram juntos. Se a mensagem não aparecer, cole com Ctrl+V: ela está copiada.')
     } catch (e) {
       if (e instanceof DOMException && e.name === 'AbortError') return // a pessoa fechou o Compartilhar
-      setShareError('Não foi possível abrir o Compartilhar. Use o WhatsApp Web e anexe o PDF.')
+      // O computador não conseguiu compartilhar: abre a conversa e baixa o PDF para anexar
+      if (!phoneInvalid) openWeb()
+      else setShareError('Não foi possível abrir o Compartilhar. Digite o WhatsApp para abrir a conversa e anexar o PDF.')
     }
   }
 
@@ -508,11 +501,11 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
       <div className="oc-dialog-fields">
         {!share && (
           <>
-            <label className="cl-field">
+            <NoAutofill><label className="cl-field">
               <span className="cl-field__label">WhatsApp</span>
               <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" aria-invalid={phone && phoneInvalid ? true : undefined} />
-            </label>
-            {!registered && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para este envio.</p>}
+            </label></NoAutofill>
+            {!registered && <p className="oc-small cl-muted">O cliente não tem celular cadastrado. Digite o número para este envio.</p>}
           </>
         )}
         <label className="cl-field">
@@ -521,7 +514,7 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
         </label>
 
         <div className={`oc-attach${pdf.error ? ' oc-attach--bad' : ''}`} role="status" data-testid="anexo-pdf">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6" /></svg>
+          <AppIcon name="pdfFile" size={24} />
           <span>
             {pdf.loading && 'Preparando o PDF do orçamento…'}
             {file && <><strong>{file.name}</strong> · {Math.max(1, Math.round(file.size / 1024))} KB</>}
@@ -643,25 +636,13 @@ function eventText(ev: QuoteEvent): string {
 
 function eventIcon(ev: QuoteEvent) {
   if (ev.type === 'DISPATCHED' && ev.detail === 'WHATSAPP') return <WhatsIcon />
-  const paths: Record<string, string> = {
-    CREATED: 'M12 5v14M5 12h14',
-    UPDATED: 'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
-    CONFIRMED: 'M5 12l5 5 9-10',
-    APPROVED: 'M5 12l5 5 9-10',
-    REJECTED: 'M6 6l12 12M18 6L6 18',
-    CANCELED: 'M6 18L18 6',
-    BACK_TO_DRAFT: 'M9 14l-5-5 5-5M4 9h11a5 5 0 0 1 0 10h-3',
-    NEW_VERSION: 'M8 8h12v12H8zM16 8V4H4v12h4',
-    DISPATCHED: 'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9zM14 3v6h6',
-    CONVERTED: 'M3 7l9-4 9 4-9 4zM3 7v10l9 4 9-4V7',
+  const icons: Record<QuoteEvent['type'], AppIconName> = {
+    CREATED: 'plus', UPDATED: 'edit', CONFIRMED: 'check', APPROVED: 'check', REJECTED: 'close', CANCELED: 'cancel',
+    BACK_TO_DRAFT: 'arrowLeft', NEW_VERSION: 'quote', DISPATCHED: 'quote', CONVERTED: 'order',
   }
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={paths[ev.type]} /></svg>
+  return <AppIcon name={icons[ev.type] ?? 'quote'} size={24} />
 }
 
-function WhatsIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12z" />
-    </svg>
-  )
+function WhatsIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="chat" size={24} onAccent={onAccent} />
 }

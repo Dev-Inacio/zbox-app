@@ -2,8 +2,12 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // https://vite.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // Versão de demonstração no GitHub Pages: o site fica em /zbox-app/
+  base: mode === 'demo' ? '/zbox-app/' : '/',
+  // Já prepara as bibliotecas do PDF: sem isso, o servidor pode falhar ao carregá-las e o PDF não é gerado
+  optimizeDeps: { include: ['html2canvas-pro', 'jspdf'] },
   server: {
     // Em desenvolvimento, o Vite repassa tudo que começa com /api para o back (Spring Boot na 8080).
     // Assim o front chama '/api/...' sem endereço fixo e sem precisar de CORS no back.
@@ -20,4 +24,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

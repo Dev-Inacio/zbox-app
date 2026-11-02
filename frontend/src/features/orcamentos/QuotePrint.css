@@ -12,7 +12,8 @@
   gap: 12px;
 }
 
-.qp__back { color: #E9A06E; font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; }
+.qp__back { color: var(--color-accent); font-weight: 600; text-decoration: none; min-height: 44px; display: inline-flex; align-items: center; gap: 8px; } /* mesmo Voltar das outras telas: ícone laranja suave */
+.qp__back:hover { text-decoration: underline; }
 
 .qp__page { padding: 32px var(--page-gutter); }
 .qp__page .qd { box-shadow: 0 12px 32px rgba(27, 31, 35, 0.12); min-height: 1123px; display: flex; }
@@ -25,6 +26,13 @@
 @media print {
   .qp { background: #FFFFFF; min-height: 0; }
   .qp__toolbar { display: none; }
-  .qp__page { padding: 0; }
-  .qp__page .qd { box-shadow: none; min-height: calc(297mm - 20mm); }
+  /* Folga de 1 mm em volta: com a moldura encostada na borda da área de impressão,
+     o navegador cortava a linha da direita e a de baixo (embaixo do "Valor final") */
+  .qp__page { padding: 1mm; }
+  .qp__page .qd { box-shadow: none; min-height: calc(297mm - 20mm - 4mm); }
 }
+
+
+/* v3: barra do imprimir em azul-marinho */
+.qp__toolbar { background: var(--wine-dark); }
+.qp__back { color: #FFFFFF; }

@@ -3,7 +3,8 @@ import type { ApiErrorBody, LoginRequest, LoginResponse } from './types'
 
 // Chave do mock: true = simulação local; false = chama o back de verdade (POST /api/auth/login).
 // Troque para false quando o endpoint do Inácio estiver no ar.
-const USE_MOCK = false
+// Na versão de demonstração (sem back) o login é sempre o simulado.
+const USE_MOCK = import.meta.env.VITE_DEMO === 'true'
 
 export function login(request: LoginRequest): Promise<LoginResponse> {
   return USE_MOCK ? mockLogin(request) : apiLogin(request)
@@ -59,6 +60,7 @@ function fromRawToken(token: string, username: string): LoginResponse {
 // Responde exatamente nos formatos do contrato.
 //
 // Usuários de teste:
+//   demo        + senha "demo1234" → sucesso (ADMIN), usuário das demonstrações
 //   thayna      + senha "zbox1234" → sucesso (ADMIN)
 //   funcionario + senha "zbox1234" → sucesso (EMPLOYEE)
 //   bloqueado                     → 423 ACCOUNT_LOCKED
@@ -78,6 +80,15 @@ async function mockLogin(request: LoginRequest): Promise<LoginResponse> {
 
   if (username === 'bloqueado') {
     throw new ApiError(423, 'ACCOUNT_LOCKED', 'Muitas tentativas. Tente novamente em 15 minutos.')
+  }
+
+  if (username === 'demo' && request.password === 'demo1234') {
+    return {
+      accessToken: 'mock-access-token',
+      tokenType: 'Bearer',
+      expiresIn: 900,
+      user: { id: 3, name: 'Demonstração', email: 'demo@zbox.com.br', role: 'ADMIN' },
+    }
   }
 
   if (username === 'thayna' && request.password === 'zbox1234') {
