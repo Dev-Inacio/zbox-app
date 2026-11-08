@@ -181,7 +181,7 @@
   cursor: pointer;
   position: relative;
 }
-.oc-pill[aria-pressed='true'], .oc-pill--radio:has(input:checked) { border: 2px solid var(--color-accent); background: var(--wine-soft); color: var(--color-danger); font-weight: 600; }
+.oc-pill[aria-pressed='true'], .oc-pill--radio:has(input:checked) { border: 2px solid var(--color-accent); background: var(--wine-soft); color: var(--color-accent); font-weight: 600; }
 .oc-pill--radio input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .oc-pill:focus-visible, .oc-pill--radio:has(input:focus-visible) { outline: 3px solid var(--color-accent-soft); }
 

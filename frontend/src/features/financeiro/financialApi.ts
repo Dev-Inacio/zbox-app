@@ -2,7 +2,7 @@ import { ApiError } from '../auth/types'
 import { readMockSession } from '../auth/session'
 import { customerMobile } from '../clientes/format'
 import type { Page } from '../clientes/types'
-import { daysBetween, todayIso } from '../pedidos/dates'
+import { daysBetween, isoDateTimeToDay, todayIso } from '../pedidos/dates'
 import { mockAllOrders } from '../pedidos/ordersApi'
 import type { Order, OrderStatus, PaymentMethod, PaymentStatus } from '../pedidos/types'
 
@@ -20,6 +20,8 @@ export type FinancialSummary = {
   overdueOrders: number
   receivedCents: number
   receivedPayments: number
+  refundedCents: number         // devolvido a clientes no período
+  refunds: number
   byMethod: { method: PaymentMethod; amountCents: number }[]
   overdueCustomers: number      // clientes diferentes com pagamento atrasado
   notDeliveredCents: number     // falta receber de pedidos ainda não entregues
@@ -69,6 +71,7 @@ export type ReceivedPayment = {
   paidAt: string
   userName: string
   note?: string | null // 'Entrada' no sinal do pedido
+  refund?: boolean     // devolução ao cliente (o dinheiro saiu)
   // Só para ADMIN e MANAGER (mesma regra de "Gastos e lucro"). Para EMPLOYEE vem null.
   // Números do PEDIDO deste pagamento: os mesmos de "Como foi o mês" e do quadro do pedido (o cliente lança num lugar
   // e vê igual nos outros). Antes era a parte proporcional do pagamento, que confundia (R$ 0,49 de R$ 100.000).
@@ -77,6 +80,7 @@ export type ReceivedPayment = {
     orderMaterialCents: number
     orderOtherCents: number    // gasto antigo do tipo "mão de obra"
     orderRemainingCents: number
+    orderRefundedCents: number
     orderLaborCents: number    // mão de obra = serviço − material − outros (o que sobra para você)
   } | null
 }
@@ -86,9 +90,11 @@ export type ReceivedOrder = {
   orderId: number
   orderNumber: string
   customerName: string
-  amountCents: number // soma do que entrou no período
+  amountCents: number // o que entrou no período menos o que foi devolvido
   lastPaidAt: string
   payments: { id: number; amountCents: number; method: PaymentMethod; paidAt: string }[]
+  refunds: { id: number; amountCents: number; method: PaymentMethod; refundedAt: string; reason: string; userName: string }[]
+  outside: { id: number; amountCents: number; method: PaymentMethod; paidAt: string }[] // pagamentos do mesmo pedido em outras datas (não somam aqui)
   split: ReceivedPayment['split']
 }
 
@@ -98,11 +104,12 @@ function paymentSplit(o: Order): ReceivedPayment['split'] {
   const materialCents = (o.expenses ?? []).filter((e) => e.type === 'MATERIAL').reduce((s, e) => s + e.amountCents, 0)
   const otherCents = (o.expenses ?? []).filter((e) => e.type === 'LABOR').reduce((s, e) => s + e.amountCents, 0)
   return {
-    orderTotalCents: o.totalCents,
+    orderTotalCents: o.totalCents - o.refundedCents - o.waivedCents,
     orderMaterialCents: materialCents,
     orderOtherCents: otherCents,
     orderRemainingCents: o.remainingCents,
-    orderLaborCents: o.totalCents - materialCents - otherCents,
+    orderRefundedCents: o.refundedCents,
+    orderLaborCents: o.totalCents - o.refundedCents - o.waivedCents - materialCents - otherCents,
   }
 }
 
@@ -128,6 +135,7 @@ export async function getFinancialSummary(from: string, to: string): Promise<Fin
   const payments = (empty ? [] : mockAllOrders()).flatMap((o) => o.payments).filter((p) => !p.reversed && inPeriod(p.paidAt, from, to))
   const byMethod = new Map<PaymentMethod, number>()
   for (const p of payments) byMethod.set(p.method, (byMethod.get(p.method) ?? 0) + p.amountCents)
+  const refunds = (empty ? [] : mockAllOrders()).flatMap((o) => o.refunds).filter((r) => !r.canceled && inPeriod(r.refundedAt, from, to))
   const notDelivered = open.filter((o) => o.status !== 'DELIVERED')
   return {
     receivableCents: open.reduce((s, o) => s + o.remainingCents, 0),
@@ -136,6 +144,8 @@ export async function getFinancialSummary(from: string, to: string): Promise<Fin
     overdueOrders: overdue.length,
     receivedCents: payments.reduce((s, p) => s + p.amountCents, 0),
     receivedPayments: payments.length,
+    refundedCents: refunds.reduce((s, r) => s + r.amountCents, 0),
+    refunds: refunds.length,
     byMethod: [...byMethod.entries()].map(([method, amountCents]) => ({ method, amountCents })).sort((a, b) => b.amountCents - a.amountCents),
     overdueCustomers: new Set(overdue.map((o) => o.customer.id)).size,
     notDeliveredCents: notDelivered.reduce((sum, o) => sum + o.remainingCents, 0),
@@ -183,14 +193,22 @@ export async function listReceivedOrders(from: string, to: string, page: number,
         .filter((p) => !p.reversed && inPeriod(p.paidAt, from, to))
         .sort((a, b) => b.paidAt.localeCompare(a.paidAt) || b.id - a.id)
         .map((p) => ({ id: p.id, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt }))
-      if (payments.length === 0) return []
+      const refunds = o.refunds
+        .filter((r) => !r.canceled && inPeriod(r.refundedAt, from, to))
+        .map((r) => ({ id: r.id, amountCents: r.amountCents, method: r.method, refundedAt: r.refundedAt, reason: r.reason, userName: r.userName }))
+      if (payments.length === 0 && refunds.length === 0) return []
+      const days = [...payments.map((p) => p.paidAt), ...refunds.map((r) => r.refundedAt)].sort()
       return [{
         orderId: o.id, orderNumber: o.number, customerName: o.customer.name,
-        amountCents: payments.reduce((s, p) => s + p.amountCents, 0),
-        lastPaidAt: payments[0].paidAt, payments, split: paymentSplit(o),
+        amountCents: payments.reduce((s, p) => s + p.amountCents, 0) - refunds.reduce((s, r) => s + r.amountCents, 0),
+        lastPaidAt: days[days.length - 1], payments, refunds, split: paymentSplit(o),
+        outside: o.payments
+          .filter((p) => !p.reversed && !inPeriod(p.paidAt, from, to))
+          .sort((a, b) => b.paidAt.localeCompare(a.paidAt) || b.id - a.id)
+          .map((p) => ({ id: p.id, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt })),
       }]
     })
-    .sort((a, b) => b.lastPaidAt.localeCompare(a.lastPaidAt) || b.payments[0].id - a.payments[0].id)
+    .sort((a, b) => b.lastPaidAt.localeCompare(a.lastPaidAt) || b.orderId - a.orderId)
   const start = page * size
   return { content: rows.slice(start, start + size), page, size, totalElements: rows.length, totalPages: Math.max(1, Math.ceil(rows.length / size)) }
 }
@@ -201,10 +219,16 @@ export async function listPaymentsByCustomer(customerId: number): Promise<Receiv
   check()
   return mockAllOrders()
     .filter((o) => o.customer.id === customerId)
-    .flatMap((o) => o.payments.filter((p) => !p.reversed).map((p): ReceivedPayment => ({
-      id: p.id, orderId: o.id, orderNumber: o.number, customerName: o.customer.name, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt, userName: p.userName, note: p.note,
-      split: paymentSplit(o),
-    })))
+    .flatMap((o) => [
+      ...o.payments.filter((p) => !p.reversed).map((p): ReceivedPayment => ({
+        id: p.id, orderId: o.id, orderNumber: o.number, customerName: o.customer.name, amountCents: p.amountCents, method: p.method, paidAt: p.paidAt, userName: p.userName, note: p.note,
+        split: paymentSplit(o),
+      })),
+      ...o.refunds.filter((r) => !r.canceled).map((r): ReceivedPayment => ({
+        id: r.id, orderId: o.id, orderNumber: o.number, customerName: o.customer.name, amountCents: r.amountCents, method: r.method, paidAt: r.refundedAt, userName: r.userName, note: r.reason, refund: true,
+        split: paymentSplit(o),
+      })),
+    ])
     .sort((a, b) => b.paidAt.localeCompare(a.paidAt) || b.id - a.id)
 }
 
@@ -223,6 +247,8 @@ export type ProfitRow = {
   expectedProfitCents: number // mão de obra = serviço − material (− outros gastos)
   materialCents: number
   laborCents: number
+  deliveredOn: string | null
+  createdOn: string
 }
 
 export type ProfitReport = {
@@ -243,24 +269,27 @@ export async function getProfitReport(from: string, to: string): Promise<ProfitR
   if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Só Administrador e Gerente veem o lucro.')
   const all = simulation() === 'vazio' ? [] : mockAllOrders()
   const received = all.flatMap((o) => o.payments).filter((p) => !p.reversed && inPeriod(p.paidAt, from, to)).reduce((s, p) => s + p.amountCents, 0)
+    - all.flatMap((o) => o.refunds).filter((r) => !r.canceled && inPeriod(r.refundedAt, from, to)).reduce((s, r) => s + r.amountCents, 0)
   const expenses = all.flatMap((o) => o.expenses ?? []).filter((e) => inPeriod(e.date, from, to))
   const sum = (t: 'MATERIAL' | 'LABOR') => expenses.filter((e) => e.type === t).reduce((s, e) => s + e.amountCents, 0)
   const materialCents = sum('MATERIAL')
   const laborCents = sum('LABOR')
   const orders = all
-    .filter((o) => inPeriod(o.createdAt.slice(0, 10), from, to) || (o.deliveredOn !== null && inPeriod(o.deliveredOn, from, to)) || (o.expenses ?? []).some((e) => inPeriod(e.date, from, to)))
+    .filter((o) => inPeriod(isoDateTimeToDay(o.createdAt), from, to) || (o.deliveredOn !== null && inPeriod(o.deliveredOn, from, to)) || (o.expenses ?? []).some((e) => inPeriod(e.date, from, to)) || o.refunds.some((r) => !r.canceled && inPeriod(r.refundedAt, from, to)))
     .filter((o) => o.status !== 'CANCELED' || (o.expenses ?? []).length > 0) // cancelado só aparece se teve gasto (prejuízo)
     .map((o): ProfitRow => ({
       orderId: o.id, number: o.number, customerName: o.customer.name, status: o.status,
-      totalCents: o.status === 'CANCELED' ? 0 : o.totalCents,
+      totalCents: o.status === 'CANCELED' ? 0 : o.totalCents - o.refundedCents - o.waivedCents, // o que o serviço rendeu, sem o devolvido
       expensesCents: o.profit!.expensesCents,
       profitCents: o.status === 'CANCELED' ? -o.profit!.expensesCents : o.profit!.profitCents,
       marginPercent: o.status === 'CANCELED' ? 0 : o.profit!.marginPercent,
       hasExpenses: (o.expenses ?? []).length > 0,
-      paidCents: o.paidCents,
+      paidCents: o.paidCents - o.refundedCents,
       expectedProfitCents: o.status === 'CANCELED' ? -o.profit!.expensesCents : o.profit!.expectedProfitCents,
       materialCents: o.profit!.materialCents,
       laborCents: o.profit!.laborCents,
+      deliveredOn: o.deliveredOn,
+      createdOn: isoDateTimeToDay(o.createdAt),
     }))
     .sort((a, b) => Number(b.hasExpenses) - Number(a.hasExpenses) || b.profitCents - a.profitCents)
   return { receivedCents: received, materialCents, laborCents, expensesCents: materialCents + laborCents, cashCents: received - materialCents - laborCents, orders }

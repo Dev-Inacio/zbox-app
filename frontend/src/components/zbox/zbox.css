@@ -208,3 +208,27 @@ button.zb-stat { font: inherit; color: inherit; text-align: left; cursor: pointe
 
 /* v3: seta do "Ver" só em linha */
 .zb-seemore__arrow { width: auto; height: auto; background: transparent; color: var(--color-accent); }
+
+/* Card "Cliente" do orçamento e do pedido */
+.zb-client { gap: 0; }
+.zb-client__who { display: flex; align-items: center; gap: 12px; padding: 12px 0 14px; }
+.zb-client__names { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: break-word; }
+.zb-client__names b { font-size: 17px; }
+.zb-client__names span { font-size: 14px; color: var(--color-text-muted); }
+.zb-client__row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-top: 1px solid var(--color-line); }
+.zb-client__row:last-child { padding-bottom: 0; }
+.zb-client__row .zv-data__icon { width: 40px; height: 40px; }
+.zb-client__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; overflow-wrap: break-word; }
+.zb-client__text > span { font-size: 14px; color: var(--color-text-muted); }
+.zb-client__text > b { font-size: 16px; font-weight: 600; line-height: 1.4; }
+.zb-client__acts { flex: none; display: flex; gap: 8px; }
+.zb-client__acts .zv-btn { height: 40px; padding: 0 12px; font-size: 15px; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) {
+  .zb-client__who { flex-wrap: wrap; }
+  .zb-client__names { flex-basis: calc(100% - 60px); }
+  .zb-client__who .zv-link { margin-left: 60px; }
+  .zb-client__row { flex-wrap: wrap; }
+  .zb-client__text { flex-basis: calc(100% - 52px); }
+  .zb-client__acts { width: 100%; }
+  .zb-client__acts .zv-btn { flex: 1; justify-content: center; }
+}

@@ -22,6 +22,7 @@ import type {
   OrderStatus,
   OrderSummary,
   PaymentRequest,
+  RefundRequest,
 } from './types'
 
 // ⚠️ SIMULAÇÃO (mock) — enquanto o Inácio não publica /api/orders e /api/financial.
@@ -48,13 +49,17 @@ let nextEventId = 1
 let nextExpenseId = 1
 // Idempotency-Key → pagamento já criado (o back guarda por 24 h). Evita pagamento duplicado no duplo clique.
 const idempotency = new Map<string, number>()
+let nextRefundId = 1_000_000
 
 const ACTIVE: OrderStatus[] = ['NEW', 'IN_PRODUCTION', 'READY']
 
 // ---------- Regras de dinheiro (no back real: no Service, dentro da transação) ----------
 function recompute(order: Order) {
   order.paidCents = order.payments.filter((p) => !p.reversed).reduce((sum, p) => sum + p.amountCents, 0)
-  order.remainingCents = order.totalCents - order.paidCents
+  const refunds = order.refunds.filter((r) => !r.canceled)
+  order.refundedCents = refunds.reduce((sum, r) => sum + r.amountCents, 0) // sozinha, não muda o que falta receber
+  order.waivedCents = refunds.reduce((sum, r) => sum + r.waivedCents, 0)   // "não cobrar o restante"
+  order.remainingCents = order.totalCents - order.paidCents - order.waivedCents
   order.paymentStatus =
     order.remainingCents <= 0 ? 'PAID'
       : order.status === 'DELIVERED' ? 'OVERDUE'
@@ -73,12 +78,14 @@ export function computeProfit(order: Order): ProfitSummary {
   const materialCents = sum('MATERIAL')
   const laborCents = sum('LABOR')
   const expensesCents = materialCents + laborCents
-  const expectedProfitCents = order.totalCents - expensesCents
-  const cashBalanceCents = order.paidCents - expensesCents
+  // Devolução diminui o que o serviço rendeu
+  const netCents = order.totalCents - order.refundedCents - order.waivedCents
+  const expectedProfitCents = netCents - expensesCents
+  const cashBalanceCents = order.paidCents - order.refundedCents - expensesCents
   const profitCents = expectedProfitCents < 0 ? expectedProfitCents : Math.max(0, Math.min(cashBalanceCents, expectedProfitCents))
   return {
     materialCents, laborCents, expensesCents, profitCents, expectedProfitCents,
-    marginPercent: order.totalCents > 0 ? Math.round((profitCents / order.totalCents) * 1000) / 10 : 0,
+    marginPercent: netCents > 0 ? Math.round((profitCents / netCents) * 1000) / 10 : 0,
     cashBalanceCents,
   }
 }
@@ -161,7 +168,7 @@ function fromQuote(quote: Quote, createdAt: string): Order {
     paymentTerms: quote.paymentTerms, notes: quote.notes,
     createdAt,
     deliveredAt: null, deliveredOn: null, receivedBy: null, deliveryNote: null, canceledAt: null, cancelReason: null,
-    payments: [], lastCollectionAt: null, events: [], invoice: null,
+    payments: [], refunds: [], refundedCents: 0, waivedCents: 0, lastCollectionAt: null, events: [], invoice: null,
     expenses: [], profit: null,
   }
 }
@@ -338,9 +345,50 @@ export async function reversePayment(id: number, paymentId: number, reason: stri
   if (!payment) throw new ApiError(404, 'PAYMENT_NOT_FOUND', 'Pagamento não encontrado.')
   if (payment.reversed) throw new ApiError(409, 'PAYMENT_ALREADY_REVERSED', 'Este pagamento já foi estornado.')
   if (reason.trim().length < 3) fieldError('reason', 'Conte o motivo do estorno.')
+  if (order.paidCents - payment.amountCents < order.refundedCents) {
+    throw new ApiError(409, 'PAYMENT_HAS_REFUND', 'Este valor já foi devolvido ao cliente. Desfaça a devolução antes de estornar.')
+  }
   payment.reversed = true
   payment.reversedReason = reason.trim()
   event(order, 'PAYMENT_REVERSED', `${formatMoney(payment.amountCents)} · ${reason.trim()}`)
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/refunds { amountCents, method, refundedAt, reason } — só ADMIN e MANAGER
+export async function addRefund(id: number, request: RefundRequest, idempotencyKey?: string): Promise<Order> {
+  await wait(500)
+  if (idempotencyKey && idempotency.has(idempotencyKey)) return snapshot(find(id))
+  const role = readMockSession()?.role
+  if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Você não tem permissão para devolver valores.')
+  const order = find(id)
+  const available = order.paidCents - order.refundedCents
+  if (available <= 0) throw new ApiError(409, 'NOTHING_TO_REFUND', 'Este pedido não tem valor recebido para devolver.')
+  if (!Number.isInteger(request.amountCents) || request.amountCents <= 0) fieldError('amountCents', 'Informe um valor maior que R$ 0,00.')
+  if (request.amountCents > available) throw new ApiError(422, 'REFUND_EXCEEDS_RECEIVED', 'O valor passou do recebido.', [{ field: 'amountCents', code: 'MAX', message: `O valor não pode ser maior que o recebido (${formatMoney(available)}).` }])
+  if (!METHODS.includes(request.method)) fieldError('method', 'Escolha a forma da devolução.')
+  if (!isDay(request.refundedAt)) fieldError('refundedAt', 'Informe a data da devolução.')
+  if (request.refundedAt > todayIso()) fieldError('refundedAt', 'A data da devolução não pode ser no futuro.')
+  const reason = request.reason.trim()
+  if (reason.length < 3) fieldError('reason', 'Conte o motivo da devolução.')
+  const waivedCents = request.waiveRemaining ? Math.max(0, order.remainingCents) : 0
+  const refund = { id: nextRefundId++, amountCents: request.amountCents, method: request.method, refundedAt: request.refundedAt, reason, waivedCents, userName: userName(), createdAt: now(), canceled: false }
+  order.refunds.unshift(refund)
+  event(order, 'REFUND', `${formatMoney(refund.amountCents)} · ${METHOD_LABEL[refund.method]} · ${reason}${waivedCents ? ` · restante de ${formatMoney(waivedCents)} não será cobrado` : ''}`)
+  if (idempotencyKey) idempotency.set(idempotencyKey, refund.id)
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/refunds/{refundId}/cancel — devolução lançada por engano
+export async function cancelRefund(id: number, refundId: number): Promise<Order> {
+  await wait(400)
+  const role = readMockSession()?.role
+  if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Você não tem permissão para desfazer devoluções.')
+  const order = find(id)
+  const refund = order.refunds.find((r) => r.id === refundId)
+  if (!refund) throw new ApiError(404, 'REFUND_NOT_FOUND', 'Devolução não encontrada.')
+  if (refund.canceled) throw new ApiError(409, 'REFUND_ALREADY_CANCELED', 'Esta devolução já foi desfeita.')
+  refund.canceled = true
+  event(order, 'REFUND_CANCELED', formatMoney(refund.amountCents))
   return snapshot(order)
 }
 

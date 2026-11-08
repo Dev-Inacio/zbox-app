@@ -1,10 +1,11 @@
 import { useCallback, useState } from 'react'
-import { ChevronRight, Info, MapPin, MessageCircle, Phone, Plus } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { AppIcon } from '../../components/ui/AppIcon'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { CustomerCard } from '../../components/zbox/CustomerCard'
 import { PagedList } from '../../components/ui/PagedList'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Toast } from '../../components/ui/Toast'
@@ -12,22 +13,21 @@ import { ItemsCard } from '../../components/zbox'
 import { useFlashMessage } from '../../hooks/useFlashMessage'
 import { useRequest } from '../../hooks/useRequest'
 import { INVOICE_ENABLED, InvoiceCard, InvoiceDialog, InvoiceFileDialog, InvoiceTag } from './Invoice'
-import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { useAuth } from '../auth/useAuth'
 import { ApiError } from '../auth/types'
-import { customerMobile, formatDateTime, maskPhone, whatsappLink } from '../clientes/format'
+import { customerMobile, formatDateTime } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
 import { discountLabel, toItemView } from '../orcamentos/itemView'
 import { formatMoney } from '../orcamentos/money'
 import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from './dates'
 import { EXPENSE_TYPE_LABEL, METHOD_LABEL, NEXT_STEP, ORDER_STATUS_LABEL, ORDER_STEPS, PREVIOUS_STEP } from './labels'
 import { OrderStatusBadge, PaymentStatusBadge } from './OrderBadges'
-import { CancelOrderDialog, CollectDialog, DeleteExpenseDialog, DeliverDialog, ExpenseDialog, PaymentDialog, ReversePaymentDialog } from './OrderDialogs'
+import { CancelOrderDialog, CancelRefundDialog, CollectDialog, DeleteExpenseDialog, DeliverDialog, ExpenseDialog, PaymentDialog, RefundDialog, ReversePaymentDialog } from './OrderDialogs'
 import { canReversePayment, canEditInvoice, canSeeProfit } from './permissions'
 import { formatPercentBR, LABOR_GOOD_PERCENT, LABOR_MIN_PERCENT, profitView } from './profitHealth'
 import type { HealthResult, ProfitHealth } from './profitHealth'
 import { changeOrderStatus, getOrder } from './ordersApi'
-import type { Order, OrderEvent, OrderExpense, OrderStatus, Payment } from './types'
+import type { Order, OrderEvent, OrderExpense, OrderRefund, OrderStatus, Payment } from './types'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
 import '../orcamentos/Orcamentos.css'
@@ -36,7 +36,7 @@ import './Pedidos.css'
 // HU21 (andamento), HU22 (entregar), HU23 (pagamentos), HU24 (cobrar).
 // Regra de ouro: andamento e pagamento são coisas separadas. Entregar não é receber.
 
-type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | 'expense' | 'invoice' | 'invoiceView' | { reverse: Payment } | { editExpense: OrderExpense } | { deleteExpense: OrderExpense } | null
+type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | 'expense' | 'invoice' | 'invoiceView' | 'refund' | { refundFrom: Payment } | { cancelRefund: OrderRefund } | { reverse: Payment } | { editExpense: OrderExpense } | { deleteExpense: OrderExpense } | null
 
 export function OrderDetailPage() {
   const { id } = useParams()
@@ -129,7 +129,7 @@ function OrderDetail({ id }: { id: number }) {
 
           <ItemsCard items={order.items.map(toItemView)} versionLabel={`Do orçamento nº ${order.quote.number} · ${order.quote.version}ª proposta`} />
 
-          <OrderCustomer customer={order.customer} />
+          <CustomerCard customer={order.customer} />
 
           <section className="cl-card" aria-labelledby="t-hist-ped">
             <h2 id="t-hist-ped" className="cl-card__title">Histórico</h2>
@@ -152,7 +152,7 @@ function OrderDetail({ id }: { id: number }) {
 
         <aside className="oc-aside">
           <PaymentCard order={order} canReverse={canReversePayment(user?.role)}
-            onPay={() => setDialog('pay')} onCollect={() => setDialog('collect')} onReverse={(p) => setDialog({ reverse: p })} />
+            onPay={() => setDialog('pay')} onCollect={() => setDialog('collect')} onReverse={(p) => setDialog({ reverse: p })} onRefund={() => setDialog('refund')} onCancelRefund={(r) => setDialog({ cancelRefund: r })} />
           {INVOICE_ENABLED && <InvoiceCard order={order} canEdit={canEditInvoice(user?.role)} onEdit={() => setDialog('invoice')} onView={() => setDialog('invoiceView')} />}
           {canSeeProfit(user?.role) && order.profit && order.expenses && (
             <ProfitCard order={order} onAdd={() => setDialog('expense')} onEdit={(e) => setDialog({ editExpense: e })} onDelete={(e) => setDialog({ deleteExpense: e })} />
@@ -180,8 +180,13 @@ function OrderDetail({ id }: { id: number }) {
       {dialog !== null && typeof dialog === 'object' && 'deleteExpense' in dialog && (
         <DeleteExpenseDialog order={order} expense={dialog.deleteExpense} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto excluído.')(u)} />
       )}
+      {dialog === 'refund' && <RefundDialog order={order} onCancel={() => setDialog(null)} onDone={(u, message) => done(message ?? 'Devolução registrada.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'refundFrom' in dialog && <RefundDialog order={order} from={dialog.refundFrom} onCancel={() => setDialog(null)} onDone={(u, message) => done(message ?? 'Devolução registrada.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'cancelRefund' in dialog && (
+        <CancelRefundDialog order={order} refund={dialog.cancelRefund} onCancel={() => setDialog(null)} onDone={done('Devolução desfeita.')} />
+      )}
       {dialog !== null && typeof dialog === 'object' && 'reverse' in dialog && (
-        <ReversePaymentDialog order={order} payment={dialog.reverse} onCancel={() => setDialog(null)} onDone={done('Pagamento estornado.')} />
+        <ReversePaymentDialog order={order} payment={dialog.reverse} onCancel={() => setDialog(null)} onDone={done('Pagamento estornado.')} onRefundInstead={() => setDialog({ refundFrom: dialog.reverse })} />
       )}
       <ConfirmDialog
         open={dialog === 'back'} title={`Voltar para ${ORDER_STATUS_LABEL[PREVIOUS_STEP[order.status] ?? 'NEW']}?`} confirmLabel="Voltar etapa" loading={stepBusy} loadingText="Salvando…"
@@ -254,7 +259,7 @@ function StepPanel({ order, busy, onNext }: { order: Order; busy: boolean; onNex
 }
 
 // ---------- Pagamento ----------
-function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order: Order; canReverse: boolean; onPay: () => void; onCollect: () => void; onReverse: (p: Payment) => void }) {
+function PaymentCard({ order, canReverse, onPay, onCollect, onReverse, onRefund, onCancelRefund }: { order: Order; canReverse: boolean; onPay: () => void; onCollect: () => void; onReverse: (p: Payment) => void; onRefund: () => void; onCancelRefund: (r: OrderRefund) => void }) {
   const pct = order.totalCents > 0 ? Math.min(100, Math.round((order.paidCents / order.totalCents) * 100)) : 0
   const overdue = order.paymentStatus === 'OVERDUE'
   const owes = order.remainingCents > 0 && order.status !== 'CANCELED'
@@ -269,6 +274,8 @@ function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order
         {order.discountCents > 0 && <div className="zv-sum__off"><dt>Desconto{discountLabel(order.discountType, order.discountValue) ? ` (${discountLabel(order.discountType, order.discountValue)})` : ''}</dt><dd>− {formatMoney(order.discountCents)}</dd></div>}
         <div className="zv-sum__total" data-testid="total"><dt>Total do pedido</dt><dd>{formatMoney(order.totalCents)}</dd></div>
         <div><dt>Já recebido</dt><dd className="zv-sum__in" data-testid="recebido">{formatMoney(order.paidCents)}</dd></div>
+        {order.refundedCents > 0 && <div className="zv-sum__refund"><dt>Devolvido ao cliente</dt><dd data-testid="devolvido">− {formatMoney(order.refundedCents)}</dd></div>}
+        {order.waivedCents > 0 && <div className="zv-sum__refund"><dt>Não será cobrado</dt><dd data-testid="nao-cobrado">− {formatMoney(order.waivedCents)}</dd></div>}
       </dl>
       <div className="zv-bar" role="img" aria-label={`${pct}% recebido`}><span style={{ width: `${pct}%` }} /></div>
       {order.remainingCents > 0 ? (
@@ -277,7 +284,7 @@ function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order
           <b data-testid="falta-receber">{formatMoney(order.remainingCents)}</b>
         </div>
       ) : (
-        <div className="zv-note zv-note--success"><span><b>Tudo recebido</b></span></div>
+        <div className="zv-note zv-note--success"><span><b>{order.waivedCents > 0 || order.refundedCents > 0 ? 'Nada a receber' : 'Tudo recebido'}</b></span></div>
       )}
       {owes && <button type="button" className="zv-btn zv-btn--primary zv-btn--big zv-btn--full" onClick={onPay} data-testid="registrar-pagamento"><CashIcon />Registrar pagamento</button>}
       {owes && (order.status === 'DELIVERED' || order.paidCents > 0) && (
@@ -307,6 +314,29 @@ function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order
         </ul>
         )} />
       )}
+      {order.refunds.length > 0 && (
+        <>
+          <b className="zv-side-title">Devoluções</b>
+          <ul className="zv-pays" data-testid="lista-devolucoes">
+            {order.refunds.map((r) => (
+              <li key={r.id} className={r.canceled ? 'is-reversed' : undefined}>
+                <span className="zv-two">
+                  <span>Devolvido · {METHOD_LABEL[r.method]}</span>
+                  <span>{formatDay(r.refundedAt)} · por {r.userName} · {r.reason}{r.waivedCents > 0 ? ` · restante de ${formatMoney(r.waivedCents)} não será cobrado` : ''}</span>
+                  {r.canceled && <span className="zv-pays__rev">Desfeita</span>}
+                </span>
+                <span className="zv-pays__side">
+                  <b className="zv-pays__minus">− {formatMoney(r.amountCents)}</b>
+                  {canReverse && !r.canceled && <button type="button" className="zv-textbtn" onClick={() => onCancelRefund(r)} aria-label={`Desfazer devolução de ${formatMoney(r.amountCents)}`}>Desfazer</button>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {canReverse && order.paidCents - order.refundedCents > 0 && (
+        <button type="button" className="zv-btn zv-btn--full zv-btn--danger" onClick={onRefund} data-testid="devolver-cliente">Devolver ao cliente</button>
+      )}
       {order.paymentTerms && <span className="zv-small">Combinado: {order.paymentTerms}</span>}
     </section>
   )
@@ -318,7 +348,7 @@ function ProfitCard({ order, onAdd, onEdit, onDelete }: { order: Order; onAdd: (
   const expenses = order.expenses!
   // Mesmas regras e frases do Financeiro (profitView)
   const view = profitView({
-    totalCents: order.totalCents, materialCents: p.materialCents, expectedProfitCents: p.expectedProfitCents,
+    totalCents: order.totalCents - order.refundedCents - order.waivedCents, materialCents: p.materialCents, expectedProfitCents: p.expectedProfitCents,
   })
   const { rate } = view
   const loss = view.tone === 'loss'
@@ -336,7 +366,7 @@ function ProfitCard({ order, onAdd, onEdit, onDelete }: { order: Order; onAdd: (
           <Info size={24} strokeWidth={1.8} aria-hidden="true" />
           <span><b>Falta lançar o material</b><span>Lance quanto gastou de material para ver quanto sobrou para você.</span></span>
         </div>
-        <div className="zv-line"><span>Valor do serviço</span><b>{formatMoney(order.totalCents)}</b></div>
+        <div className="zv-line"><span>Valor do serviço</span><b>{formatMoney(order.totalCents - order.refundedCents - order.waivedCents)}</b></div>
         <button type="button" className="zv-btn zv-btn--full" onClick={onAdd} data-testid="lancar-material"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Lançar material</button>
       </> : <>
       <div className={`pd-profit__big${loss ? ' is-loss' : view.tone === 'pending' ? ' is-pending' : ''}`}>
@@ -350,7 +380,7 @@ function ProfitCard({ order, onAdd, onEdit, onDelete }: { order: Order; onAdd: (
 
       {/* A conta, curta: serviço − material = sua mão de obra (o recebido já está no quadro Pagamento) */}
       <dl className="pd-calc">
-        <div><dt>Valor do serviço</dt><dd>{formatMoney(order.totalCents)}</dd></div>
+        <div><dt>Valor do serviço</dt><dd>{formatMoney(order.totalCents - order.refundedCents - order.waivedCents)}</dd></div>
         <div><dt className="pd-calc__icon"><AppIcon name="material" size={24} />− Material</dt><dd data-testid="total-material">− {formatMoney(p.materialCents)}</dd></div>
         {/* Gasto antigo lançado como "mão de obra" (antes de 11/10) ainda desconta */}
         {p.laborCents > 0 && <div><dt>Outros gastos</dt><dd>− {formatMoney(p.laborCents)}</dd></div>}
@@ -418,6 +448,8 @@ function eventText(ev: OrderEvent): string {
     case 'DELIVERED': return `Entregue · recebido por ${ev.detail ?? '—'}`
     case 'PAYMENT': return `Pagamento de ${ev.detail ?? ''}`
     case 'PAYMENT_REVERSED': return `Pagamento estornado · ${ev.detail ?? ''}`
+    case 'REFUND': return `Devolvido ao cliente · ${ev.detail ?? ''}`
+    case 'REFUND_CANCELED': return `Devolução desfeita · ${ev.detail ?? ''}`
     case 'COLLECTION': return 'Cobrado pelo WhatsApp'
     case 'CANCELED': return `Cancelado · ${ev.detail ?? ''}`
   }
@@ -426,7 +458,9 @@ function eventText(ev: OrderEvent): string {
 function eventIcon(ev: OrderEvent) {
   switch (ev.type) {
     case 'PAYMENT':
-    case 'PAYMENT_REVERSED': return <CashIcon />
+    case 'PAYMENT_REVERSED':
+    case 'REFUND':
+    case 'REFUND_CANCELED': return <CashIcon />
     case 'DELIVERED': return <TruckIcon />
     case 'COLLECTION': return <WhatsIcon />
     case 'STATUS_CHANGED': return ev.detail?.endsWith('READY') ? <CheckIcon /> : <PlayIcon />
@@ -436,29 +470,6 @@ function eventIcon(ev: OrderEvent) {
 }
 
 // ---------- Ícones ----------
-// Card Cliente: celular e botão do WhatsApp vêm do cadastro ATUAL do cliente (o pedido guarda uma cópia antiga)
-function OrderCustomer({ customer }: { customer: Order['customer'] }) {
-  const { registered } = useCustomerWhatsapp(customer.id, customerMobile(customer))
-  return (
-    <section className="zv-card" aria-labelledby="t-cliente">
-      <div className="zv-card__head">
-        <div>
-          <h2 id="t-cliente" className="zv-h2">Cliente</h2>
-          <p className="zv-sub">{customer.name}</p>
-        </div>
-        <div className="zv-card__acts">
-          {registered && <button type="button" className="zv-btn" onClick={() => window.open(whatsappLink(registered), '_blank', 'noopener')}><MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" />WhatsApp</button>}
-          <Link to={`/clientes/${customer.id}`} className="zv-link">Ver cadastro<ChevronRight size={18} aria-hidden="true" /></Link>
-        </div>
-      </div>
-      <div className="zv-cust">
-        {registered && <div className="zv-data zv-data--plain"><span className="zv-data__icon"><Phone size={22} strokeWidth={1.8} aria-hidden="true" /></span><span className="zv-data__text"><span>Celular</span><span>{maskPhone(registered)}</span></span></div>}
-        {customer.addressLine && <div className="zv-data zv-data--plain"><span className="zv-data__icon"><MapPin size={22} strokeWidth={1.8} aria-hidden="true" /></span><span className="zv-data__text"><span>Endereço da obra</span><span>{customer.addressLine}</span></span></div>}
-      </div>
-    </section>
-  )
-}
-
 function WhatsIcon({ onAccent = false }: { onAccent?: boolean }) {
   return <AppIcon name="chat" size={24} onAccent={onAccent} />
 }

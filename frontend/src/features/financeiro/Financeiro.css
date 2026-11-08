@@ -289,3 +289,117 @@
 .fn-jump a { display: inline-flex; align-items: center; min-height: 48px; padding: 0 18px; border: 1px solid var(--color-border); border-radius: var(--radius); background: var(--color-surface); color: var(--color-ink); font-weight: 600; text-decoration: none; }
 .fn-jump a:hover { border-color: var(--wine); color: var(--wine); }
 #falta, #entrou, #resumo { scroll-margin-top: 80px; }
+
+/* Falta receber: atrasado com faixa vermelha e quanto tempo faz */
+.fn-tr--overdue td:first-child { box-shadow: inset 4px 0 0 var(--color-danger); padding-left: 14px; }
+.fn-tr__note { font-size: 14px; color: var(--color-text-muted); }
+@media (max-width: 767px) {
+  .fn-section .zv-table tr.fn-tr--overdue { box-shadow: inset 4px 0 0 var(--color-danger); padding-left: 14px; }
+  .fn-section .zv-table tr.fn-tr--overdue td:first-child { box-shadow: none; padding-left: 0; }
+}
+
+/* O que entrou: por forma de pagamento e total */
+.fn-methods { display: flex; flex-wrap: wrap; gap: 16px 24px; padding: 16px 20px; border-radius: 12px; background: var(--color-bg); }
+.fn-method { flex: 1 1 180px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.fn-method__top { display: flex; justify-content: space-between; gap: 8px; font-size: 16px; }
+.fn-method__bar { display: block; height: 8px; border-radius: 999px; background: var(--color-neutral-soft); overflow: hidden; }
+.fn-method__bar i { display: block; height: 100%; border-radius: inherit; background: var(--color-accent); }
+.fn-total { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; padding: 14px 20px; border-radius: 12px; background: var(--color-success-soft); font-weight: 600; }
+.fn-total strong { font-family: var(--font-display, inherit); font-size: 24px; color: var(--color-success); font-variant-numeric: tabular-nums; }
+.fn-section__side { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
+.fn-print { display: inline-flex; align-items: center; gap: 6px; height: 40px; }
+
+/* Imprimir resumo: sai só o Resumo do mês */
+@media print {
+  .zb-sidebar, .zb-topbar, .page-hero__actions, .fn-hero, .fn-jump, #falta, #entrou, .fn-periods, .fn-print, .fn-section button, .fn-add, .pg, .toast-region { display: none !important; }
+  .zb-app { display: block; background: #FFFFFF; }
+  .zb-app__main { padding: 0; }
+  .fn-section.zv-card { border: 0; box-shadow: none; padding: 0; }
+  .fn-verdict, .fn-kpi, .fn-highlight, .pd-health__tag { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Como foi cada serviço: tabela no computador, cartão no celular */
+.fn-svc { display: flex; flex-direction: column; gap: 14px; }
+.fn-svc__head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.fn-svc__head p { margin: 2px 0 0; }
+.fn-svc__box { border: 1px solid var(--color-line); border-radius: 12px; overflow: hidden; }
+.fn-svc__table { width: 100%; border-collapse: collapse; font-size: 15px; }
+.fn-svc__table th { padding: 12px 16px; background: var(--color-bg); font-size: 14px; font-weight: 600; color: var(--color-text-muted); text-align: left; white-space: nowrap; }
+.fn-svc__table td { padding: 12px 16px; border-top: 1px solid var(--color-line); vertical-align: middle; }
+.fn-svc__table th.fn-svc__r, .fn-svc__table td.fn-svc__r { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.fn-svc__when b, .fn-svc__when span { display: block; }
+.fn-svc__when span { font-size: 13px; color: var(--color-text-muted); }
+.fn-svc__who > .fn-avatar { flex: none; }
+.fn-svc__person { display: flex; align-items: center; gap: 12px; min-width: 220px; }
+.fn-svc .pd-health--low.fn-tag { background: #FDF0DC; color: #9A5B00; }
+.fn-svc__left strong, .fn-svc__left span { display: block; }
+.fn-svc__left span { font-size: 13px; color: var(--color-text-muted); }
+.fn-svc__tag { text-align: right; white-space: nowrap; }
+.fn-svc__pay { display: block; margin: 6px 0 0 auto; padding: 0; min-height: 24px; border: 0; background: none; font: inherit; font-size: 13px; font-weight: 600; color: var(--color-accent); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.fn-svc .pg { margin-top: 2px; }
+@media (max-width: 1180px) and (min-width: 768px) {
+  .fn-svc__table th, .fn-svc__table td { padding: 10px; }
+  .fn-svc__table .fn-avatar { display: none; }
+  .fn-svc__person { min-width: 0; }
+}
+@media (max-width: 767px) {
+  .fn-svc__box { border: 0; border-radius: 0; overflow: visible; }
+  .fn-svc__table, .fn-svc__table tbody { display: block; }
+  .fn-svc__table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .fn-svc__table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; padding: 14px; margin-bottom: 10px; border: 1px solid var(--color-line); border-radius: 12px; }
+  .fn-svc__table td { padding: 0; border: 0; }
+  td.fn-svc__who { grid-column: 1 / -1; grid-row: 1; }
+  .fn-svc__person { min-width: 0; }
+  .fn-svc__when { grid-column: 1; grid-row: 2; }
+  .fn-svc__when b, .fn-svc__when span { display: inline; }
+  .fn-svc__when span { margin-left: 6px; }
+  .fn-svc__tag { grid-column: 2; grid-row: 2; }
+  .fn-svc__table td.fn-svc__r { grid-column: 1 / -1; display: flex; justify-content: space-between; gap: 12px; }
+  .fn-svc__table td.fn-svc__r::before { content: attr(data-label); color: var(--color-text-muted); }
+  .fn-svc__left span { margin-left: 8px; display: inline; }
+  .fn-svc__left { align-items: baseline; }
+  .fn-svc__left strong { margin-left: auto; }
+  .fn-svc__tag { display: contents; }
+  .fn-svc__tag .fn-tag { grid-column: 2; grid-row: 2; justify-self: end; }
+  .fn-svc__pay { grid-column: 1 / -1; min-height: 44px; margin: 0; text-align: center; }
+}
+@media print { .fn-svc__pay { display: none !important; } .fn-svc__table tr { break-inside: avoid; } }
+
+/* O que entrou: devolução e fechamento do caixa */
+.fn-pay__parts .fn-pay__refund { color: var(--color-danger); }
+.fn-pay__parts .fn-pay__refund > span:first-child { min-width: 0; overflow-wrap: anywhere; }
+.fn-pay__parts .fn-pay__refund > span:last-child { flex: none; font-weight: 700; }
+.fn-cash { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.fn-cash__box { display: flex; flex-direction: column; gap: 4px; padding: 14px 18px; border-radius: 12px; }
+.fn-cash__box span { font-size: 14px; font-weight: 600; color: var(--color-text-muted); }
+.fn-cash__box strong { font-size: 22px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.fn-cash__box.is-in { background: var(--color-success-soft); }
+.fn-cash__box.is-in strong { color: var(--color-success); }
+.fn-cash__box.is-out { background: var(--color-danger-soft); }
+.fn-cash__box.is-out strong { color: var(--color-danger); }
+.fn-cash__box.is-net { background: #FFFFFF; border: 1.5px solid var(--color-success); }
+.fn-cash__box.is-net strong { color: var(--color-success); }
+@media (max-width: 767px) { .fn-cash { grid-template-columns: minmax(0, 1fr); } }
+
+/* Pagamento do mesmo serviço em outra data: aparece, mas não soma no período */
+.fn-pay__outside { padding-top: 6px; border-top: 1px dashed var(--color-line); font-style: italic; }
+
+/* Lançamentos do cartão: data, tipo, observação e valor, sempre nas mesmas colunas */
+.fn-pay__parts .fn-part { display: grid; grid-template-columns: 96px auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 6px 0; font-size: 14px; }
+.fn-part time { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.fn-part__tag { justify-self: start; padding: 2px 10px; border-radius: 999px; background: var(--color-neutral-soft); color: var(--color-ink); font-weight: 600; white-space: nowrap; }
+.fn-part__tag.is-out { background: var(--color-danger-soft); color: var(--color-danger); }
+.fn-part__note { min-width: 0; color: var(--color-text-muted); overflow-wrap: anywhere; }
+.fn-part > b { font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
+.fn-part__in { color: var(--color-success); }
+.fn-part__out { color: var(--color-danger); }
+.fn-pay__outside .fn-part > b { color: var(--color-text-muted); font-weight: 600; }
+.fn-pay__outside { font-style: normal; }
+@media (max-width: 640px) {
+  .fn-pay__parts .fn-part { grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 8px 0; }
+  .fn-part time { grid-column: 1; grid-row: 1; }
+  .fn-part > b { grid-column: 2; grid-row: 1; }
+  .fn-part__tag { grid-column: 1 / -1; grid-row: 2; white-space: normal; }
+  .fn-part__note { grid-column: 1 / -1; grid-row: 3; }
+  .fn-part__note:empty { display: none; }
+}
