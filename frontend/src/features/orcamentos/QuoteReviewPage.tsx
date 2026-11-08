@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { ChevronLeft, CircleCheck, TriangleAlert } from 'lucide-react'
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
+import { ChevronLeft, CircleCheck, Info, TriangleAlert, Zap } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
@@ -12,6 +12,7 @@ import { customerMobile, formatDate, maskPhone } from '../clientes/format'
 import { discountLabel, toItemView } from './itemView'
 import { formatMoney } from './money'
 import { confirmQuote, getQuote } from './quotesApi'
+import { directSaleToOrder } from '../pedidos/ordersApi'
 import { QuoteSteps } from './QuoteSteps'
 import type { Quote } from './types'
 import '../../components/ui/ButtonVariants.css'
@@ -39,6 +40,8 @@ export function QuoteReviewPage() {
 
 function Review({ quote }: { quote: Quote }) {
   const navigate = useNavigate()
+  const direct = useSearchParams()[0].get('direta') === '1' // HU32 — Venda direta
+  const editTo = `/orcamentos/${quote.id}/editar${direct ? '?direta=1' : ''}`
   const [confirming, setConfirming] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -47,11 +50,18 @@ function Review({ quote }: { quote: Quote }) {
     setConfirming(true)
     setError(null)
     try {
+      if (direct) {
+        // Confirma + aprova + cria o pedido de uma vez (no back: uma transação só)
+        const order = await directSaleToOrder(quote.id)
+        navigate(`/pedidos/${order.id}`, { replace: true, state: { flash: 'Pedido criado. Agora é só acompanhar a produção e registrar os pagamentos.' } })
+        return
+      }
       await confirmQuote(quote.id)
       navigate(`/orcamentos/${quote.id}`, { replace: true, state: { flash: 'Orçamento confirmado com sucesso.' } })
     } catch (e) {
       setConfirming(false)
-      setError(e instanceof ApiError ? e.message : 'Não foi possível confirmar. Verifique sua conexão e tente de novo.')
+      const fallback = direct ? 'Não foi possível criar o pedido. Nada foi salvo. Verifique sua conexão e tente de novo.' : 'Não foi possível confirmar. Verifique sua conexão e tente de novo.'
+      setError(e instanceof ApiError ? e.message : fallback)
     }
   }
 
@@ -65,9 +75,9 @@ function Review({ quote }: { quote: Quote }) {
   return (
     <>
       <PageHero
-        title="Confira antes de confirmar"
-        back={{ to: `/orcamentos/${quote.id}/editar`, label: 'Voltar e editar' }}
-        subtitle="É assim que o cliente vai ver."
+        title={direct ? 'Venda direta · conferir' : 'Confira antes de confirmar'}
+        back={{ to: editTo, label: 'Voltar e editar' }}
+        subtitle={direct ? 'Confira e crie o pedido. Nada vai ser enviado ao cliente.' : 'É assim que o cliente vai ver.'}
       />
       <QuoteSteps current={3} />
       <main className="page-body oc-layout oc-layout--review">
@@ -83,12 +93,20 @@ function Review({ quote }: { quote: Quote }) {
             ))}
           </ul>
           {error && <Alert variant="error">{error}</Alert>}
-          {blocked && <Alert variant="warning">Adicione pelo menos 1 item com preço antes de confirmar.</Alert>}
-          <Button fullWidth onClick={confirm} loading={confirming} loadingText="Confirmando…" disabled={blocked} data-testid="confirmar-orcamento">
-            <CircleCheck size={20} strokeWidth={1.8} aria-hidden="true" />Confirmar orçamento
-          </Button>
-          <Link to={`/orcamentos/${quote.id}/editar`} className="zv-btn zv-btn--full"><ChevronLeft size={20} strokeWidth={1.8} aria-hidden="true" />Voltar e editar</Link>
-          <p className="zv-obs">Confirmar <b>não envia</b> nada ao cliente. Depois você escolhe: WhatsApp, PDF ou imprimir.</p>
+          {blocked && <Alert variant="warning">Adicione pelo menos 1 item com preço antes de {direct ? 'criar o pedido' : 'confirmar'}.</Alert>}
+          {direct ? (
+            <Button fullWidth onClick={confirm} loading={confirming} loadingText="Criando pedido…" disabled={blocked} data-testid="criar-pedido-direto">
+              <Zap size={20} strokeWidth={1.8} aria-hidden="true" />Criar pedido
+            </Button>
+          ) : (
+            <Button fullWidth onClick={confirm} loading={confirming} loadingText="Confirmando…" disabled={blocked} data-testid="confirmar-orcamento">
+              <CircleCheck size={20} strokeWidth={1.8} aria-hidden="true" />Confirmar orçamento
+            </Button>
+          )}
+          <Link to={editTo} className="zv-btn zv-btn--full"><ChevronLeft size={20} strokeWidth={1.8} aria-hidden="true" />Voltar e editar</Link>
+          {direct
+            ? <p className="zv-obs oc-direct-note"><Info size={22} strokeWidth={1.8} aria-hidden="true" /><span>O cliente <b>já fechou</b>. Não vamos gerar PDF nem abrir WhatsApp. O pedido nasce como <b>Novo</b> e <b>Não pago</b>.</span></p>
+            : <p className="zv-obs">Confirmar <b>não envia</b> nada ao cliente. Depois você escolhe: WhatsApp, PDF ou imprimir.</p>}
         </aside>
       </main>
     </>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Zap } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Button } from '../../components/ui/Button'
@@ -76,10 +76,17 @@ export function QuotesListPage() {
         title="Orçamentos"
         subtitle={counts.data ? `${sent} esperando resposta do cliente` : ' '}
         actions={
-          <Link to="/orcamentos/novo" className="zv-btn zv-btn--primary zv-btn--top zv-m-full" data-testid="novo-orcamento">
-            <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-            Novo orçamento
-          </Link>
+          <>
+            <Link to="/orcamentos/novo" className="zv-btn zv-btn--primary zv-btn--top zv-m-full" data-testid="novo-orcamento">
+              <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
+              Novo orçamento
+            </Link>
+            {/* HU32 — cliente já fechou: pula o envio e vira pedido na hora */}
+            <Link to="/orcamentos/novo?direta=1" className="zv-btn zv-btn--top zv-btn--direct zv-m-full" data-testid="venda-direta">
+              <Zap size={20} strokeWidth={1.8} aria-hidden="true" />
+              Venda direta (sem orçamento)
+            </Link>
+          </>
         }
       />
 

@@ -388,3 +388,9 @@
   .oc-steps { padding: 10px 12px; gap: 6px; }
   .oc-steps__item { flex-direction: column; gap: 4px; font-size: 12.5px; text-align: center; }
 }
+
+/* HU32 — Venda direta */
+.zv-btn--direct { background: #FFFFFF; color: #1F4E8C; border: 1.5px solid #1F4E8C; }
+.zv-btn--direct:hover { background: #E8F0FA; }
+.oc-direct-note { display: flex; gap: 12px; padding: 16px; border-radius: 12px; background: #E8F0FA; color: #0F2A4A; line-height: 1.5; }
+.oc-direct-note svg { flex: none; color: #1F4E8C; }

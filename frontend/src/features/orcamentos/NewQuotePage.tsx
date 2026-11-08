@@ -26,6 +26,7 @@ export function NewQuotePage() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const presetId = Number(params.get('cliente')) || null
+  const direct = params.get('direta') === '1' // HU32 — Venda direta
   const [term, setTerm] = useState('')
   const [debounced, setDebounced] = useState('')
   const [page, setPage] = useState(0)
@@ -50,7 +51,7 @@ export function NewQuotePage() {
       setError(null)
       try {
         const quote = await createQuote(customerId)
-        navigate(`/orcamentos/${quote.id}/editar`, { replace: true })
+        navigate(`/orcamentos/${quote.id}/editar${direct ? '?direta=1' : ''}`, { replace: true })
       } catch (e) {
         setCreating(null)
         if (e instanceof ApiError && e.code === 'CUSTOMER_INACTIVE') setError('Este cliente está desativado. Reative o cliente para fazer orçamento.')
@@ -58,7 +59,7 @@ export function NewQuotePage() {
         else setError('Não foi possível criar o orçamento. Tente de novo.')
       }
     },
-    [navigate],
+    [navigate, direct],
   )
 
   // Atalho vindo do detalhe do cliente: cria uma vez só (mesmo se o React rodar o efeito 2×)
@@ -71,7 +72,7 @@ export function NewQuotePage() {
 
   return (
     <>
-      <PageHero title="Novo orçamento" back={{ to: '/orcamentos', label: 'Voltar para orçamentos' }} subtitle="Comece escolhendo o cliente." />
+      <PageHero title={direct ? 'Venda direta' : 'Novo orçamento'} back={{ to: '/orcamentos', label: 'Voltar para orçamentos' }} subtitle={direct ? 'O cliente já fechou. Comece escolhendo o cliente.' : 'Comece escolhendo o cliente.'} />
       <main className="page-body oc-layout">
         <div className="oc-layout__main">
           <section className="cl-card cl-card--elevated" aria-labelledby="titulo-cliente">
