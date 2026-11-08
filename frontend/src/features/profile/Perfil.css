@@ -22,7 +22,7 @@
 .pf-letterhead .qd__docfield { font-size: 12px; padding: 8px 12px; }
 .pf-letterhead .qd__doctitle { font-size: 12px; padding: 8px 12px; }
 
-@media (max-width: 1023px) {
+@media (max-width: 1439px) {
   .pf-layout { grid-template-columns: minmax(0, 1fr); }
   .pf-aside { position: static; }
 }
@@ -43,3 +43,6 @@
 .pf-letterhead .qd__brand { flex-direction: column; align-items: flex-start; gap: 14px; padding: 18px; }
 .pf-letterhead .qd__brand-text { border-left: 0; padding-left: 0; }
 .pf-letterhead .qd__header .qd__docbox { border-left: 0; border-top: 1px solid #3A4149; }
+
+/* Notebook e janela média: formulário e prévia um embaixo do outro, para nada ficar espremido */
+@media (max-width: 1439px) { .pf-layout > :last-child { max-width: 640px; } }

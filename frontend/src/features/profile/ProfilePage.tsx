@@ -105,7 +105,7 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
 
   // Prévia ao vivo: o que está digitado agora, no formato do orçamento
   const req = toRequest(values)
-  const preview: Company = { ...company, ...req, name: req.name || 'ZBOX' }
+  const preview: Company = { ...company, ...req, name: req.name || 'Zezinho Esquadrinhas' }
 
   function searchCep(digits: string) {
     cepAbort.current?.abort()

@@ -403,3 +403,6 @@
   .fn-part__note { grid-column: 1 / -1; grid-row: 3; }
   .fn-part__note:empty { display: none; }
 }
+/* Tabela de serviços: se não couber, rola de lado em vez de cortar */
+@media (min-width: 768px) { .fn-svc__box { overflow-x: auto; } }
+@media (min-width: 1181px) { .fn-svc__person { min-width: 170px; } }

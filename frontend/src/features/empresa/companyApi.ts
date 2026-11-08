@@ -11,7 +11,7 @@ const KEY = 'zbox.company'
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 
 export const EMPTY_COMPANY: Company = {
-  name: 'ZBOX',
+  name: 'Zezinho Esquadrinhas',
   tagline: 'Serralheria e esquadrias',
   whatsapp: null,
   phone: null,
