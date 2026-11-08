@@ -555,7 +555,7 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
           <span className="cl-field__label">Mensagem (pode editar)</span>
           <textarea autoComplete="off" className="cl-input cl-textarea" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} data-testid="mensagem-cobranca" />
         </label>
-        <p className="oc-note">O WhatsApp abre com a mensagem pronta. <strong>Você revisa e aperta enviar</strong>; o ZBOX não envia sozinho. Fica registrado "Cobrado em" no pedido.</p>
+        <p className="oc-note">O WhatsApp abre com a mensagem pronta. <strong>Você revisa e aperta enviar</strong>; o sistema não envia sozinho. Fica registrado "Cobrado em" no pedido.</p>
         {error && <Alert variant="error">{error}</Alert>}
       </div>
     </ConfirmDialog>

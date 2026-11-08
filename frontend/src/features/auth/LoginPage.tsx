@@ -92,7 +92,7 @@ export function LoginPage() {
             Clientes, orçamentos, pedidos e o dinheiro que falta receber — organizados para a sua serralheria.
           </p>
         </div>
-        <p className="login__copy">© ZBOX · Qualidade em cada detalhe</p>
+        <p className="login__copy">© Zezinho Esquadrinhas · Qualidade em cada detalhe</p>
       </aside>
 
       <main className="login__main">

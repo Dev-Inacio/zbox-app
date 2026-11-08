@@ -420,7 +420,7 @@ function WhatsAppDialog({ open, quote, busy, error, onCancel, onSent }: {
 
 function defaultWhatsAppMessage(quote: Quote): string {
   const firstName = quote.customer.name.split(' ')[0]
-  return `Olá, ${firstName}! Aqui está o seu orçamento nº ${quote.number} da ZBOX.\nCaso tenha alguma dúvida, estamos à disposição.`
+  return `Olá, ${firstName}! Aqui está o seu orçamento nº ${quote.number} da Zezinho Esquadrinhas.\nCaso tenha alguma dúvida, estamos à disposição.`
 }
 
 // Como o PDF chega no WhatsApp:
@@ -527,7 +527,7 @@ function WhatsAppForm({ quote, busy, error, onCancel, onSent }: {
             ? <>Vai abrir o <strong>Compartilhar</strong> do aparelho. Escolha <strong>WhatsApp</strong> e a conversa de {firstName}. A mensagem e o PDF vão juntos; <strong>você confere e aperta enviar</strong>.</>
             : desktopShare
               ? <><strong>Enviar com o PDF</strong> abre o Compartilhar do computador. Escolha o <strong>aplicativo do WhatsApp</strong> e a conversa de {firstName}: o PDF e a mensagem vão juntos, <strong>você confere e aperta enviar</strong>.</>
-              : <><strong>Abrir WhatsApp Web</strong> abre a conversa com a mensagem pronta e <strong>baixa</strong> o PDF. O link do WhatsApp não aceita arquivo, então anexe o PDF lá (clipe ou arraste) e <strong>aperte enviar</strong>. O ZBOX não envia sozinho.</>}
+              : <><strong>Abrir WhatsApp Web</strong> abre a conversa com a mensagem pronta e <strong>baixa</strong> o PDF. O link do WhatsApp não aceita arquivo, então anexe o PDF lá (clipe ou arraste) e <strong>aperte enviar</strong>. O sistema não envia sozinho.</>}
         </p>
 
         {desktopShare && (

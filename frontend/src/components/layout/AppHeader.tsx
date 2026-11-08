@@ -66,7 +66,7 @@ export function AppHeader() {
   return (
     <header className="app-header">
       <div className="app-header__inner">
-        <button type="button" className="app-header__logo" onClick={() => go('/inicio')} aria-label="ZBOX, ir para o início">
+        <button type="button" className="app-header__logo" onClick={() => go('/inicio')} aria-label="Zezinho Esquadrinhas, ir para o início">
           <Logo />
         </button>
 

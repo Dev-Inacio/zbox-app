@@ -78,7 +78,7 @@ export function InvoiceCard({ order, canEdit, onEdit, onView }: { order: Order; 
       {!invoice ? (
         <>
           <InvoiceTag number={null} />
-          <p className="zv-sub">O ZBOX não emite a nota. Anote aqui o número da nota que você emitiu.</p>
+          <p className="zv-sub">O sistema não emite a nota. Anote aqui o número da nota que você emitiu.</p>
           {canEdit && <button type="button" className="zv-btn zv-btn--full" onClick={onEdit} data-testid="invoice-add"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Anotar nota fiscal</button>}
         </>
       ) : (
@@ -206,7 +206,7 @@ export function InvoiceFileDialog({ order, onClose }: { order: Order; onClose: (
   return (
     <ConfirmDialog open title={`Nota fiscal ${order.invoice?.number ?? ''}`} confirmLabel="Fechar" hideCancel onCancel={onClose} onConfirm={onClose}>
       <div className="inv-view">
-        <p className="oc-small cl-muted">Este é o arquivo que você anexou. O ZBOX só mostra: quem gera a nota é a Prefeitura ou o emissor.</p>
+        <p className="oc-small cl-muted">Este é o arquivo que você anexou. O sistema só mostra: quem gera a nota é a Prefeitura ou o emissor.</p>
         {missing && <Alert variant="warning">O arquivo não está mais disponível. Use "Corrigir" para enviar de novo.</Alert>}
         {file && (file.isPdf
           ? <iframe id="inv-frame" className="inv-view__doc" src={file.url} title={`Nota fiscal ${order.invoice?.number ?? ''}`} />
