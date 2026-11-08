@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
-import { Info, Plus } from 'lucide-react'
-import { Link, useParams } from 'react-router-dom'
+import { CircleCheck, Info, Plus, Zap } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { AppIcon } from '../../components/ui/AppIcon'
 import { Alert } from '../../components/ui/Alert'
@@ -44,6 +44,7 @@ export function OrderDetailPage() {
 }
 
 function OrderDetail({ id }: { id: number }) {
+  const flash = (useLocation().state as { flash?: string } | null)?.flash ?? null
   const { user } = useAuth()
   const [attempt, setAttempt] = useState(0)
   const fetcher = useCallback(() => getOrder(id), [id])
@@ -101,9 +102,12 @@ function OrderDetail({ id }: { id: number }) {
         title={`Pedido nº ${order.number}`}
         back={{ to: '/pedidos', label: 'Voltar para pedidos' }}
         badge={<span className="zv-tags"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} />{order.invoice && <InvoiceTag number={order.invoice.number} />}</span>}
-        subtitle={<>{order.customer.name} · do orçamento <Link to={`/orcamentos/${order.quote.id}?versao=${order.quote.version}`} className="pd-hero-link">#{order.quote.number} v{order.quote.version}</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</>}
+        subtitle={order.directSale
+          ? <span className="pd-direct"><Zap size={18} strokeWidth={1.8} aria-hidden="true" /><span>{order.customer.name} · <b>Venda direta</b> · sem orçamento enviado · <Link to={`/orcamentos/${order.quote.id}`} className="pd-hero-link">ver orçamento guardado</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</span></span>
+          : <>{order.customer.name} · do orçamento <Link to={`/orcamentos/${order.quote.id}?versao=${order.quote.version}`} className="pd-hero-link">#{order.quote.number} v{order.quote.version}</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</>}
       />
 
+      {flash && <div role="status" className="pd-flash"><CircleCheck size={24} strokeWidth={1.8} aria-hidden="true" /><span>{flash}</span></div>}
       <main className="page-body oc-layout pd-layout">
         <div className="oc-layout__main">
           <section className="zv-card zv-card--steps" aria-labelledby="t-andamento">

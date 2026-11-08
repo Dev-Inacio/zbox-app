@@ -517,8 +517,10 @@ const monthShort = (month: string) => {
 const plural = (n: number, one: string, many: string) => (n === 1 ? `1 ${one}` : `${n} ${many}`)
 
 function FinanceHero({ s, monthName, showProfit, monthLeft, monthPercent }: { s: FinancialSummary; monthName: string; showProfit: boolean; monthLeft: number | null; monthPercent: number | null }) {
-  const sold = s.receivedCents + s.receivableCents
-  const percent = sold > 0 ? Math.round((s.receivedCents / sold) * 100) : 0
+  // O que ficou: entrou menos o que foi devolvido ao cliente
+  const kept = s.receivedCents - s.refundedCents
+  const sold = kept + s.receivableCents
+  const percent = sold > 0 ? Math.max(0, Math.round((kept / sold) * 100)) : 0
   return (
     <section className="fn-hero" aria-label="Resumo do mês">
       <div data-testid="total-a-receber">
@@ -531,13 +533,13 @@ function FinanceHero({ s, monthName, showProfit, monthLeft, monthPercent }: { s:
         <div className="fn-hero__progress">
           <div className="fn-hero__row"><span>Recebido de tudo que foi vendido em {monthName}</span><strong>{percent}%</strong></div>
           <div className="fn-hero__bar"><i style={{ width: `${percent}%` }} /></div>
-          <div className="fn-hero__row"><span>{formatMoney(s.receivedCents)} recebidos</span><span>de {formatMoney(sold)}</span></div>
+          <div className="fn-hero__row"><span>{formatMoney(kept)} recebidos</span><span>de {formatMoney(sold)}</span></div>
         </div>
       </div>
       <div className="fn-hero__tiles">
         <div className="fn-hero__tile" data-testid="total-recebido">
-          <span>Entrou em {monthName}</span><b className="is-good">{shortMoney(s.receivedCents)}</b>
-          <span>{s.receivedPayments === 0 ? 'Nenhum pagamento' : plural(s.receivedPayments, 'pagamento', 'pagamentos')}</span>
+          <span>Entrou em {monthName}</span><b className={kept < 0 ? "is-bad" : "is-good"}>{kept < 0 ? `− ${shortMoney(-kept)}` : shortMoney(kept)}</b>
+          <span>{s.receivedPayments === 0 ? 'Nenhum pagamento' : plural(s.receivedPayments, 'pagamento', 'pagamentos')}{s.refundedCents > 0 ? ` · − ${shortMoney(s.refundedCents)} devolvido` : ''}</span>
         </div>
         <div className="fn-hero__tile">
           <span>Atrasado</span><b className={s.overdueCents > 0 ? 'is-bad' : undefined}>{shortMoney(s.overdueCents)}</b>

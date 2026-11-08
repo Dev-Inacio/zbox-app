@@ -87,6 +87,8 @@ export type Quote = {
   decisionNote: string | null
   // Aprovado que já virou pedido (HU19). Um orçamento vira UM pedido só.
   order: { id: number; number: string } | null
+  // HU32 — Venda direta: o cliente já fechou, o orçamento não foi enviado (vira pedido na hora)
+  directSale?: boolean
   events: QuoteEvent[]
 }
 

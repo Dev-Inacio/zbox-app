@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
-import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
 import { CustomerCard } from '../../components/zbox/CustomerCard'
@@ -146,6 +146,7 @@ function EditorLoader({ id }: { id: number }) {
 
 function Editor({ quote }: { quote: Quote }) {
   const navigate = useNavigate()
+  const direct = useSearchParams()[0].get('direta') === '1' // HU32 — Venda direta
   const [saved, setSaved] = useState<FormState>(() => toForm(quote))
   const [form, setForm] = useState<FormState>(saved)
   const [errors, setErrors] = useState<Errors>({})
@@ -241,7 +242,7 @@ function Editor({ quote }: { quote: Quote }) {
       setSaved(nextForm)
       setForm(nextForm)
       setSavedAt(updated.updatedAt)
-      if (mode === 'review') navigate(`/orcamentos/${quote.id}/revisar`)
+      if (mode === 'review') navigate(`/orcamentos/${quote.id}/revisar${direct ? '?direta=1' : ''}`)
     } catch (e) {
       if (e instanceof ApiError) {
         if (e.code === 'VALIDATION_ERROR') {
@@ -281,7 +282,7 @@ function Editor({ quote }: { quote: Quote }) {
   return (
     <>
       <PageHero
-        title={`Orçamento nº ${quote.number}`}
+        title={direct ? 'Venda direta' : `Orçamento nº ${quote.number}`}
         back={{ to: '/orcamentos', label: 'Voltar para orçamentos' }}
         badge={<StatusTag tone="neutral">Rascunho · {quote.version}ª proposta</StatusTag>}
         subtitle={dirty ? 'Alterações não salvas' : <span className="zv-saved"><CircleCheck size={18} strokeWidth={1.8} aria-hidden="true" />Rascunho salvo às {savedTime}</span>}

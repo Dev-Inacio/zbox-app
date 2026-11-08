@@ -358,6 +358,24 @@ export function mockMarkQuoteConverted(id: number, order: { id: number; number: 
   quote.events.unshift({ id: nextEventId++, type: 'CONVERTED', version: quote.version, detail: order.number, userName: userName(), createdAt: when ?? now() })
 }
 
+// HU32 — Venda direta: confirma e aprova de uma vez, SEM envio ao cliente.
+// Contrato proposto para o back (HU32): POST /api/quotes/{id}/direct-sale → cria o pedido numa transação só.
+export function mockDirectSaleApprove(id: number) {
+  const quote = latest(id)
+  if (quote.directSale && quote.status === 'APPROVED') return // duplo clique
+  requireStatus(quote, 'DRAFT')
+  if (quote.items.length === 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'Adicione pelo menos 1 item.')
+  if (quote.totalCents <= 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'O valor final precisa ser maior que R$ 0,00.')
+  const at = now()
+  quote.directSale = true
+  quote.status = 'APPROVED'
+  quote.confirmedAt = at
+  quote.decidedAt = at
+  quote.approvalMethod = 'IN_PERSON'
+  event(quote, 'CONFIRMED', `Venda direta · ${formatMoney(quote.totalCents)}`)
+  event(quote, 'APPROVED', 'Venda direta (cliente já fechou)')
+}
+
 // Pedido cancelado: o orçamento de origem passa a "Recusado" (o cliente desistiu do serviço)
 export function mockMarkQuoteRejected(id: number, note: string) {
   const quote = latest(id)

@@ -309,3 +309,11 @@
 .pd-waive { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 10px; cursor: pointer; }
 .pd-waive input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--color-accent); }
 .pd-waive small { display: block; margin-top: 2px; font-size: 14px; color: var(--color-text-muted); }
+
+/* HU32 — Venda direta */
+.pd-direct { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pd-direct svg { color: #1F4E8C; flex: none; }
+.pd-direct b { color: #1F4E8C; }
+.pd-flash { display: flex; gap: 14px; align-items: center; margin: 0 40px 8px; padding: 18px 22px; border-radius: 14px; background: #E6F2EC; border: 1px solid #B9DCC8; color: #1B5E3D; font-size: 17px; }
+.pd-flash svg { color: #247A50; flex: none; }
+@media (max-width: 720px) { .pd-flash { margin: 0 16px 8px; } }

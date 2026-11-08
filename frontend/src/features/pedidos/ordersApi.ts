@@ -3,7 +3,7 @@ import type { FieldError } from '../auth/types'
 import { readMockSession } from '../auth/session'
 import type { Page } from '../clientes/types'
 import { formatMoney } from '../orcamentos/money'
-import { mockMarkQuoteConverted, mockMarkQuoteRejected, mockQuoteForConversion } from '../orcamentos/quotesApi'
+import { mockDirectSaleApprove, mockMarkQuoteConverted, mockMarkQuoteRejected, mockQuoteForConversion } from '../orcamentos/quotesApi'
 import type { Quote, QuoteItem } from '../orcamentos/types'
 import { todayIso } from './dates'
 import { METHOD_LABEL, METHODS } from './labels'
@@ -161,6 +161,7 @@ function fromQuote(quote: Quote, createdAt: string): Order {
     number: String(nextNumber++).padStart(6, '0'),
     status: 'NEW', paymentStatus: 'UNPAID',
     quote: { id: quote.id, number: quote.number, version: quote.version },
+    directSale: quote.directSale ?? false,
     customer: structuredClone(quote.customer),
     items: structuredClone(quote.items) as QuoteItem[],
     subtotalCents: quote.subtotalCents, discountType: quote.discountType, discountValue: quote.discountValue, discountCents: quote.discountCents, totalCents: quote.totalCents,
@@ -228,6 +229,16 @@ export async function convertQuoteToOrder(quoteId: number, request: ConvertToOrd
   store.set(order.id, order)
   mockMarkQuoteConverted(quote.id, { id: order.id, number: order.number })
   return snapshot(order)
+}
+
+// HU32 — POST /api/quotes/{id}/direct-sale (proposto): confirma + aprova + cria o pedido de uma vez.
+// No back real tem que ser UMA transação: ou cria tudo, ou nada.
+export async function directSaleToOrder(quoteId: number): Promise<Order> {
+  await wait(300)
+  const existing = [...store.values()].find((o) => o.quote.id === quoteId)
+  if (existing) return snapshot(existing) // duplo clique: devolve o mesmo pedido
+  mockDirectSaleApprove(quoteId)
+  return convertQuoteToOrder(quoteId, { downPayment: null })
 }
 
 // GET /api/orders?search=&status=&payment=&customerId=&page=0&size=20

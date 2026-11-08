@@ -67,6 +67,7 @@ export type Order = {
   status: OrderStatus
   paymentStatus: PaymentStatus
   quote: { id: number; number: string; version: number }
+  directSale?: boolean // HU32 — veio de Venda direta (sem orçamento enviado)
   customer: QuoteCustomer
   items: QuoteItem[]
   subtotalCents: number
