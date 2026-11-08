@@ -36,6 +36,8 @@ public class AuditLog {
 
     private Instant createdAt;
 
+    private Integer version;
+
     public AuditLog() {
     }
 
@@ -93,5 +95,13 @@ public class AuditLog {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Integer getVersion() {
+        return version;
+    }
+
+    public void setVersion(Integer version) {
+        this.version = version;
     }
 }
