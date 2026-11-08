@@ -1,4 +1,4 @@
-import logo from '../../assets/zbox-logo-claro.png'
+import logo from '../../assets/logo-zezinho.png'
 import { companyAddressLine } from '../empresa/format'
 import type { Company } from '../empresa/types'
 import { customerMobile, formatDate, maskPhone } from '../clientes/format'

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import { Banknote, Building2, FileText, Home, LogOut, Menu, Package, PanelLeftClose, PanelLeftOpen, Users, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import logo from '../../assets/zbox-logo-escuro.png'
+import logo from '../../assets/logo-zezinho.png'
 import { useAuth } from '../../features/auth/useAuth'
 import './Sidebar.css'
 
@@ -42,7 +42,7 @@ export function Sidebar() {
     <>
       {/* Tablet/celular: barra no topo com botão "Menu" escrito (não só ícone) */}
       <div className="zb-topbar">
-        <img src={logo} alt="ZBOX Serralheria e Alumínio" className="zb-topbar__logo" />
+        <img src={logo} alt="Zezinho Esquadrinhas" className="zb-topbar__logo" />
         <button type="button" className="zb-topbar__menu" aria-expanded={open} aria-controls="zb-sidebar" onClick={() => setOpen(true)}>
           <Menu size={24} aria-hidden="true" /> Menu
         </button>
@@ -51,7 +51,7 @@ export function Sidebar() {
 
       <aside id="zb-sidebar" className={`zb-sidebar${collapsed ? ' is-min' : ''}${open ? ' is-open' : ''}`} aria-label="Menu principal">
         <div className="zb-sidebar__top">
-          <img src={logo} alt="ZBOX Serralheria e Alumínio" className="zb-sidebar__logo" />
+          <img src={logo} alt="Zezinho Esquadrinhas" className="zb-sidebar__logo" />
           <button type="button" className="zb-sidebar__close" onClick={() => setOpen(false)} aria-label="Fechar menu"><X size={24} /></button>
         </div>
 

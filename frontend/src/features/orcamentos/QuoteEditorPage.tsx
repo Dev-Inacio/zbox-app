@@ -3,10 +3,10 @@ import type { FormEvent } from 'react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
+import { CustomerCard } from '../../components/zbox/CustomerCard'
 import { Button } from '../../components/ui/Button'
 import { useRequest } from '../../hooks/useRequest'
 import { ApiError } from '../auth/types'
-import { customerMobile, maskPhone } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
 import { ChevronRight, CircleCheck, Lock, Plus, Trash2 } from 'lucide-react'
 import { StatusTag } from '../../components/zbox'
@@ -294,16 +294,7 @@ function Editor({ quote }: { quote: Quote }) {
             {errors.form && <Alert variant="error">{errors.form}</Alert>}
             {quote.versionReason && <Alert variant="info">Versão {quote.version}: {quote.versionReason}</Alert>}
 
-            <section className="cl-card" aria-labelledby="t-cliente">
-              <h2 id="t-cliente" className="cl-card__title">Cliente</h2>
-              <div className="oc-customer">
-                <span className="oc-avatar" aria-hidden="true">{quote.customer.name.split(' ').slice(0, 2).map((p) => p[0]).join('')}</span>
-                <span className="oc-customer__text">
-                  <span className="oc-customer__name">{quote.customer.name}</span>
-                  <span className="cl-muted">{[customerMobile(quote.customer) ? maskPhone(customerMobile(quote.customer)!) : null, quote.customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
-                </span>
-              </div>
-            </section>
+            <CustomerCard customer={quote.customer} />
 
             <section className="cl-card" aria-labelledby="t-itens">
               <div className="cl-card__header">

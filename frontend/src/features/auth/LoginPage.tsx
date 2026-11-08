@@ -5,7 +5,7 @@ import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { PasswordInput } from '../../components/ui/PasswordInput'
 import { Alert } from '../../components/ui/Alert'
-import logoEscuro from '../../assets/zbox-logo-escuro.png'
+import logoEscuro from '../../assets/logo-zezinho.png'
 import { login } from './authApi'
 import { useAuth } from './useAuth'
 import { ApiError } from './types'
@@ -83,9 +83,8 @@ export function LoginPage() {
           {[8, 22, 37, 55, 70, 86, 94].map((x, i) => <i key={x} className="login__dot" style={{ left: `${x}%`, animationDelay: `${i * 1.7}s` }} />)}
         </div>
         <div className="login__logo-wrap">
-          <img src={logoEscuro} alt="ZBOX Serralheria e Alumínio" className="login__logo-img" />
-          <p className="login__tag">SERRALHERIA E ALUMÍNIO</p>
-          <p className="login__tag2">QUALIDADE EM CADA DETALHE</p>
+          <img src={logoEscuro} alt="Zezinho Esquadrinhas" className="login__logo-img" />
+          <p className="login__tag">QUALIDADE EM CADA DETALHE</p>
         </div>
         <div className="login__pitch login__rise">
           <h2 className="login__headline">Do orçamento à entrega, tudo no mesmo lugar.</h2>
@@ -93,7 +92,7 @@ export function LoginPage() {
             Clientes, orçamentos, pedidos e o dinheiro que falta receber — organizados para a sua serralheria.
           </p>
         </div>
-        <p className="login__copy">© ZBOX · Serralheria e Alumínio</p>
+        <p className="login__copy">© ZBOX · Qualidade em cada detalhe</p>
       </aside>
 
       <main className="login__main">

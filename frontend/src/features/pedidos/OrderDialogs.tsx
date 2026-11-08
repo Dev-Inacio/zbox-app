@@ -6,13 +6,13 @@ import { NoAutofill } from '../../components/ui/NoAutofill'
 import { ApiError } from '../auth/types'
 import { onlyDigits } from '../clientes/format'
 import { formatMoney, maskMoneyInput, parseDecimalToHundredths } from '../orcamentos/money'
-import { addExpense, deleteExpense, updateExpense, convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, getOrder, registerCollection, reversePayment } from './ordersApi'
+import { addExpense, addRefund, cancelRefund, deleteExpense, updateExpense, convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, getOrder, registerCollection, reversePayment } from './ordersApi'
 import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { formatDay, todayIso } from './dates'
 import { collectionMessage } from './messages'
 import type { CollectTarget } from './messages'
 import { EXPENSE_TYPE_LABEL, METHOD_LABEL, METHODS } from './labels'
-import type { ExpenseType, Order, OrderExpense, Payment, PaymentMethod } from './types'
+import type { ExpenseType, Order, OrderExpense, OrderRefund, Payment, PaymentMethod } from './types'
 import type { Quote } from '../orcamentos/types'
 import '../orcamentos/Orcamentos.css'
 import './Pedidos.css'
@@ -158,7 +158,7 @@ export function ConvertToOrderDialog({ quote, onCancel, onDone }: { quote: Quote
               ))}
             </div>
             <MethodPills value={method} onChange={setMethod} name="forma-entrada" />
-            {errors.method && <p className="field__error">{errors.method}</p>}
+            {errors.method && !method && <p className="field__error">{errors.method}</p>}
           </div>
         )}
 
@@ -222,7 +222,7 @@ export function PaymentDialog({ target, onCancel, onDone }: { target: PaymentTar
           Recebi o valor total ({formatMoney(target.remainingCents)})
         </button>
         <MethodPills value={method} onChange={setMethod} name="forma-pagamento" />
-        {errors.method && <p className="field__error">{errors.method}</p>}
+        {errors.method && !method && <p className="field__error">{errors.method}</p>}
         <div className="pd-grid-2">
           <DateField id="data-pagamento" label="Data do pagamento" value={paidAt} max={today} onChange={setPaidAt} error={errors.paidAt} />
           <div className="cl-field">
@@ -230,6 +230,9 @@ export function PaymentDialog({ target, onCancel, onDone }: { target: PaymentTar
             <input autoComplete="off" id="obs-pagamento" className="cl-input" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: pago na loja" />
           </div>
         </div>
+        {!errors.paidAt && paidAt && paidAt <= today && paidAt.slice(0, 7) !== today.slice(0, 7) && (
+          <Alert variant="warning" data-testid="aviso-outro-mes">Este pagamento vai contar em {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(`${paidAt}T12:00:00`))}, não neste mês. No Financeiro, ele aparece no período dessa data.</Alert>
+        )}
         {general && <Alert variant="error">{general}</Alert>}
       </div>
     </ConfirmDialog>
@@ -309,7 +312,7 @@ export function DeliverDialog({ order, onCancel, onDone }: { order: Order; onCan
             {paid === true && (
               <>
                 <MethodPills value={method} onChange={setMethod} name="forma-entrega" />
-                {errors.method && <p className="field__error">{errors.method}</p>}
+                {errors.method && !method && <p className="field__error">{errors.method}</p>}
               </>
             )}
             {paid === false && (
@@ -369,12 +372,15 @@ export function CancelOrderDialog({ order, onCancel, onDone }: { order: Order; o
 }
 
 // ---------- HU23: estornar (ADMIN/MANAGER) ----------
-export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { order: Order; payment: Payment; onCancel: () => void; onDone: Done }) {
+export function ReversePaymentDialog({ order, payment, onCancel, onDone, onRefundInstead }: { order: Order; payment: Payment; onCancel: () => void; onDone: Done; onRefundInstead: () => void }) {
   const [reason, setReason] = useState('')
+  const [cause, setCause] = useState<'MISTAKE' | 'RETURNED'>('MISTAKE')
+  const returned = cause === 'RETURNED'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
+    if (returned) { onRefundInstead(); return }
     if (reason.trim().length < 3 || busy) return
     setBusy(true)
     setError(null)
@@ -389,15 +395,124 @@ export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { ord
   }
 
   return (
-    <ConfirmDialog open title="Estornar pagamento?" confirmLabel="Estornar" variant="danger" loading={busy} loadingText="Estornando…"
-      confirmDisabled={reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
+    <ConfirmDialog open title="Estornar pagamento?" confirmLabel={returned ? 'Continuar para devolução' : 'Estornar'} variant="danger" loading={busy} loadingText="Estornando…"
+      confirmDisabled={!returned && reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
         <p><strong>{formatMoney(payment.amountCents)}</strong> · {METHOD_LABEL[payment.method]} · {formatDay(payment.paidAt)}</p>
-        <p className="oc-small cl-muted">O pagamento não é apagado: fica riscado no histórico, e o valor volta para "falta receber".</p>
+        <fieldset className="pd-reverse-causes">
+          <legend className="cl-field__label">O que aconteceu?</legend>
+          <label className="pd-choice">
+            <input type="radio" name="motivo-estorno" checked={!returned} onChange={() => setCause('MISTAKE')} data-testid="estorno-engano" />
+            <b>Lancei errado</b>
+            <span>Valor errado, pedido errado ou o dinheiro não entrou. O valor volta para "falta receber".</span>
+          </label>
+          <label className="pd-choice">
+            <input type="radio" name="motivo-estorno" checked={returned} onChange={() => setCause('RETURNED')} data-testid="estorno-devolveu" />
+            <b>Devolvi o dinheiro ao cliente</b>
+            <span>O cliente não gostou ou desistiu. Registra uma devolução, e você escolhe se ainda cobra o restante.</span>
+          </label>
+        </fieldset>
+        {!returned && (
+          <label className="cl-field">
+            <span className="cl-field__label">Motivo</span>
+            <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: lançado no pedido errado" data-testid="motivo-estorno" />
+            <span className="cl-field__hint">O pagamento fica riscado no pedido, com este motivo.</span>
+          </label>
+        )}
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+// Devolução: dinheiro que voltou para o cliente. O saldo a receber não muda.
+export function RefundDialog({ order, from, onCancel, onDone }: { order: Order; from?: Payment; onCancel: () => void; onDone: Done }) {
+  const today = todayIso()
+  const available = order.paidCents - order.refundedCents
+  // Vindo do estorno de um pagamento, já começa com o valor e a forma dele
+  const [amount, setAmount] = useState(from ? maskMoneyInput(String(Math.min(from.amountCents, available))) : '')
+  const [method, setMethod] = useState<PaymentMethod | null>(from?.method ?? null)
+  const [date, setDate] = useState(today)
+  const [reason, setReason] = useState('')
+  const [waive, setWaive] = useState(Boolean(from)) // o cliente desistiu: normalmente não se cobra mais
+  const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [general, setGeneral] = useState<string | null>(null)
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
+  const cents = parseDecimalToHundredths(amount) ?? 0
+
+  async function submit() {
+    const e: Record<string, string> = {}
+    if (cents <= 0) e.amountCents = 'Informe um valor maior que R$ 0,00.'
+    else if (cents > available) e.amountCents = `O valor não pode ser maior que o recebido (${formatMoney(available)}).`
+    if (!method) e.method = 'Escolha a forma da devolução.'
+    if (!date) e.refundedAt = 'Informe a data.'
+    else if (date > today) e.refundedAt = 'A data da devolução não pode ser no futuro.'
+    if (reason.trim().length < 3) e.reason = 'Conte o motivo da devolução.'
+    setErrors(e)
+    setGeneral(null)
+    if (Object.keys(e).length || busy || !method) return
+    setBusy(true)
+    try {
+      onDone(await addRefund(order.id, { amountCents: cents, method, refundedAt: date, reason, waiveRemaining: waive && order.remainingCents > 0 }, idempotencyKey), `Devolução de ${formatMoney(cents)} registrada.${waive && order.remainingCents > 0 ? ' O restante não será cobrado.' : ''}`)
+    } catch (err) {
+      const r = readError(err)
+      setErrors(r.fields)
+      setGeneral(r.general)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title="Devolver ao cliente" confirmLabel={cents > 0 ? `Devolver ${formatMoney(cents)}` : 'Devolver'} variant="danger" loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">Pedido #{order.number} · {order.customer.name}</p>
+        <p className="oc-small cl-muted">Use quando o dinheiro voltou para o cliente, como num abatimento por defeito. O cliente não fica devendo o valor devolvido. Se o pagamento foi lançado errado, use "Estornar".</p>
+        <div className="pd-sum pd-sum--one"><div className="pd-sum__row"><span>Pode devolver até</span><strong>{formatMoney(available)}</strong></div></div>
+        <MoneyField id="valor-devolucao" label="Valor devolvido" value={amount} onChange={setAmount} error={errors.amountCents} />
+        <button type="button" className="zv-btn zv-btn--full" onClick={() => setAmount(maskMoneyInput(String(available)))} data-testid="devolver-tudo">Devolver tudo ({formatMoney(available)})</button>
+        <MethodPills value={method} onChange={setMethod} name="forma-devolucao" />
+        {errors.method && !method && <p className="field__error">{errors.method}</p>}
+        <DateField id="data-devolucao" label="Data da devolução" value={date} max={today} onChange={setDate} error={errors.refundedAt} />
         <label className="cl-field">
           <span className="cl-field__label">Motivo</span>
-          <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: lançado no pedido errado" />
+          <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Ex.: acabamento com defeito" data-testid="motivo-devolucao" />
+          {errors.reason && <span className="field__error">{errors.reason}</span>}
         </label>
+        {order.remainingCents > 0 && (
+          <label className="pd-waive">
+            <input type="checkbox" checked={waive} onChange={(ev) => setWaive(ev.target.checked)} data-testid="nao-cobrar-restante" />
+            <span><b>Não cobrar o restante de {formatMoney(order.remainingCents)}</b><small>O cliente não vai pagar mais nada. O pedido sai de "Falta receber" e das cobranças.</small></span>
+          </label>
+        )}
+        {general && <Alert variant="error">{general}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+export function CancelRefundDialog({ order, refund, onCancel, onDone }: { order: Order; refund: OrderRefund; onCancel: () => void; onDone: Done }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      onDone(await cancelRefund(order.id, refund.id), 'Devolução desfeita.')
+    } catch (err) {
+      const r = readError(err)
+      setError(r.general ?? Object.values(r.fields)[0] ?? NETWORK)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title="Desfazer devolução?" confirmLabel="Desfazer" variant="danger" loading={busy} loadingText="Desfazendo…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p><strong>{formatMoney(refund.amountCents)}</strong> · {METHOD_LABEL[refund.method]} · {formatDay(refund.refundedAt)}</p>
+        <p className="oc-small cl-muted">Use só se foi lançada por engano. Ela fica riscada no pedido{refund.waivedCents > 0 ? `, e os ${formatMoney(refund.waivedCents)} que não seriam cobrados voltam para "falta receber"` : ''}.</p>
         {error && <Alert variant="error">{error}</Alert>}
       </div>
     </ConfirmDialog>

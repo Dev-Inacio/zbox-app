@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Calendar, MessageCircle, Plus } from 'lucide-react'
+import { Calendar, MessageCircle, Plus, Printer } from 'lucide-react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
 import { Button } from '../../components/ui/Button'
@@ -11,7 +11,7 @@ import { ListFilters, SegFilter, StatusTag } from '../../components/zbox'
 import { usePagedList } from '../../hooks/usePagedList'
 import { useRequest } from '../../hooks/useRequest'
 import { formatMoney } from '../orcamentos/money'
-import { formatDay, sinceText } from '../pedidos/dates'
+import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from '../pedidos/dates'
 import { METHOD_LABEL } from '../pedidos/labels'
 import { OrderStatusBadge } from '../pedidos/OrderBadges'
 import { InvoiceTag } from '../pedidos/Invoice'
@@ -198,12 +198,7 @@ export function FinancialPage() {
         <section id="entrou" className="zv-card fn-section" aria-labelledby="t-entrou">
           <div className="fn-section__head">
             <h2 id="t-entrou" className="fn-section__title">O que entrou {receivedRange.label}</h2>
-            {periodSummary.data && periodSummary.data.receivedPayments > 0 && (
-              <span className="fn-section__chips">
-                <span className="fn-chip fn-chip--good">Total <strong>{formatMoney(periodSummary.data.receivedCents)}</strong></span>
-                {periodSummary.data.byMethod.map((m) => <span key={m.method} className="fn-chip">{METHOD_LABEL[m.method]} <strong>{formatMoney(m.amountCents)}</strong></span>)}
-              </span>
-            )}
+            {periodSummary.data && periodSummary.data.receivedPayments > 0 && <span className="cl-muted">Estornados não entram</span>}
           </div>
           <div className="fn-periods" role="group" aria-label="Período">
             {PERIODS.map((p) => (
@@ -213,6 +208,16 @@ export function FinancialPage() {
               </button>
             ))}
           </div>
+          {periodSummary.data && periodSummary.data.receivedPayments > 0 && (
+            <div className="fn-methods" aria-label="Por forma de pagamento">
+              {periodSummary.data.byMethod.map((m) => (
+                <div key={m.method} className="fn-method">
+                  <div className="fn-method__top"><span>{METHOD_LABEL[m.method]}</span><b>{formatMoney(m.amountCents)}</b></div>
+                  <span className="fn-method__bar"><i style={{ width: `${Math.round((m.amountCents / periodSummary.data!.receivedCents) * 100)}%` }} /></span>
+                </div>
+              ))}
+            </div>
+          )}
           <ListState loading={received.loading} error={received.error} empty={received.data?.totalElements === 0}
                 emptyTitle="Nenhum pagamento neste período." emptyText="Escolha outro período." onRetry={() => setVersion((n) => n + 1)} />
               {received.data && received.data.content.length > 0 && (
@@ -224,19 +229,35 @@ export function FinancialPage() {
                         <div className="fn-pay__top">
                           <span className="fn-pay__who">
                             <span className="fn-pay__name">{p.customerName}</span>
-                            <span className="fn-pay__meta">{p.payments.length === 1 ? `${formatDay(p.lastPaidAt)} · ${METHOD_LABEL[p.payments[0].method]}` : `${p.payments.length} pagamentos`} · <Link to={`/pedidos/${p.orderId}`}>Pedido #{p.orderNumber}</Link></span>
+                            <span className="fn-pay__meta">{p.payments.length === 1 && p.refunds.length === 0 ? `${formatDay(p.lastPaidAt)} · ${METHOD_LABEL[p.payments[0].method]}` : [p.payments.length ? (p.payments.length === 1 ? '1 pagamento' : `${p.payments.length} pagamentos`) : null, p.refunds.length ? (p.refunds.length === 1 ? '1 devolução' : `${p.refunds.length} devoluções`) : null].filter(Boolean).join(' · ')} · <Link to={`/pedidos/${p.orderId}`}>Pedido #{p.orderNumber}</Link></span>
                           </span>
-                          <strong className="fn-pay__value">+ {formatMoney(p.amountCents)}</strong>
+                          <strong className={`fn-pay__value${p.amountCents < 0 ? ' fn-neg' : ''}`}>{p.amountCents < 0 ? `− ${formatMoney(-p.amountCents)}` : `+ ${formatMoney(p.amountCents)}`}</strong>
                         </div>
-                        {p.payments.length > 1 && (
+                        {(p.payments.length > 1 || p.refunds.length > 0) && (
                           <ul className="fn-pay__parts" data-testid="partes-pagamento">
-                            {p.payments.map((part) => <li key={part.id}><span>{formatDay(part.paidAt)} · {METHOD_LABEL[part.method]}</span><span>{formatMoney(part.amountCents)}</span></li>)}
+                            {p.payments.map((part) => <li key={part.id} className="fn-part"><time>{formatDay(part.paidAt)}</time><span className="fn-part__tag">{METHOD_LABEL[part.method]}</span><span className="fn-part__note" /><b className="fn-part__in">+ {formatMoney(part.amountCents)}</b></li>)}
+                            {p.refunds.map((r) => <li key={r.id} className="fn-part"><time>{formatDay(r.refundedAt)}</time><span className="fn-part__tag is-out">Devolvido · {METHOD_LABEL[r.method]}</span><span className="fn-part__note">{r.reason} · por {r.userName}</span><b className="fn-part__out">− {formatMoney(r.amountCents)}</b></li>)}
+                          </ul>
+                        )}
+                        {p.outside.length > 0 && (
+                          <ul className="fn-pay__parts fn-pay__outside" data-testid="fora-do-periodo">
+                            {p.outside.map((part) => <li key={part.id} className="fn-part"><time>{formatDay(part.paidAt)}</time><span className="fn-part__tag">{METHOD_LABEL[part.method]}</span><span className="fn-part__note">fora deste período, não soma aqui</span><b>{formatMoney(part.amountCents)}</b></li>)}
                           </ul>
                         )}
                         {p.split && <PaymentSplit split={p.split} onAddExpense={() => openOrder(p.orderId, 'expense')} onEditExpenses={() => openOrder(p.orderId, 'expenses')} />}
                       </li>
                     ))}
                   </ul>
+                  {periodSummary.data && (
+                    <>
+                      <div className="fn-cash" data-testid="total-entrou">
+                        <div className="fn-cash__box is-in"><span>Entrou · {periodSummary.data.receivedPayments === 1 ? '1 pagamento' : `${periodSummary.data.receivedPayments} pagamentos`}</span><strong>{formatMoney(periodSummary.data.receivedCents)}</strong></div>
+                        <div className="fn-cash__box is-out"><span>Devolvido a cliente · {periodSummary.data.refunds}</span><strong data-testid="total-devolvido">{periodSummary.data.refundedCents > 0 ? `− ${formatMoney(periodSummary.data.refundedCents)}` : formatMoney(0)}</strong></div>
+                        <div className="fn-cash__box is-net"><span>Ficou no caixa {receivedRange.label}</span><strong data-testid="total-caixa">{formatMoney(periodSummary.data.receivedCents - periodSummary.data.refundedCents)}</strong></div>
+                      </div>
+                      <p className="oc-small cl-muted">Devolução = dinheiro que voltou para o cliente (ex.: abatimento por defeito). O cliente não fica devendo. Diferente de <b>estorno</b>, que corrige um pagamento lançado errado.</p>
+                    </>
+                  )}
                   <Pagination page={received.data.page} totalPages={received.data.totalPages} size={received.data.size} total={received.data.totalElements} shown={received.data.content.length}
                     onChange={(p) => update({ paginaEntrou: p === 0 ? null : String(p + 1) })} />
                 </>
@@ -258,7 +279,7 @@ export function FinancialPage() {
             ))}
           </div>
             <ListState loading={profit.loading} error={profit.error} empty={false} emptyTitle="" emptyText="" onRetry={() => setVersion((n) => n + 1)} />
-              {profit.data && <ProfitTab report={profit.data} byMonth={profitByMonth.data ?? null} label={range.label} onAddExpense={(id) => openOrder(id, 'expense')}
+              {profit.data && <ProfitTab report={profit.data} byMonth={profitByMonth.data ?? null} label={range.label}
                 onPay={(o) => setAction({ kind: 'pay', row: { orderId: o.orderId, number: o.number, customerName: o.customerName, remainingCents: o.totalCents - o.paidCents } })} />}
           </section>
         )}
@@ -315,7 +336,7 @@ function PaymentSplit({ split: s, onAddExpense, onEditExpenses }: {
         )}
         {s.orderRemainingCents > 0
           ? <span className="fn-chip fn-chip--muted">Falta receber <strong>{formatMoney(s.orderRemainingCents)}</strong></span>
-          : <span className="fn-chip fn-chip--muted"><AppIcon name="check" size={16} />Pedido pago</span>}
+          : <span className="fn-chip fn-chip--muted"><AppIcon name="check" size={16} />{s.orderRefundedCents > 0 ? 'Nada a receber' : 'Pedido pago'}</span>}
       </span>
       <span className="fn-split__actions">
         {/* Um valor de material por pedido: depois de lançado, só editar */}
@@ -327,7 +348,7 @@ function PaymentSplit({ split: s, onAddExpense, onEditExpenses }: {
   )
 }
 
-const HEALTH_TAG: Record<ProfitHealth, string> = { OUT_OF_POCKET: 'Prejuízo', LOW: 'Prejuízo', NORMAL: 'Normal', GREAT: 'Ótimo' }
+const HEALTH_TAG: Record<ProfitHealth, string> = { OUT_OF_POCKET: 'Prejuízo', LOW: 'Baixo', NORMAL: 'Normal', GREAT: 'Ótimo' }
 
 // "Gastos e lucro" virou um painel: em poucos segundos, o mês foi bom ou ruim?
 // O detalhe de cada pagamento (material × mão de obra) e a correção do material ficam em Recebidos.
@@ -340,9 +361,9 @@ const VERDICT: Record<ProfitHealth, { title: string; tone: 'bad' | 'ok' | 'great
 
 type ServiceRow = { o: ProfitRow; view: ProfitView }
 
-function ProfitTab({ report, byMonth, label, onAddExpense, onPay }: {
+function ProfitTab({ report, byMonth, label, onPay }: {
   byMonth: { month: string; leftCents: number; percent: number | null }[] | null
-  report: ProfitReport; label: string; onAddExpense: (orderId: number) => void; onPay: (o: ProfitRow) => void
+  report: ProfitReport; label: string; onPay: (o: ProfitRow) => void
 }) {
   const active = report.orders.filter((o) => o.status !== 'CANCELED')
   // Cada serviço com a MESMA conta do pedido (profitView): régua, selo e mão de obra
@@ -370,8 +391,8 @@ function ProfitTab({ report, byMonth, label, onAddExpense, onPay }: {
   const best = byPercent[0]
   const worst = byPercent.length > 1 ? byPercent[byPercent.length - 1] : null
   // Listas de 5 em 5 (design 25/10). Os números de cima continuam do resumo inteiro.
-  const missingPage = usePagedList(missing, 5)
-  const servicesPage = usePagedList(byPercent, 5)
+  const byDate = [...rated].sort((a, b) => (a.o.deliveredOn ?? a.o.createdOn).localeCompare(b.o.deliveredOn ?? b.o.createdOn) || a.o.number.localeCompare(b.o.number))
+  const servicesPage = usePagedList(byDate, 5)
 
   if (active.length === 0) {
     return <div className="cl-state"><p className="cl-state__title">Nenhum serviço com movimento {label}.</p><p className="cl-state__text">Escolha outro período acima.</p></div>
@@ -393,7 +414,7 @@ function ProfitTab({ report, byMonth, label, onAddExpense, onPay }: {
             <MonthGauge percent={month.percent} />
           </>
         ) : (
-          <p className="fn-verdict__text">Nenhum serviço deste período tem material lançado. Lance o material (aqui embaixo ou em Recebidos) para ver se o mês foi bom.</p>
+          <p className="fn-verdict__text">Nenhum serviço deste período tem material lançado. Lance o material em "O que entrou" ou no pedido para ver se o mês foi bom.</p>
         )}
       </section>
 
@@ -414,47 +435,40 @@ function ProfitTab({ report, byMonth, label, onAddExpense, onPay }: {
         </div>
       )}
 
-      <div className="fn-two">
       {byMonth && <LeftByMonth rows={byMonth} />}
-      {/* 4. O que falta fazer */}
-      {missing.length > 0 && (
-        <section className="fn-todo" aria-labelledby="t-falta">
-          <h3 id="t-falta" className="fn-subtitle fn-subtitle--icon"><AppIcon name="material" size={32} />Falta lançar o material ({missing.length === 1 ? '1 serviço' : `${missing.length} serviços`})</h3>
-          <p className="oc-small cl-muted">Sem o material, não dá para saber quanto estes serviços deixaram para você.</p>
-          <ul className="fn-mini">
-            {missingPage.content.map(({ o }) => (
-              <li key={o.orderId}>
-                <span><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link><span className="cl-muted oc-small"> · #{o.number} · {formatMoney(o.totalCents)}</span></span>
-                <span className="fn-mini__right">
-                  {o.totalCents > o.paidCents && <button type="button" className="btn btn--secondary fn-add" onClick={() => onPay(o)} data-testid="receber-falta-material">Recebi pagamento</button>}
-                  <button type="button" className="btn btn--secondary fn-add" onClick={() => onAddExpense(o.orderId)} data-testid="lancar-gasto-linha"><AppIcon name="plus" size={24} />Lançar material</button>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {missingPage.needsPages && <Pagination page={missingPage.page} totalPages={missingPage.totalPages} size={missingPage.size} total={missingPage.total} shown={missingPage.content.length} onChange={missingPage.setPage} />}
-        </section>
-      )}
 
-      </div>
-
-      {/* 5. Todos os serviços, resumidos */}
+      {/* 5. Todos os serviços, em ordem de data */}
       {rated.length > 0 && (
-        <section aria-labelledby="t-todos">
-          <h3 id="t-todos" className="fn-subtitle">Como foi cada serviço ({rated.length === 1 ? '1 serviço' : `${rated.length} serviços`})</h3>
-          <ul className="fn-mini" data-testid="lista-lucro">
-            {servicesPage.content.map(({ o, view }) => (
-              <li key={o.orderId}>
-                <span><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link><span className="cl-muted oc-small"> · #{o.number} · {STATUS[o.status]}</span></span>
-                <span className="fn-mini__right">
-                  <span className={`pd-health__tag fn-tag pd-health--${view.rate!.health.toLowerCase()}`}>{HEALTH_TAG[view.rate!.health]} · {formatPercentBR(view.rate!.percent)}</span>
-                  <strong className={view.tone === 'loss' ? 'fn-neg' : 'fn-pos'} data-testid="lucro-servico">{formatMoney(view.valueCents)}</strong>
-                  {o.totalCents > o.paidCents && <button type="button" className="btn btn--secondary fn-add" onClick={() => onPay(o)} data-testid="receber-servico">Recebi pagamento</button>}
-                </span>
-              </li>
-            ))}
-          </ul>
-          {servicesPage.needsPages && <Pagination page={servicesPage.page} totalPages={servicesPage.totalPages} size={servicesPage.size} total={servicesPage.total} shown={servicesPage.content.length} onChange={servicesPage.setPage} />}
+        <section className="fn-svc" aria-labelledby="t-todos">
+          <div className="fn-svc__head">
+            <div>
+              <h3 id="t-todos" className="fn-subtitle">Como foi cada serviço</h3>
+              <p className="oc-small cl-muted">Quanto você ganhou em cada um e quando foi entregue.</p>
+            </div>
+            <button type="button" className="zv-btn zv-btn--sm fn-print" onClick={() => window.print()} data-testid="imprimir-resumo"><Printer size={18} strokeWidth={1.8} aria-hidden="true" />Imprimir</button>
+          </div>
+          <div className="fn-svc__box">
+            <table className="fn-svc__table" data-testid="lista-lucro">
+              <thead><tr><th scope="col">Quando</th><th scope="col">Serviço</th><th scope="col" className="fn-svc__r">Cobrou</th><th scope="col" className="fn-svc__r">Material</th><th scope="col" className="fn-svc__r">Sobrou</th><th scope="col" className="fn-svc__r">% sobrou</th><th scope="col"><span className="sr-only">Situação</span></th></tr></thead>
+              <tbody>
+                {servicesPage.content.map(({ o, view }) => (
+                  <tr key={o.orderId}>
+                    <td className="fn-svc__when"><b>{formatDayShort(o.deliveredOn ?? o.createdOn)}</b><span>{o.deliveredOn ? 'entregue' : STATUS[o.status].toLowerCase()}</span></td>
+                    <td className="fn-svc__who"><span className="fn-svc__person"><span className="fn-avatar" aria-hidden="true">{initials(o.customerName)}</span><span className="zv-two"><Link to={`/pedidos/${o.orderId}`}>{o.customerName}</Link><span>Pedido nº {o.number}</span></span></span></td>
+                    <td className="fn-svc__r" data-label="Cobrou">{formatMoney(o.totalCents)}</td>
+                    <td className="fn-svc__r" data-label="Material">{formatMoney(o.materialCents + o.laborCents)}</td>
+                    <td className="fn-svc__r fn-svc__left" data-label="Sobrou"><strong className={view.valueCents < 0 ? 'fn-neg' : 'fn-pos'} data-testid="lucro-servico">{view.valueCents < 0 ? `− ${formatMoney(-view.valueCents)}` : formatMoney(view.valueCents)}</strong></td>
+                    <td className="fn-svc__r" data-label="% sobrou">{formatPercentBR(view.rate!.percent)}</td>
+                    <td className="fn-svc__tag">
+                      <span className={`pd-health__tag fn-tag pd-health--${view.rate!.health.toLowerCase()}`}>{HEALTH_TAG[view.rate!.health]}</span>
+                      {o.totalCents > o.paidCents && <button type="button" className="fn-svc__pay" onClick={() => onPay(o)} data-testid="receber-servico">Recebi pagamento</button>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {servicesPage.needsPages ? <Pagination page={servicesPage.page} totalPages={servicesPage.totalPages} size={servicesPage.size} total={servicesPage.total} shown={servicesPage.content.length} noun="serviços" onChange={servicesPage.setPage} /> : null}
         </section>
       )}
     </div>
@@ -605,14 +619,15 @@ function PickOrderDialog({ onCancel, onPick }: { onCancel: () => void; onPick: (
 
 function ReceivableRow({ r, onPay, onCollect }: { r: Receivable; onPay: () => void; onCollect: () => void }) {
   const percent = r.totalCents > 0 ? Math.round((r.paidCents / r.totalCents) * 100) : 0
+  const overdue = r.paymentStatus === 'OVERDUE'
+  const collected = r.lastCollectionAt ? `cobrado ${formatDayShort(isoDateTimeToDay(r.lastCollectionAt))}` : overdue ? 'nunca cobrado' : null
   return (
-    <tr>
+    <tr className={overdue ? 'fn-tr--overdue' : undefined}>
       <td><span className="fn-who"><span className="fn-avatar" aria-hidden="true">{initials(r.customerName)}</span><span className="zv-two"><Link to={`/pedidos/${r.orderId}`}>{r.customerName}</Link><span>Pedido nº {r.number}</span></span></span></td>
       <td>
         <span className="inv-stack">
-          {r.paymentStatus === 'OVERDUE' && r.deliveredOn
-          ? <StatusTag tone="danger">Atrasado · {sinceText(r.deliveredOn).replace('há ', '')}</StatusTag>
-          : <OrderStatusBadge status={r.status} />}
+          {overdue ? <StatusTag tone="danger">Pagamento atrasado</StatusTag> : <OrderStatusBadge status={r.status} />}
+          <small className="fn-tr__note">{overdue && r.deliveredOn ? `entregue ${sinceText(r.deliveredOn)}` : 'ainda não entregue'}{collected ? ` · ${collected}` : ''}</small>
           {r.status === 'DELIVERED' && <InvoiceTag number={r.invoiceNumber} />}
         </span>
       </td>
@@ -626,7 +641,7 @@ function ReceivableRow({ r, onPay, onCollect }: { r: Receivable; onPay: () => vo
       <td className="zv-r zv-actions">
         <span>
           <button type="button" className="zv-btn zv-btn--sm" onClick={onCollect} data-testid="cobrar-linha"><MessageCircle size={20} strokeWidth={1.8} aria-hidden="true" />Cobrar</button>
-          <button type="button" className="zv-btn zv-btn--sm" onClick={onPay} data-testid="pagar-linha"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Pagamento</button>
+          <button type="button" className={`zv-btn zv-btn--sm${overdue ? ' zv-btn--primary' : ''}`} onClick={onPay} data-testid="pagar-linha"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Pagamento</button>
         </span>
       </td>
     </tr>

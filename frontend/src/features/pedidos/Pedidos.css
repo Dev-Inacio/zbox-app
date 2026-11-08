@@ -301,3 +301,11 @@
 /* Lista: total e quanto falta, para o pagamento aparecer aqui também */
 .pd-list-money { display: inline-flex; flex-direction: column; align-items: flex-end; gap: 2px; white-space: nowrap; }
 .pd-list-money span { font-size: 15px; color: var(--color-text-muted); }
+
+/* Estornar: lancei errado ou devolvi o dinheiro */
+.pd-reverse-causes { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; border: 0; }
+.pd-reverse-causes .pd-choice b, .pd-reverse-causes .pd-choice span { display: block; }
+.pd-reverse-causes .pd-choice span { font-size: 14px; color: var(--color-text-muted); }
+.pd-waive { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid var(--color-border); border-radius: 10px; cursor: pointer; }
+.pd-waive input { flex: none; width: 20px; height: 20px; margin: 2px 0 0; accent-color: var(--color-accent); }
+.pd-waive small { display: block; margin-top: 2px; font-size: 14px; color: var(--color-text-muted); }

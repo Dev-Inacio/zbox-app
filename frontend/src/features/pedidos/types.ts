@@ -24,9 +24,25 @@ export type Payment = {
   reversedReason: string | null
 }
 
+// Devolução: dinheiro que VOLTOU para o cliente (ex.: abatimento por defeito). O cliente não fica devendo.
+// Diferente de estorno, que corrige um pagamento lançado errado e faz o valor voltar a "falta receber".
+export type OrderRefund = {
+  id: number
+  amountCents: number
+  method: PaymentMethod
+  refundedAt: string // YYYY-MM-DD
+  reason: string
+  waivedCents: number // restante que deixou de ser cobrado junto com esta devolução
+  userName: string
+  createdAt: string
+  canceled: boolean // lançada por engano e desfeita
+}
+
+export type RefundRequest = Pick<OrderRefund, 'amountCents' | 'method' | 'refundedAt' | 'reason'> & { waiveRemaining?: boolean }
+
 export type OrderEvent = {
   id: number
-  type: 'CREATED' | 'STATUS_CHANGED' | 'DELIVERED' | 'PAYMENT' | 'PAYMENT_REVERSED' | 'COLLECTION' | 'CANCELED'
+  type: 'CREATED' | 'STATUS_CHANGED' | 'DELIVERED' | 'PAYMENT' | 'PAYMENT_REVERSED' | 'REFUND' | 'REFUND_CANCELED' | 'COLLECTION' | 'CANCELED'
   detail: string | null
   userName: string
   createdAt: string
@@ -70,6 +86,9 @@ export type Order = {
   canceledAt: string | null
   cancelReason: string | null
   payments: Payment[]
+  refunds: OrderRefund[]
+  refundedCents: number
+  waivedCents: number // o que o cliente não vai mais pagar
   lastCollectionAt: string | null
   events: OrderEvent[]
   invoice: Invoice | null
