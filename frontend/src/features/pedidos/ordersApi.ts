@@ -3,12 +3,17 @@ import type { FieldError } from '../auth/types'
 import { readMockSession } from '../auth/session'
 import type { Page } from '../clientes/types'
 import { formatMoney } from '../orcamentos/money'
-import { mockCreateApprovedQuote, mockMarkQuoteConverted, mockQuoteForConversion } from '../orcamentos/quotesApi'
+import { mockDirectSaleApprove, mockMarkQuoteConverted, mockMarkQuoteRejected, mockQuoteForConversion } from '../orcamentos/quotesApi'
 import type { Quote, QuoteItem } from '../orcamentos/types'
-import { addDaysIso, todayIso } from './dates'
+import { todayIso } from './dates'
 import { METHOD_LABEL, METHODS } from './labels'
 import type {
+  InvoiceRequest,
   ConvertToOrderRequest,
+  ExpenseRequest,
+  ExpenseType,
+  OrderExpense,
+  ProfitSummary,
   DeliverRequest,
   ListOrdersParams,
   Order,
@@ -16,8 +21,8 @@ import type {
   OrderEvent,
   OrderStatus,
   OrderSummary,
-  PaymentMethod,
   PaymentRequest,
+  RefundRequest,
 } from './types'
 
 // ⚠️ SIMULAÇÃO (mock) — enquanto o Inácio não publica /api/orders e /api/financial.
@@ -31,7 +36,6 @@ const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
 const simulation = () => new URLSearchParams(window.location.search).get('simular')
 const userName = () => readMockSession()?.name ?? 'Usuário'
 const now = () => new Date().toISOString()
-const daysAgoIso = (days: number) => new Date(Date.now() - days * 86400000).toISOString()
 
 function normalize(text: string) {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -42,15 +46,20 @@ let nextOrderId = 1
 let nextNumber = 40
 let nextPaymentId = 1
 let nextEventId = 1
+let nextExpenseId = 1
 // Idempotency-Key → pagamento já criado (o back guarda por 24 h). Evita pagamento duplicado no duplo clique.
 const idempotency = new Map<string, number>()
+let nextRefundId = 1_000_000
 
 const ACTIVE: OrderStatus[] = ['NEW', 'IN_PRODUCTION', 'READY']
 
 // ---------- Regras de dinheiro (no back real: no Service, dentro da transação) ----------
 function recompute(order: Order) {
   order.paidCents = order.payments.filter((p) => !p.reversed).reduce((sum, p) => sum + p.amountCents, 0)
-  order.remainingCents = order.totalCents - order.paidCents
+  const refunds = order.refunds.filter((r) => !r.canceled)
+  order.refundedCents = refunds.reduce((sum, r) => sum + r.amountCents, 0) // sozinha, não muda o que falta receber
+  order.waivedCents = refunds.reduce((sum, r) => sum + r.waivedCents, 0)   // "não cobrar o restante"
+  order.remainingCents = order.totalCents - order.paidCents - order.waivedCents
   order.paymentStatus =
     order.remainingCents <= 0 ? 'PAID'
       : order.status === 'DELIVERED' ? 'OVERDUE'
@@ -58,9 +67,46 @@ function recompute(order: Order) {
           : 'UNPAID'
 }
 
+// HU27: quanto sobra do serviço. Sempre calculado aqui (no back).
+// Regras da PO (11/10):
+//   - Previsto = valor do serviço − gastos. Material lançado: o resto é a mão de obra de quem faz (o "sobrou para você").
+//   - O lucro só conta o que o cliente PAGOU: fica R$ 0,00 até receber e volta a zero se o pagamento for estornado.
+//   - Gastos maiores que o valor do serviço = prejuízo (saiu do bolso), mesmo sem ter recebido.
+export function computeProfit(order: Order): ProfitSummary {
+  const expenses = order.expenses ?? []
+  const sum = (t: ExpenseType) => expenses.filter((e) => e.type === t).reduce((acc, e) => acc + e.amountCents, 0)
+  const materialCents = sum('MATERIAL')
+  const laborCents = sum('LABOR')
+  const expensesCents = materialCents + laborCents
+  // Devolução diminui o que o serviço rendeu
+  const netCents = order.totalCents - order.refundedCents - order.waivedCents
+  const expectedProfitCents = netCents - expensesCents
+  const cashBalanceCents = order.paidCents - order.refundedCents - expensesCents
+  const profitCents = expectedProfitCents < 0 ? expectedProfitCents : Math.max(0, Math.min(cashBalanceCents, expectedProfitCents))
+  return {
+    materialCents, laborCents, expensesCents, profitCents, expectedProfitCents,
+    marginPercent: netCents > 0 ? Math.round((profitCents / netCents) * 1000) / 10 : 0,
+    cashBalanceCents,
+  }
+}
+
+const seesProfit = () => {
+  const role = readMockSession()?.role
+  return role === 'ADMIN' || role === 'MANAGER'
+}
+
 function snapshot(order: Order): Order {
   recompute(order)
-  return structuredClone(order)
+  const copy = structuredClone(order)
+  if (seesProfit()) {
+    copy.expenses = [...(order.expenses ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+    copy.profit = computeProfit(order)
+  } else {
+    // EMPLOYEE não recebe gastos nem lucro (nem escondido na resposta)
+    copy.expenses = null
+    copy.profit = null
+  }
+  return copy
 }
 
 function event(order: Order, type: OrderEvent['type'], detail: string | null = null, when = now(), who = userName()) {
@@ -115,19 +161,22 @@ function fromQuote(quote: Quote, createdAt: string): Order {
     number: String(nextNumber++).padStart(6, '0'),
     status: 'NEW', paymentStatus: 'UNPAID',
     quote: { id: quote.id, number: quote.number, version: quote.version },
+    directSale: quote.directSale ?? false,
     customer: structuredClone(quote.customer),
     items: structuredClone(quote.items) as QuoteItem[],
-    subtotalCents: quote.subtotalCents, discountCents: quote.discountCents, totalCents: quote.totalCents,
+    subtotalCents: quote.subtotalCents, discountType: quote.discountType, discountValue: quote.discountValue, discountCents: quote.discountCents, totalCents: quote.totalCents,
     paidCents: 0, remainingCents: quote.totalCents,
     paymentTerms: quote.paymentTerms, notes: quote.notes,
     createdAt,
     deliveredAt: null, deliveredOn: null, receivedBy: null, deliveryNote: null, canceledAt: null, cancelReason: null,
-    payments: [], lastCollectionAt: null, events: [],
+    payments: [], refunds: [], refundedCents: 0, waivedCents: 0, lastCollectionAt: null, events: [], invoice: null,
+    expenses: [], profit: null,
   }
 }
 
 function toSummary(o: Order): OrderSummary {
   return {
+    invoiceNumber: o.invoice?.number ?? null,
     id: o.id, number: o.number, customerName: o.customer.name, createdAt: o.createdAt, status: o.status, paymentStatus: o.paymentStatus,
     totalCents: o.totalCents, paidCents: o.paidCents, remainingCents: o.remainingCents, deliveredOn: o.deliveredOn,
   }
@@ -145,88 +194,14 @@ function byPriority(a: Order, b: Order): number {
   return bDay.localeCompare(aDay)
 }
 
-// ---------- Dados de exemplo (datas relativas a hoje) ----------
-type SeedPayment = { amountCents: number; method: PaymentMethod; daysAgo: number; note?: string }
-type Seed = {
-  customerId: number; createdDaysAgo: number; status: OrderStatus
-  items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[]
-  payments?: SeedPayment[]; deliveredDaysAgo?: number; receivedBy?: string; collectedDaysAgo?: number; half?: boolean
-}
-
-function seed() {
-  const seeds: Seed[] = [
-    { customerId: 1, createdDaysAgo: 60, status: 'DELIVERED', deliveredDaysAgo: 40, receivedBy: 'Síndico Paulo', half: true,
-      items: [{ description: 'Janela de correr 2 folhas (fachada)', chargeType: 'AREA', quantity: 12, unit: null, widthCm: 150, heightCm: 120, unitPriceCents: 62000 }],
-      payments: [{ amountCents: 0, method: 'TRANSFER', daysAgo: 40, note: 'Restante na entrega' }] },
-    { customerId: 5, createdDaysAgo: 50, status: 'DELIVERED', deliveredDaysAgo: 35, receivedBy: 'Dra. Helena', collectedDaysAgo: 22, half: true,
-      items: [
-        { description: 'Box de vidro temperado 8 mm', chargeType: 'AREA', quantity: 4, unit: null, widthCm: 120, heightCm: 190, unitPriceCents: 42000 },
-        { description: 'Espelho bisotê', chargeType: 'UNIT', quantity: 1, unit: 'un', widthCm: null, heightCm: null, unitPriceCents: 36960 },
-      ] },
-    { customerId: 6, createdDaysAgo: 30, status: 'DELIVERED', deliveredDaysAgo: 22, receivedBy: 'Roberto',
-      items: [{ description: 'Portão de garagem', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 300, heightCm: 220, unitPriceCents: 47000 }] },
-    { customerId: 4, createdDaysAgo: 20, status: 'IN_PRODUCTION', half: true,
-      items: [{ description: 'Fachada de vidro da loja', chargeType: 'UNIT', quantity: 1, unit: 'conj', widthCm: null, heightCm: null, unitPriceCents: 420000 }] },
-    { customerId: 8, createdDaysAgo: 10, status: 'READY',
-      items: [
-        { description: 'Porta de abrir alumínio', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 80, heightCm: 210, unitPriceCents: 70000 },
-        { description: 'Janela maxim-ar banheiro', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 60, heightCm: 60, unitPriceCents: 90000 },
-      ],
-      payments: [{ amountCents: -1, method: 'PIX', daysAgo: 1, note: 'À vista' }] },
-    { customerId: 10, createdDaysAgo: 2, status: 'NEW',
-      payments: [{ amountCents: 200000, method: 'CASH', daysAgo: 2, note: 'Entrada' }],
-      items: [
-        { description: 'Janela maxim-ar 60 × 60', chargeType: 'AREA', quantity: 6, unit: null, widthCm: 60, heightCm: 60, unitPriceCents: 90000 },
-        { description: 'Porta pivotante de alumínio', chargeType: 'UNIT', quantity: 1, unit: 'un', widthCm: null, heightCm: null, unitPriceCents: 459600 },
-      ] },
-  ]
-
-  for (const s of seeds) {
-    const quote = mockCreateApprovedQuote(s.customerId, s.items, s.createdDaysAgo + 2)
-    if (!quote) continue
-    const created = daysAgoIso(s.createdDaysAgo)
-    const order = fromQuote(quote, created)
-    event(order, 'CREATED', `${quote.number} v1`, created, 'Thayná')
-    const half = Math.round(order.totalCents / 2)
-    if (s.half) pushPayment(order, { amountCents: half, method: 'PIX', paidAt: addDaysIso(todayIso(), -s.createdDaysAgo), note: 'Entrada' }, created, 'Thayná')
-
-    const steps: OrderStatus[] = ['IN_PRODUCTION', 'READY', 'DELIVERED']
-    const target = steps.indexOf(s.status)
-    for (let i = 0; i < steps.length && i <= target; i++) {
-      const to = steps[i]
-      if (to === 'DELIVERED') {
-        const day = addDaysIso(todayIso(), -(s.deliveredDaysAgo ?? 0))
-        order.status = 'DELIVERED'
-        order.deliveredOn = day
-        order.deliveredAt = daysAgoIso(s.deliveredDaysAgo ?? 0)
-        order.receivedBy = s.receivedBy ?? null
-        event(order, 'DELIVERED', s.receivedBy ?? null, order.deliveredAt, 'Inácio')
-      } else {
-        const from = order.status
-        order.status = to
-        event(order, 'STATUS_CHANGED', `${from}→${to}`, daysAgoIso(Math.max(0, s.createdDaysAgo - (i + 1) * 3)), 'Inácio')
-      }
-    }
-    for (const p of s.payments ?? []) {
-      recompute(order)
-      const amount = p.amountCents <= 0 ? order.remainingCents : p.amountCents
-      pushPayment(order, { amountCents: amount, method: p.method, paidAt: addDaysIso(todayIso(), -p.daysAgo), note: p.note }, daysAgoIso(p.daysAgo), 'Thayná')
-    }
-    if (s.collectedDaysAgo !== undefined) {
-      order.lastCollectionAt = daysAgoIso(s.collectedDaysAgo)
-      event(order, 'COLLECTION', 'WHATSAPP', order.lastCollectionAt, 'Thayná')
-    }
-    order.events.sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-    recompute(order)
-    store.set(order.id, order)
-    mockMarkQuoteConverted(quote.id, { id: order.id, number: order.number }, created)
-  }
-}
-seed()
-
 // Para o mock do Financeiro e do Início (no back real, são consultas no mesmo banco)
 export function mockAllOrders(): Order[] {
-  return [...store.values()].map(snapshot)
+  return [...store.values()].map((o) => {
+    recompute(o)
+    const copy = structuredClone(o)
+    copy.profit = computeProfit(o)
+    return copy
+  })
 }
 
 // ---------- Endpoints ----------
@@ -254,6 +229,16 @@ export async function convertQuoteToOrder(quoteId: number, request: ConvertToOrd
   store.set(order.id, order)
   mockMarkQuoteConverted(quote.id, { id: order.id, number: order.number })
   return snapshot(order)
+}
+
+// HU32 — POST /api/quotes/{id}/direct-sale (proposto): confirma + aprova + cria o pedido de uma vez.
+// No back real tem que ser UMA transação: ou cria tudo, ou nada.
+export async function directSaleToOrder(quoteId: number): Promise<Order> {
+  await wait(300)
+  const existing = [...store.values()].find((o) => o.quote.id === quoteId)
+  if (existing) return snapshot(existing) // duplo clique: devolve o mesmo pedido
+  mockDirectSaleApprove(quoteId)
+  return convertQuoteToOrder(quoteId, { downPayment: null })
 }
 
 // GET /api/orders?search=&status=&payment=&customerId=&page=0&size=20
@@ -371,9 +356,50 @@ export async function reversePayment(id: number, paymentId: number, reason: stri
   if (!payment) throw new ApiError(404, 'PAYMENT_NOT_FOUND', 'Pagamento não encontrado.')
   if (payment.reversed) throw new ApiError(409, 'PAYMENT_ALREADY_REVERSED', 'Este pagamento já foi estornado.')
   if (reason.trim().length < 3) fieldError('reason', 'Conte o motivo do estorno.')
+  if (order.paidCents - payment.amountCents < order.refundedCents) {
+    throw new ApiError(409, 'PAYMENT_HAS_REFUND', 'Este valor já foi devolvido ao cliente. Desfaça a devolução antes de estornar.')
+  }
   payment.reversed = true
   payment.reversedReason = reason.trim()
   event(order, 'PAYMENT_REVERSED', `${formatMoney(payment.amountCents)} · ${reason.trim()}`)
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/refunds { amountCents, method, refundedAt, reason } — só ADMIN e MANAGER
+export async function addRefund(id: number, request: RefundRequest, idempotencyKey?: string): Promise<Order> {
+  await wait(500)
+  if (idempotencyKey && idempotency.has(idempotencyKey)) return snapshot(find(id))
+  const role = readMockSession()?.role
+  if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Você não tem permissão para devolver valores.')
+  const order = find(id)
+  const available = order.paidCents - order.refundedCents
+  if (available <= 0) throw new ApiError(409, 'NOTHING_TO_REFUND', 'Este pedido não tem valor recebido para devolver.')
+  if (!Number.isInteger(request.amountCents) || request.amountCents <= 0) fieldError('amountCents', 'Informe um valor maior que R$ 0,00.')
+  if (request.amountCents > available) throw new ApiError(422, 'REFUND_EXCEEDS_RECEIVED', 'O valor passou do recebido.', [{ field: 'amountCents', code: 'MAX', message: `O valor não pode ser maior que o recebido (${formatMoney(available)}).` }])
+  if (!METHODS.includes(request.method)) fieldError('method', 'Escolha a forma da devolução.')
+  if (!isDay(request.refundedAt)) fieldError('refundedAt', 'Informe a data da devolução.')
+  if (request.refundedAt > todayIso()) fieldError('refundedAt', 'A data da devolução não pode ser no futuro.')
+  const reason = request.reason.trim()
+  if (reason.length < 3) fieldError('reason', 'Conte o motivo da devolução.')
+  const waivedCents = request.waiveRemaining ? Math.max(0, order.remainingCents) : 0
+  const refund = { id: nextRefundId++, amountCents: request.amountCents, method: request.method, refundedAt: request.refundedAt, reason, waivedCents, userName: userName(), createdAt: now(), canceled: false }
+  order.refunds.unshift(refund)
+  event(order, 'REFUND', `${formatMoney(refund.amountCents)} · ${METHOD_LABEL[refund.method]} · ${reason}${waivedCents ? ` · restante de ${formatMoney(waivedCents)} não será cobrado` : ''}`)
+  if (idempotencyKey) idempotency.set(idempotencyKey, refund.id)
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/refunds/{refundId}/cancel — devolução lançada por engano
+export async function cancelRefund(id: number, refundId: number): Promise<Order> {
+  await wait(400)
+  const role = readMockSession()?.role
+  if (role !== 'ADMIN' && role !== 'MANAGER') throw new ApiError(403, 'FORBIDDEN', 'Você não tem permissão para desfazer devoluções.')
+  const order = find(id)
+  const refund = order.refunds.find((r) => r.id === refundId)
+  if (!refund) throw new ApiError(404, 'REFUND_NOT_FOUND', 'Devolução não encontrada.')
+  if (refund.canceled) throw new ApiError(409, 'REFUND_ALREADY_CANCELED', 'Esta devolução já foi desfeita.')
+  refund.canceled = true
+  event(order, 'REFUND_CANCELED', formatMoney(refund.amountCents))
   return snapshot(order)
 }
 
@@ -397,5 +423,108 @@ export async function cancelOrder(id: number, reason: string): Promise<Order> {
   order.canceledAt = now()
   order.cancelReason = reason.trim()
   event(order, 'CANCELED', order.cancelReason)
+  mockMarkQuoteRejected(order.quote.id, order.cancelReason) // o orçamento de origem fica "Recusado"
   return snapshot(order)
+}
+
+// ---------- HU27: gastos do serviço (só ADMIN e MANAGER) ----------
+function forbidIfEmployee() {
+  if (!seesProfit()) throw new ApiError(403, 'FORBIDDEN', 'Só Administrador e Gerente podem ver e lançar gastos.')
+}
+
+function validateExpense(r: ExpenseRequest): ExpenseRequest {
+  const errors: FieldError[] = []
+  const description = (r.description ?? '').trim() || null // PO 11/10: sem descrição na tela (campo opcional)
+  if (r.type !== 'MATERIAL' && r.type !== 'LABOR') errors.push({ field: 'type', code: 'REQUIRED', message: 'Escolha Material ou Mão de obra.' })
+  if (description && description.length > 120) errors.push({ field: 'description', code: 'SIZE', message: 'Descreva o gasto (2 a 120 letras).' })
+  if (!Number.isInteger(r.amountCents) || r.amountCents <= 0) errors.push({ field: 'amountCents', code: 'POSITIVE', message: 'Informe um valor maior que zero.' })
+  else if (r.amountCents > 100_000_000) errors.push({ field: 'amountCents', code: 'MAX', message: 'Valor alto demais. Confira os números.' })
+  if (!isDay(r.date)) errors.push({ field: 'date', code: 'REQUIRED', message: 'Informe a data do gasto.' })
+  else if (r.date > todayIso()) errors.push({ field: 'date', code: 'PAST', message: 'A data do gasto não pode ser no futuro.' })
+  if (errors.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', errors)
+  return { ...r, description }
+}
+
+function findExpense(order: Order, expenseId: number): OrderExpense {
+  const expense = order.expenses?.find((e) => e.id === expenseId)
+  if (!expense) throw new ApiError(404, 'EXPENSE_NOT_FOUND', 'Gasto não encontrado.')
+  return expense
+}
+
+// POST /api/orders/{id}/expenses
+export async function addExpense(id: number, request: ExpenseRequest): Promise<Order> {
+  await wait(500)
+  forbidIfEmployee()
+  const order = find(id)
+  const r = validateExpense(request)
+  order.expenses ??= []
+  // Regra do cliente: cada pedido tem UM valor de material. Mudou? Edita, não soma outro.
+  if (r.type === 'MATERIAL' && order.expenses.some((e) => e.type === 'MATERIAL')) {
+    throw new ApiError(409, 'MATERIAL_ALREADY_SET', 'Este pedido já tem material lançado. Use "Editar" para mudar o valor.')
+  }
+  order.expenses.push({ id: nextExpenseId++, type: r.type, description: r.description, amountCents: r.amountCents, date: r.date, userName: userName(), createdAt: now() })
+  return snapshot(order)
+}
+
+// PUT /api/orders/{id}/expenses/{expenseId}
+export async function updateExpense(id: number, expenseId: number, request: ExpenseRequest): Promise<Order> {
+  await wait(500)
+  forbidIfEmployee()
+  const order = find(id)
+  const expense = findExpense(order, expenseId)
+  const r = validateExpense(request)
+  Object.assign(expense, { type: r.type, description: r.description, amountCents: r.amountCents, date: r.date })
+  return snapshot(order)
+}
+
+// DELETE /api/orders/{id}/expenses/{expenseId}
+export async function deleteExpense(id: number, expenseId: number): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  findExpense(order, expenseId)
+  order.expenses = order.expenses!.filter((e) => e.id !== expenseId)
+  return snapshot(order)
+}
+
+// ---------- HU29: nota fiscal ----------
+const invoiceFiles = new Map<number, File>() // no back: arquivo guardado no servidor
+const INVOICE_FILE_TYPES = ['application/pdf', 'image/jpeg', 'image/png']
+
+// PUT /api/orders/{id}/invoice — só ADMIN e MANAGER
+export async function saveInvoice(id: number, request: InvoiceRequest): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  if (order.status === 'CANCELED') throw new ApiError(409, 'ORDER_CANCELLED', 'Pedido cancelado não recebe nota.')
+  const number = request.number.trim()
+  const errors: FieldError[] = []
+  if (!/^[\p{L}\p{N}]{1,20}$/u.test(number)) errors.push({ field: 'number', code: 'INVALID', message: 'Informe o número da nota.' })
+  if (!request.issuedAt) errors.push({ field: 'issuedAt', code: 'REQUIRED', message: 'Informe a data da nota.' })
+  else if (request.issuedAt > todayIso()) errors.push({ field: 'issuedAt', code: 'FUTURE', message: 'A data da nota não pode ser no futuro.' })
+  if (!['SERVICE', 'PRODUCT', 'BOTH'].includes(request.type)) errors.push({ field: 'type', code: 'INVALID', message: 'Escolha o tipo da nota.' })
+  if ((request.notes ?? '').length > 300) errors.push({ field: 'notes', code: 'SIZE', message: 'Máximo de 300 caracteres.' })
+  if (errors.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', errors)
+  order.invoice = { number, issuedAt: request.issuedAt, type: request.type, notes: request.notes?.trim() || null, hasFile: order.invoice?.hasFile ?? false, updatedBy: userName(), updatedAt: now() }
+  return snapshot(order)
+}
+
+// POST /api/orders/{id}/invoice/file (multipart "file")
+export async function uploadInvoiceFile(id: number, file: File): Promise<Order> {
+  await wait(400)
+  forbidIfEmployee()
+  const order = find(id)
+  if (!order.invoice) throw new ApiError(409, 'INVOICE_NOT_FOUND', 'Anote a nota antes de enviar o arquivo.')
+  if (!INVOICE_FILE_TYPES.includes(file.type) || file.size > 5 * 1024 * 1024) {
+    throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', [{ field: 'file', code: 'INVALID', message: 'Envie um PDF ou foto de até 5 MB.' }])
+  }
+  invoiceFiles.set(id, file)
+  order.invoice.hasFile = true
+  return snapshot(order)
+}
+
+// GET /api/orders/{id}/invoice/file
+export async function getInvoiceFile(id: number): Promise<File | null> {
+  await wait(200)
+  return invoiceFiles.get(id) ?? null
 }

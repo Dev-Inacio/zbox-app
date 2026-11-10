@@ -3,6 +3,7 @@ import type { ChangeEvent, Ref } from 'react'
 import { PageHero } from '../../components/layout/PageHero'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { NoAutofill } from '../../components/ui/NoAutofill'
 import { Toast } from '../../components/ui/Toast'
 import { useRequest } from '../../hooks/useRequest'
 import { useAuth } from '../auth/useAuth'
@@ -12,7 +13,7 @@ import { formatDateTime, maskCep, maskPhone, onlyDigits } from '../clientes/form
 import { UFS } from '../clientes/validation'
 import { lookupCep } from '../clientes/viaCep'
 import { getCompany, updateCompany } from '../empresa/companyApi'
-import { canEditCompany, companyAddressLine, ROLE_LABEL } from '../empresa/format'
+import { canEditCompany, companyAddressLine } from '../empresa/format'
 import type { Company, CompanyRequest } from '../empresa/types'
 import { CompanyBrand } from '../orcamentos/QuoteDocument'
 import '../../components/ui/ButtonVariants.css'
@@ -58,7 +59,6 @@ function toRequest(v: Values): CompanyRequest {
 // Mesmas regras do back: a tela avisa antes, o back confere de novo
 function validate(v: Values): Errors {
   const e: Errors = {}
-  if (v.name.trim().length < 2) e.name = 'Informe o nome da empresa.'
   const w = onlyDigits(v.whatsapp)
   if (w.length !== 10 && w.length !== 11) e.whatsapp = 'WhatsApp com DDD: 10 ou 11 números.'
   const p = onlyDigits(v.phone)
@@ -75,11 +75,10 @@ export function ProfilePage() {
   const [attempt, setAttempt] = useState(0)
   const request = useRequest(`empresa#${attempt}`, getCompany)
   const [toast, setToast] = useState<string | null>(null)
-  const who = user ? <>Você entrou como <strong className="pf-strong">{user.name}</strong> · {ROLE_LABEL[user.role]}</> : undefined
 
   return (
     <>
-      <PageHero title="Perfil" subtitle={who} />
+      <PageHero title="Dados da empresa" subtitle="Só o Administrador pode alterar." />
       <main className="page-body">
         {request.data
           ? <CompanyForm company={request.data} canEdit={canEditCompany(user?.role)}
@@ -106,7 +105,7 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
 
   // Prévia ao vivo: o que está digitado agora, no formato do orçamento
   const req = toRequest(values)
-  const preview: Company = { ...company, ...req, name: req.name || 'ZBOX' }
+  const preview: Company = { ...company, ...req, name: req.name || 'Zezinho Esquadrinhas' }
 
   function searchCep(digits: string) {
     cepAbort.current?.abort()
@@ -176,14 +175,14 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
     const id = `emp-${name}`
     const error = errors[name]
     return (
-      <div className="cl-field">
+      <div className="cl-field"><NoAutofill>
         <label htmlFor={id} className="cl-field__label">{label}</label>
         <input id={id} ref={opts.ref} className="cl-input" autoComplete="off" value={values[name]} onChange={change(name)} disabled={!canEdit} placeholder={opts.placeholder}
           inputMode={opts.inputMode} maxLength={opts.maxLength ?? 120} aria-invalid={error ? true : undefined}
           aria-describedby={error ? `${id}-erro` : opts.hint ? `${id}-dica` : undefined} data-testid={id} />
         {error && <p id={`${id}-erro`} className="field__error">{error}</p>}
         {!error && opts.hint && <p id={`${id}-dica`} className="cl-field__hint">{opts.hint}</p>}
-      </div>
+      </NoAutofill></div>
     )
   }
 
@@ -197,14 +196,7 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
         {!canEdit && <Alert variant="info">Só Administrador e Gerente podem alterar estes dados.</Alert>}
         {!company.whatsapp && canEdit && <Alert variant="warning">Preencha o WhatsApp e o endereço: o PDF do orçamento ainda está sem os dados da empresa.</Alert>}
 
-        <fieldset className="pf-group" disabled={!canEdit}>
-          <legend className="pf-legend">Identificação</legend>
-          <div className="pf-grid pf-grid--2">
-            {field('name', 'Nome da empresa', { maxLength: 60 })}
-            {field('tagline', 'Frase abaixo do nome (opcional)', { placeholder: 'Ex.: Serralheria e esquadrias', maxLength: 60 })}
-          </div>
-        </fieldset>
-
+        {/* Sem "Nome da empresa" e "Frase": o orçamento usa a logo oficial, que já traz os dois */}
         <fieldset className="pf-group" disabled={!canEdit}>
           <legend className="pf-legend">Contato</legend>
           <div className="pf-grid pf-grid--2">
@@ -216,14 +208,14 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
         <fieldset className="pf-group" disabled={!canEdit}>
           <legend className="pf-legend">Endereço</legend>
           <div className="pf-grid pf-grid--street">
-            <div className="cl-field">
+            <div className="cl-field"><NoAutofill>
               <label htmlFor="emp-cep" className="cl-field__label">CEP</label>
               <input id="emp-cep" className="cl-input" autoComplete="off" inputMode="numeric" placeholder="00000-000" value={values.cep} onChange={change('cep')} disabled={!canEdit}
                 aria-invalid={errors.cep ? true : undefined} aria-describedby="emp-cep-status" data-testid="emp-cep" />
               {errors.cep
                 ? <p id="emp-cep-status" className="field__error">{errors.cep}</p>
                 : <p id="emp-cep-status" className="cl-field__hint" aria-live="polite">{CEP_MESSAGES[cepStatus] || 'Preenche o endereço sozinho.'}</p>}
-            </div>
+            </NoAutofill></div>
             {field('street', 'Rua')}
             {field('number', 'Número', { ref: numberRef, maxLength: 10 })}
           </div>
@@ -233,7 +225,7 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
           </div>
           <div className="pf-grid pf-grid--city">
             {field('city', 'Cidade', { maxLength: 80 })}
-            <div className="cl-field">
+            <div className="cl-field"><NoAutofill>
               <label htmlFor="emp-state" className="cl-field__label">UF</label>
               <select id="emp-state" className="cl-input" autoComplete="off" value={values.state} onChange={change('state')} disabled={!canEdit}
                 aria-invalid={errors.state ? true : undefined} aria-describedby={errors.state ? 'emp-state-erro' : undefined} data-testid="emp-state">
@@ -241,7 +233,7 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
                 {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
               </select>
               {errors.state && <p id="emp-state-erro" className="field__error">{errors.state}</p>}
-            </div>
+            </NoAutofill></div>
           </div>
         </fieldset>
 
@@ -253,7 +245,6 @@ function CompanyForm({ company, canEdit, onSaved }: { company: Company; canEdit:
           </span>
           {canEdit && (
             <span className="pf-actions">
-              <Button className="btn--secondary" onClick={() => { setValues(initial); setErrors({}); setFormError(null); setCepStatus('idle') }} disabled={!dirty || saving}>Descartar</Button>
               <Button onClick={() => void save()} loading={saving} loadingText="Salvando…" disabled={!dirty} data-testid="salvar-empresa">Salvar dados da empresa</Button>
             </span>
           )}

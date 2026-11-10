@@ -1,0 +1,2 @@
+/* O <form> de cada campo não ocupa espaço: o layout continua o mesmo de antes */
+.no-autofill { display: contents; }

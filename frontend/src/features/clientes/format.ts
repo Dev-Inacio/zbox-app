@@ -49,3 +49,9 @@ export function formatDateTime(iso: string): string {
 export function whatsappLink(digits: string): string {
   return `https://wa.me/55${onlyDigits(digits)}`
 }
+
+// O cliente tem UM número só ("Celular": é o do WhatsApp e o de ligar).
+// Cadastro antigo pode ter só o "Telefone": vale ele também.
+export function customerMobile(c: { whatsapp: string | null; phone: string | null }): string | null {
+  return c.whatsapp || c.phone || null
+}

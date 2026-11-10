@@ -1,3 +1,4 @@
+import type { PieceType } from '../../assets/pecas/pieceTypes'
 // Tipos que espelham o contrato da API de Orçamentos (docs/contrato-api-orcamentos.md).
 //
 // Regra de ouro do dinheiro: na API todo valor em reais vai em CENTAVOS (número inteiro).
@@ -7,7 +8,8 @@
 
 export type QuoteStatus = 'DRAFT' | 'CONFIRMED' | 'SENT' | 'APPROVED' | 'REJECTED' | 'CANCELED' | 'SUPERSEDED'
 
-export type ChargeType = 'UNIT' | 'AREA' // por unidade | por m²
+// UNIT: quantidade × preço de cada peça (o que o editor usa). AREA (por m²) fica só para itens antigos.
+export type ChargeType = 'UNIT' | 'AREA'
 
 export type ItemUnit = 'un' | 'pç' | 'conj' | 'm' | 'kg'
 
@@ -20,14 +22,18 @@ export type ApprovalMethod = 'WHATSAPP' | 'IN_PERSON' | 'PHONE'
 export type RejectionReason = 'PRICE' | 'DEADLINE' | 'CHOSE_COMPETITOR' | 'GAVE_UP' | 'OTHER'
 
 // Item como o front ENVIA (sem subtotal: quem calcula é o back)
+// Decisão da PO (11/10): o preço é o que a pessoa digita (por peça). O sistema NÃO calcula por m².
+// Largura e altura são só a medida da peça (saem no PDF). Itens antigos ainda podem vir como AREA.
 export type QuoteItemRequest = {
   description: string
+  pieceType?: PieceType | null // desenho do PDF (sem tipo: "Outra peça")
+  details?: string | null     // detalhe curto que sai no PDF: cor, acessórios… (até 80 caracteres)
   chargeType: ChargeType
   quantity: number            // peças (inteiro, 1 a 9.999)
   unit: ItemUnit | null       // só para UNIT; em AREA é sempre m²
-  widthCm: number | null      // só para AREA
-  heightCm: number | null     // só para AREA
-  unitPriceCents: number      // preço por unidade ou por m²
+  widthCm: number | null      // medida da peça (opcional em UNIT)
+  heightCm: number | null
+  unitPriceCents: number      // UNIT: preço de cada peça | AREA (antigo): preço por m²
 }
 
 // Item como o back DEVOLVE (com os valores calculados por ele)
@@ -81,6 +87,8 @@ export type Quote = {
   decisionNote: string | null
   // Aprovado que já virou pedido (HU19). Um orçamento vira UM pedido só.
   order: { id: number; number: string } | null
+  // HU32 — Venda direta: o cliente já fechou, o orçamento não foi enviado (vira pedido na hora)
+  directSale?: boolean
   events: QuoteEvent[]
 }
 
@@ -101,6 +109,8 @@ export type QuoteSummary = {
   createdAt: string
   totalCents: number
   status: QuoteStatus
+  statusAt?: string | null    // quando entrou na situação atual
+  orderNumber?: string | null // pedido gerado por este orçamento
 }
 
 export type QuoteStatusFilter = Exclude<QuoteStatus, 'SUPERSEDED'> | 'ALL'

@@ -1,9 +1,10 @@
-import mascote from '../../assets/zbox-mascote.webp'
-import { companyContactLine } from '../empresa/format'
+import logo from '../../assets/logo-zezinho.png'
+import { companyAddressLine } from '../empresa/format'
 import type { Company } from '../empresa/types'
-import { formatDate, maskPhone } from '../clientes/format'
-import { formatAreaM2, formatMeters, formatMoney, formatPercent } from './money'
-import { PieceDrawing } from './PieceDrawing'
+import { customerMobile, formatDate, maskPhone } from '../clientes/format'
+import { formatAreaM2, formatMeters, formatMoney, formatPercent, itemPriceText } from './money'
+import { PieceDrawing } from '../../components/zbox'
+import { suggestPieceType } from './pieceKind'
 import type { Quote } from './types'
 import './QuoteDocument.css'
 
@@ -14,7 +15,8 @@ import './QuoteDocument.css'
 // `paper`: força o layout A4 mesmo numa tela de celular (usado para gerar o arquivo PDF)
 // `company`: dados da empresa do Perfil (HU26), vindos de GET /api/company
 export function QuoteDocument({ quote, company, paper = false }: { quote: Quote; company: Company; paper?: boolean }) {
-  const contact = [quote.customer.whatsapp ? maskPhone(quote.customer.whatsapp) : quote.customer.phone ? maskPhone(quote.customer.phone) : null, quote.customer.addressLine].filter(Boolean).join(' · ')
+  const mobile = customerMobile(quote.customer)
+  const contact = [mobile ? maskPhone(mobile) : null, quote.customer.addressLine].filter(Boolean).join(' · ')
 
   return (
     <article className={paper ? 'qd qd--paper' : 'qd'} aria-label={`Orçamento ${quote.number}`}>
@@ -43,17 +45,21 @@ export function QuoteDocument({ quote, company, paper = false }: { quote: Quote;
           {quote.items.map((item, i) => (
             <div key={item.id} className="qd__row">
               <span className="qd__mono qd__accent">{String(i + 1).padStart(2, '0')}</span>
-              {/* Mesmo desenho do editor: formato padrão da peça (as medidas já estão escritas ao lado) */}
-              <PieceDrawing item={{ ...item, widthCm: null, heightCm: null }} className="qd__drawing" />
+              {/* Mesmo desenho do editor (as medidas já estão escritas ao lado) */}
+              <PieceDrawing type={item.pieceType ?? suggestPieceType(item.description)} size={96} className="qd__drawing" />
               <span className="qd__desc">
                 <span className="qd__desc-title">{paper ? noBreakHyphen(item.description) : item.description}</span>
+                {item.details && <span className="qd__details">{paper ? noBreakHyphen(item.details) : item.details}</span>}
                 {item.chargeType === 'AREA' && item.widthCm && item.heightCm ? (
                   <>
                     <span className="qd__mono qd__muted">L {formatMeters(item.widthCm)} m × A {formatMeters(item.heightCm)} m = {formatAreaM2(item.areaPerPieceCm2 ?? 0)} m² · {item.quantity} {item.quantity === 1 ? 'peça' : 'peças'}</span>
                     <span className="qd__mono qd__muted">{formatAreaM2((item.areaPerPieceCm2 ?? 0) * item.quantity)} m² × {formatMoney(item.unitPriceCents)}/m²</span>
                   </>
                 ) : (
-                  <span className="qd__mono qd__muted">{item.quantity} {item.unit ?? 'un'} × {formatMoney(item.unitPriceCents)}</span>
+                  <>
+                    {item.widthCm && item.heightCm && <span className="qd__mono qd__muted">Medida: L {formatMeters(item.widthCm)} m × A {formatMeters(item.heightCm)} m</span>}
+                    <span className="qd__mono qd__muted">{itemPriceText(item)}</span>
+                  </>
                 )}
               </span>
               <span className="qd__right qd__strong">{formatMoney(item.subtotalCents)}</span>
@@ -90,14 +96,26 @@ function noBreakHyphen(text: string): string {
 
 // Marca + dados da empresa no topo do orçamento. Também aparece como prévia no Perfil.
 export function CompanyBrand({ company }: { company: Company }) {
-  const contact = companyContactLine(company)
+  const address = companyAddressLine(company)
+  const phones = [company.whatsapp ? maskPhone(company.whatsapp) : null, company.phone ? maskPhone(company.phone) : null].filter(Boolean).join(' · ')
   return (
     <div className="qd__brand">
-      <img src={mascote} alt="" className="qd__mascot" />
-      <div className="qd__brand-text">
+      {/* A logo já traz o nome e a frase: o texto fica só para leitor de tela */}
+      <img src={logo} alt={company.name} className="qd__logo" />
+      <div className="qd__brand-text" data-testid="contato-empresa">
         <span className="qd__name">{company.name}</span>
-        {company.tagline && <span className="qd__tagline">{company.tagline}</span>}
-        {contact && <span className="qd__contact" data-testid="contato-empresa">{contact}</span>}
+        {phones && (
+          <span className="qd__info">
+            <span className="qd__info-label">WhatsApp</span>
+            <span className="qd__info-value qd__info-value--big">{phones}</span>
+          </span>
+        )}
+        {address && (
+          <span className="qd__info">
+            <span className="qd__info-label">Endereço</span>
+            <span className="qd__info-value">{address}</span>
+          </span>
+        )}
       </div>
     </div>
   )

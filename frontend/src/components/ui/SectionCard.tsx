@@ -7,6 +7,8 @@ export type LoadState = 'loading' | 'success' | 'empty' | 'error'
 
 type SectionCardProps = {
   title: string
+  titleExtra?: ReactNode // ao lado do título (ex.: contador)
+  intro?: ReactNode      // frase curta abaixo do título
   state: LoadState
   onRetry: () => void
   badge?: string       // selo ao lado do título (ex.: "Dados de exemplo")
@@ -15,7 +17,7 @@ type SectionCardProps = {
   children?: ReactNode // o conteúdo, mostrado só no estado "success"
 }
 
-export function SectionCard({ title, state, onRetry, badge, action, elevated = false, children }: SectionCardProps) {
+export function SectionCard({ title, titleExtra, intro, state, onRetry, badge, action, elevated = false, children }: SectionCardProps) {
   const titleId = `secao-${title.toLowerCase().replace(/\s+/g, '-')}`
 
   return (
@@ -25,10 +27,12 @@ export function SectionCard({ title, state, onRetry, badge, action, elevated = f
       aria-busy={state === 'loading'}
     >
       <div className="section-card__header">
-        <h2 id={titleId} className="section-card__title">{title}</h2>
+        <h2 id={titleId} className="section-card__title">{title}{titleExtra && <> {titleExtra}</>}</h2>
         {badge && <span className="section-card__badge">{badge}</span>}
         {action && <div className="section-card__action">{action}</div>}
       </div>
+
+      {intro && <p className="section-card__intro">{intro}</p>}
 
       <div className="section-card__body">
         {state === 'loading' && (

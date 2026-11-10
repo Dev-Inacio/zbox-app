@@ -1,4 +1,6 @@
 import type { ReactNode } from 'react'
+import { AppIcon } from './AppIcon'
+import type { AppIconName } from './AppIcon'
 import './Alert.css'
 
 type AlertProps = {
@@ -6,15 +8,14 @@ type AlertProps = {
   children: ReactNode
 }
 
+// Ícone combina com o tipo do aviso (antes era sempre o alerta vermelho, até em aviso verde)
+const ICON: Record<AlertProps['variant'], AppIconName> = { error: 'alert', warning: 'alert', info: 'info', success: 'check' }
+
 export function Alert({ variant, children }: AlertProps) {
   // role="alert" faz o leitor de tela anunciar a mensagem assim que ela aparece
   return (
     <div role="alert" className={`alert alert--${variant}`}>
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="alert__icon">
-        <circle cx="12" cy="12" r="10" />
-        <path d="M12 7v6" />
-        <path d="M12 17h.01" />
-      </svg>
+      <AppIcon name={ICON[variant]} size={24} className="alert__icon" />
       <span>{children}</span>
     </div>
   )

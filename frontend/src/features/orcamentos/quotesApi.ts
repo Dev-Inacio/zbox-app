@@ -1,7 +1,7 @@
 import { ApiError } from '../auth/types'
 import type { FieldError } from '../auth/types'
 import { readMockSession } from '../auth/session'
-import { mockFindCustomer } from '../clientes/customersApi'
+import { getCustomer } from '../clientes/customersApi'
 import type { Customer, Page } from '../clientes/types'
 import { discountCents, formatMoney, itemSubtotalCents, validateDiscount } from './money'
 import type {
@@ -12,7 +12,6 @@ import type {
   QuoteCounts,
   QuoteCustomer,
   QuoteEvent,
-  QuoteItem,
   QuoteRequest,
   QuoteStatus,
   QuoteSummary,
@@ -53,6 +52,13 @@ function toQuoteCustomer(c: Customer): QuoteCustomer {
   return { id: c.id, name: c.name, whatsapp: c.whatsapp, phone: c.phone, addressLine: parts.length ? parts.join(' · ') : null }
 }
 
+// Rascunho e confirmado acompanham o cadastro do cliente. Depois de enviado, fica o que o cliente recebeu.
+async function refreshCustomer(quote: Quote) {
+  if (quote.status !== 'DRAFT' && quote.status !== 'CONFIRMED') return
+  const customer = await getCustomer(quote.customer.id).catch(() => null)
+  if (customer) quote.customer = toQuoteCustomer(customer)
+}
+
 function event(quote: Quote, type: QuoteEvent['type'], detail: string | null = null) {
   quote.events.unshift({ id: nextEventId++, type, version: quote.version, detail, userName: userName(), createdAt: now() })
 }
@@ -87,52 +93,14 @@ function snapshot(quote: Quote): Quote {
   return structuredClone({ ...quote, latestVersion: stored.versions.length })
 }
 
-// ---------- Dados de exemplo ----------
-function seed() {
-  const samples: { customerId: number; status: QuoteStatus; daysAgo: number; items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[]; discount?: number }[] = [
-    { customerId: 9, status: 'SENT', daysAgo: 0, discount: 500, items: [
-      { description: 'Porta pivotante de alumínio', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 100, heightCm: 210, unitPriceCents: 71500 },
-      { description: 'Janela de correr 2 folhas', chargeType: 'AREA', quantity: 2, unit: null, widthCm: 120, heightCm: 100, unitPriceCents: 85000 },
-    ] },
-    { customerId: 2, status: 'APPROVED', daysAgo: 12, items: [
-      { description: 'Portão basculante', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 300, heightCm: 250, unitPriceCents: 69000 },
-    ] },
-    { customerId: 5, status: 'CONFIRMED', daysAgo: 3, items: [
-      { description: 'Box de vidro temperado 8 mm', chargeType: 'AREA', quantity: 1, unit: null, widthCm: 120, heightCm: 190, unitPriceCents: 42000 },
-    ] },
-    { customerId: 3, status: 'REJECTED', daysAgo: 25, items: [
-      { description: 'Grade de proteção', chargeType: 'AREA', quantity: 3, unit: null, widthCm: 100, heightCm: 120, unitPriceCents: 38000 },
-    ] },
-    { customerId: 7, status: 'DRAFT', daysAgo: 1, items: [] },
-  ]
-  for (const s of samples) {
-    const customer = mockFindCustomer(s.customerId)
-    if (!customer) continue
-    const created = new Date(Date.now() - s.daysAgo * 86400000).toISOString()
-    const quote: Quote = {
-      id: nextQuoteId++, number: String(nextNumber++).padStart(6, '0'), version: 1, latestVersion: 1, status: s.status,
-      customer: toQuoteCustomer(customer),
-      items: s.items.map((i) => ({ ...i, id: nextItemId++, areaPerPieceCm2: null, subtotalCents: 0 })),
-      subtotalCents: 0, discountType: s.discount ? 'PERCENT' : null, discountValue: s.discount ?? null, discountCents: 0, totalCents: 0,
-      paymentTerms: '50% de entrada e 50% na entrega', notes: 'Prazo de fabricação: 15 dias úteis após a aprovação.', versionReason: null,
-      createdAt: created, updatedAt: created, confirmedAt: s.status === 'DRAFT' ? null : created,
-      sentAt: ['SENT', 'APPROVED', 'REJECTED'].includes(s.status) ? created : null,
-      decidedAt: ['APPROVED', 'REJECTED'].includes(s.status) ? created : null,
-      approvalMethod: s.status === 'APPROVED' ? 'WHATSAPP' : null,
-      rejectionReason: s.status === 'REJECTED' ? 'PRICE' : null,
-      decisionNote: null,
-      order: null,
-      events: [{ id: nextEventId++, type: 'CREATED', version: 1, detail: null, userName: 'Thayná', createdAt: created }],
-    }
-    recalc(quote)
-    store.set(quote.id, { versions: [quote] })
-  }
-}
-seed()
-
 // ---------- Endpoints ----------
 
 // GET /api/quotes?search=&status=&period=&customerId=&page=0&size=20
+// Evento que marca a entrada em cada situação (o histórico guarda o mais novo primeiro)
+const STATUS_EVENT: Partial<Record<Quote['status'], QuoteEvent['type']>> = {
+  CONFIRMED: 'CONFIRMED', SENT: 'DISPATCHED', APPROVED: 'APPROVED', REJECTED: 'REJECTED', CANCELED: 'CANCELED',
+}
+
 export async function listQuotes(params: ListQuotesParams): Promise<Page<QuoteSummary>> {
   await wait(500)
   const sim = simulation()
@@ -143,6 +111,7 @@ export async function listQuotes(params: ListQuotesParams): Promise<Page<QuoteSu
   const minDate = params.period === 'LAST_30' ? Date.now() - 30 * 86400000 : params.period === 'LAST_90' ? Date.now() - 90 * 86400000 : 0
 
   const all = sim === 'vazio' ? [] : [...store.keys()].map(latest)
+  await Promise.all(all.map(refreshCustomer))
   const filtered = all
     .filter((q) => params.customerId === undefined || q.customer.id === params.customerId)
     .filter((q) => params.status === 'ALL' || q.status === params.status)
@@ -158,6 +127,8 @@ export async function listQuotes(params: ListQuotesParams): Promise<Page<QuoteSu
   return {
     content: filtered.slice(start, start + params.size).map((q) => ({
       id: q.id, number: q.number, version: q.version, customerName: q.customer.name, createdAt: q.createdAt, totalCents: q.totalCents, status: q.status,
+      statusAt: q.events.find((e) => e.type === STATUS_EVENT[q.status])?.createdAt ?? null,
+      orderNumber: q.order?.number ?? null,
     })),
     page: params.page,
     size: params.size,
@@ -182,9 +153,8 @@ export async function countQuotes(): Promise<QuoteCounts> {
 
 // POST /api/quotes { customerId } → 201 rascunho v1
 export async function createQuote(customerId: number): Promise<Quote> {
-  await wait(600)
-  const customer = mockFindCustomer(customerId)
-  if (!customer) throw new ApiError(404, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.')
+  // O cliente vem do back de verdade (GET /api/customers/{id}): 404 se não existir
+  const customer = await getCustomer(customerId)
   if (customer.status === 'INACTIVE') throw new ApiError(409, 'CUSTOMER_INACTIVE', 'Cliente desativado não pode receber orçamento.')
   const created = now()
   const quote: Quote = {
@@ -205,6 +175,7 @@ export async function getQuote(id: number, version?: number): Promise<Quote> {
   if (!stored) throw new ApiError(404, 'QUOTE_NOT_FOUND', 'Orçamento não encontrado.')
   const quote = version ? stored.versions.find((v) => v.version === version) : stored.versions[stored.versions.length - 1]
   if (!quote) throw new ApiError(404, 'QUOTE_VERSION_NOT_FOUND', 'Versão não encontrada.')
+  await refreshCustomer(quote)
   return snapshot(quote)
 }
 
@@ -219,11 +190,12 @@ function validateRequest(request: QuoteRequest) {
     if (desc.length > 200) errors.push({ field: f('description'), code: 'SIZE', message: 'Máximo de 200 caracteres.' })
     if (!Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 9999) errors.push({ field: f('quantity'), code: 'RANGE', message: 'Quantidade de 1 a 9.999.' })
     if (!Number.isInteger(item.unitPriceCents) || item.unitPriceCents <= 0) errors.push({ field: f('unitPriceCents'), code: 'POSITIVE', message: 'Informe um preço maior que zero.' })
-    if (item.chargeType === 'AREA') {
-      for (const dim of ['widthCm', 'heightCm'] as const) {
-        const v = item[dim]
-        if (v === null || !Number.isInteger(v) || v < 1 || v > 2000) errors.push({ field: f(dim), code: 'RANGE', message: 'Medida de 0,01 a 20,00 m.' })
-      }
+    if ((item.details ?? '').trim().length > 80) errors.push({ field: f('details'), code: 'SIZE', message: 'Máximo de 80 caracteres.' })
+    // Medida: obrigatória só no item antigo por m². No item por peça é opcional (só informa no PDF).
+    for (const dim of ['widthCm', 'heightCm'] as const) {
+      const v = item[dim]
+      if (v === null && item.chargeType !== 'AREA') continue
+      if (v === null || !Number.isInteger(v) || v < 1 || v > 2000) errors.push({ field: f(dim), code: 'RANGE', message: 'Medida de 0,01 a 20,00 m.' })
     }
   })
   if (errors.length) throw new ApiError(400, 'VALIDATION_ERROR', 'Existem campos inválidos.', errors)
@@ -236,25 +208,29 @@ export async function updateQuote(id: number, request: QuoteRequest): Promise<Qu
   if (quote.status !== 'DRAFT') throw new ApiError(409, 'QUOTE_NOT_EDITABLE', 'Só é possível editar orçamento em rascunho.')
   validateRequest(request)
 
-  quote.items = request.items.map((i) => ({
+  // Monta numa cópia: se o desconto for recusado, o que está salvo não muda
+  const draft: Quote = { ...quote }
+  draft.items = request.items.map((i) => ({
     ...i,
     description: i.description.trim(),
+    details: i.details?.trim() || null,
     unit: i.chargeType === 'UNIT' ? (i.unit ?? 'un') : null,
-    widthCm: i.chargeType === 'AREA' ? i.widthCm : null,
-    heightCm: i.chargeType === 'AREA' ? i.heightCm : null,
+    widthCm: i.widthCm ?? null,
+    heightCm: i.heightCm ?? null,
     id: nextItemId++, areaPerPieceCm2: null, subtotalCents: 0,
   }))
-  quote.discountType = request.discountValue ? request.discountType : null
-  quote.discountValue = request.discountValue || null
-  quote.paymentTerms = request.paymentTerms?.trim() || null
-  quote.notes = request.notes?.trim() || null
-  recalc(quote)
+  draft.discountType = request.discountValue ? request.discountType : null
+  draft.discountValue = request.discountValue || null
+  draft.paymentTerms = request.paymentTerms?.trim() || null
+  draft.notes = request.notes?.trim() || null
+  recalc(draft)
 
-  const discountError = validateDiscount(quote.subtotalCents, quote.discountType, quote.discountValue)
+  const discountError = validateDiscount(draft.subtotalCents, draft.discountType, draft.discountValue)
   if (discountError === 'GREATER_THAN_SUBTOTAL') throw new ApiError(422, 'DISCOUNT_GREATER_THAN_SUBTOTAL', 'O desconto não pode ser maior que o subtotal.')
   if (discountError === 'PERCENT_OVER_100') throw new ApiError(422, 'DISCOUNT_PERCENT_OVER_100', 'O desconto não pode passar de 100%.')
   if (discountError === 'NEGATIVE') throw new ApiError(422, 'DISCOUNT_NEGATIVE', 'O desconto não pode ser negativo.')
 
+  Object.assign(quote, draft)
   quote.updatedAt = now()
   event(quote, 'UPDATED')
   return snapshot(quote)
@@ -268,8 +244,9 @@ export async function confirmQuote(id: number): Promise<Quote> {
   requireStatus(quote, 'DRAFT')
   if (quote.items.length === 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'Adicione pelo menos 1 item.')
   if (quote.totalCents <= 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'O valor final precisa ser maior que R$ 0,00.')
-  const customer = mockFindCustomer(quote.customer.id)
+  const customer = await getCustomer(quote.customer.id).catch(() => null)
   if (customer?.status === 'INACTIVE') throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'O cliente está desativado.')
+  if (customer) quote.customer = toQuoteCustomer(customer)
   quote.status = 'CONFIRMED'
   quote.confirmedAt = now()
   event(quote, 'CONFIRMED', formatMoney(quote.totalCents))
@@ -287,11 +264,11 @@ export async function backToDraft(id: number): Promise<Quote> {
   return snapshot(quote)
 }
 
-// POST /api/quotes/{id}/dispatches { channel } — o 1º envio muda CONFIRMADO → ENVIADO
+// POST /api/quotes/{id}/dispatches { channel } — o 1º envio muda CONFIRMADO → ENVIADO. Aprovado só registra no histórico.
 export async function registerDispatch(id: number, channel: DispatchChannel): Promise<Quote> {
   await wait(300)
   const quote = latest(id)
-  requireStatus(quote, 'CONFIRMED', 'SENT')
+  requireStatus(quote, 'CONFIRMED', 'SENT', 'APPROVED')
   if (quote.status === 'CONFIRMED') {
     quote.status = 'SENT'
     quote.sentAt = now()
@@ -381,24 +358,33 @@ export function mockMarkQuoteConverted(id: number, order: { id: number; number: 
   quote.events.unshift({ id: nextEventId++, type: 'CONVERTED', version: quote.version, detail: order.number, userName: userName(), createdAt: when ?? now() })
 }
 
-// Dados de exemplo: cria um orçamento já aprovado (os pedidos de exemplo nascem dele)
-export function mockCreateApprovedQuote(customerId: number, items: Omit<QuoteItem, 'id' | 'areaPerPieceCm2' | 'subtotalCents'>[], daysAgo: number, discountPercent?: number): Quote | null {
-  const customer = mockFindCustomer(customerId)
-  if (!customer) return null
-  const created = new Date(Date.now() - daysAgo * 86400000).toISOString()
-  const quote: Quote = {
-    id: nextQuoteId++, number: String(nextNumber++).padStart(6, '0'), version: 1, latestVersion: 1, status: 'APPROVED',
-    customer: toQuoteCustomer(customer),
-    items: items.map((i) => ({ ...i, id: nextItemId++, areaPerPieceCm2: null, subtotalCents: 0 })),
-    subtotalCents: 0, discountType: discountPercent ? 'PERCENT' : null, discountValue: discountPercent ?? null, discountCents: 0, totalCents: 0,
-    paymentTerms: '50% de entrada e 50% na entrega', notes: null, versionReason: null,
-    createdAt: created, updatedAt: created, confirmedAt: created, sentAt: created, decidedAt: created,
-    approvalMethod: 'WHATSAPP', rejectionReason: null, decisionNote: null, order: null,
-    events: [{ id: nextEventId++, type: 'APPROVED', version: 1, detail: 'WHATSAPP', userName: 'Thayná', createdAt: created }],
-  }
-  recalc(quote)
-  store.set(quote.id, { versions: [quote] })
-  return quote
+// HU32 — Venda direta: confirma e aprova de uma vez, SEM envio ao cliente.
+// Contrato proposto para o back (HU32): POST /api/quotes/{id}/direct-sale → cria o pedido numa transação só.
+export function mockDirectSaleApprove(id: number) {
+  const quote = latest(id)
+  if (quote.directSale && quote.status === 'APPROVED') return // duplo clique
+  requireStatus(quote, 'DRAFT')
+  if (quote.items.length === 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'Adicione pelo menos 1 item.')
+  if (quote.totalCents <= 0) throw new ApiError(422, 'QUOTE_CANNOT_BE_CONFIRMED', 'O valor final precisa ser maior que R$ 0,00.')
+  const at = now()
+  quote.directSale = true
+  quote.status = 'APPROVED'
+  quote.confirmedAt = at
+  quote.decidedAt = at
+  quote.approvalMethod = 'IN_PERSON'
+  event(quote, 'CONFIRMED', `Venda direta · ${formatMoney(quote.totalCents)}`)
+  event(quote, 'APPROVED', 'Venda direta (cliente já fechou)')
+}
+
+// Pedido cancelado: o orçamento de origem passa a "Recusado" (o cliente desistiu do serviço)
+export function mockMarkQuoteRejected(id: number, note: string) {
+  const quote = latest(id)
+  if (quote.status !== 'APPROVED') return
+  quote.status = 'REJECTED'
+  quote.rejectionReason = 'GAVE_UP'
+  quote.decisionNote = `Pedido #${quote.order?.number ?? ''} cancelado: ${note}`
+  quote.decidedAt = now()
+  event(quote, 'REJECTED', `GAVE_UP: ${quote.decisionNote}`)
 }
 
 // Para o "Recentes" do Início: tudo o que aconteceu nos orçamentos (no back real, vem do AuditLog)

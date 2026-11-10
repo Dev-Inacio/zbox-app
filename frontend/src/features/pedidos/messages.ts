@@ -15,5 +15,5 @@ export type CollectTarget = {
 export function collectionMessage(t: CollectTarget): string {
   const first = t.customerName.split(' ')[0]
   const when = t.deliveredOn ? `, entregue ${t.deliveredOn === todayIso() ? 'hoje' : `em ${formatDay(t.deliveredOn)}`}` : ''
-  return `Olá, ${first}! Tudo bem? Passando para lembrar do pedido nº ${t.number} da ZBOX${when}.\nFicou faltando ${formatMoney(t.remainingCents)}.\nSe já pagou, pode desconsiderar. Qualquer dúvida, estamos à disposição.`
+  return `Olá, ${first}! Tudo bem? Passando para lembrar do pedido nº ${t.number} da Zezinho Esquadrinhas${when}.\nFicou faltando ${formatMoney(t.remainingCents)}.\nSe já pagou, pode desconsiderar. Qualquer dúvida, estamos à disposição.`
 }
