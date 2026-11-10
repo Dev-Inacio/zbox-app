@@ -6,7 +6,7 @@
 .oc-small { font-size: 13px; margin: 0; }
 .oc-strong { font-weight: 700; }
 .oc-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.oc-minus { color: #8A3A10; font-weight: 600; }
+.oc-minus { color: var(--color-danger); font-weight: 600; }
 
 /* ---------- Selos de status (texto + cor) ---------- */
 .oc-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
@@ -38,7 +38,7 @@
   cursor: pointer;
 }
 .oc-chip:hover { border-color: #A3A8AE; }
-.oc-chip[aria-pressed='true'] { background: var(--color-ink); border-color: var(--color-ink); color: #FFFFFF; font-weight: 600; }
+.oc-chip[aria-pressed='true'] { background: var(--color-accent); border-color: var(--color-accent); color: #FFFFFF; font-weight: 600; }
 .oc-chip__count { color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .oc-chip[aria-pressed='true'] .oc-chip__count { color: #D5D8DB; }
 .oc-chip:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }
@@ -65,24 +65,6 @@
 .oc-preview__customer { font-weight: 600; font-size: 17px; }
 .oc-preview__muted { font-size: 14px; color: #5A6067; overflow-wrap: anywhere; }
 
-.oc-preview__table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
-.oc-preview__table th { padding: 0 8px 10px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: #5A6067; text-align: right; border-bottom: 1px solid #DCDDDF; }
-.oc-preview__table td { padding: 14px 8px; text-align: right; border-bottom: 1px solid #ECEBE7; white-space: nowrap; }
-.oc-preview__table th:first-child, .oc-preview__table td:first-child { padding-left: 0; text-align: left; white-space: normal; }
-.oc-preview__table th:last-child, .oc-preview__table td:last-child { padding-right: 0; }
-.oc-preview__item { display: flex; flex-direction: column; gap: 2px; overflow-wrap: anywhere; }
-.oc-preview__item strong { font-weight: 600; }
-.oc-preview__item span { font-size: 13px; color: #5A6067; }
-.oc-preview__table td strong { font-weight: 600; }
-
-.oc-preview__totals { align-self: flex-end; width: 320px; max-width: 100%; display: flex; flex-direction: column; gap: 8px; font-variant-numeric: tabular-nums; }
-.oc-preview__totals > div { display: flex; justify-content: space-between; gap: 12px; }
-.oc-preview__totals > div > span:first-child { color: #3F454B; }
-.oc-preview__discount { color: #8A3A10; }
-.oc-preview__final { align-items: baseline; padding-top: 10px; border-top: 2px solid var(--color-ink); }
-.oc-preview__final span:first-child { font-weight: 600; color: var(--color-ink) !important; }
-.oc-preview__final span:last-child { font-family: var(--font-display); font-weight: 800; font-size: 26px; }
-
 .oc-preview__terms { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding-top: 20px; border-top: 1px solid #DCDDDF; }
 .oc-preview__terms > div { display: flex; flex-direction: column; gap: 4px; }
 .oc-preview__notes { white-space: pre-line; overflow-wrap: anywhere; }
@@ -91,16 +73,7 @@
   .oc-preview { padding: 24px 20px; gap: 20px; }
   .oc-preview__head { flex-direction: column; gap: 16px; }
   .oc-preview__block--right { text-align: left; }
-  .oc-preview__table thead { display: none; }
-  .oc-preview__table tr { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; border-bottom: 1px solid #ECEBE7; }
-  .oc-preview__table td { padding: 0; border: 0; text-align: left; }
-  .oc-preview__table td:first-child { grid-column: 1 / -1; }
-  .oc-preview__table td[data-label="Qtd."], .oc-preview__table td[data-label="Preço"] { font-size: 14px; color: #5A6067; }
-  .oc-preview__table td[data-label="Qtd."] { grid-column: 1; }
-  .oc-preview__table td[data-label="Preço"] { grid-column: 1; grid-row: 3; }
-  .oc-preview__table td[data-label="Subtotal"] { grid-column: 2; grid-row: 2 / 4; align-self: center; text-align: right; }
-  .oc-preview__totals { width: 100%; }
-  .oc-preview__terms { grid-template-columns: 1fr; }
+  .oc-preview__terms { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Novo orçamento ---------- */
@@ -156,16 +129,14 @@
 
 .oc-item__fields { margin: 0 56px 0 36px; display: grid; gap: 12px; align-items: start; }
 .oc-item__fields--unit { grid-template-columns: minmax(0, 0.8fr) minmax(0, 0.8fr) minmax(0, 1.6fr); }
-.oc-item__fields--area { grid-template-columns: 96px 96px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+.oc-item__fields--area { grid-template-columns: 110px minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); }
+.oc-item__details { margin: 0 56px 0 36px; }
 .oc-label { font-size: 13px; font-weight: 600; color: var(--color-ink); }
 .oc-input-num { text-align: right; height: 44px; padding: 0 10px; font-variant-numeric: tabular-nums; }
 .oc-input-sm { height: 44px; padding: 0 6px; }
 .oc-prefixed { position: relative; }
 .oc-prefixed__text { position: absolute; left: 10px; top: 12px; font-size: 14px; color: var(--color-text-muted); pointer-events: none; }
 .oc-prefixed .oc-input-num { padding-left: 34px; }
-.oc-piece-hint { margin: 0; display: flex; align-items: center; gap: 8px; font-size: 13px; color: #5A6067; }
-.oc-piece-hint__img { width: 44px; height: 36px; flex: none; }
-.oc-piece-hint strong { color: #3F454B; font-weight: 600; }
 .oc-item__calc { margin: 0 56px 0 36px; padding: 10px 12px; border-radius: 8px; background: #F7F6F3; font-size: 14px; color: #3F454B; font-variant-numeric: tabular-nums; }
 
 /* Botões segmentados (radios de verdade) */
@@ -210,7 +181,7 @@
   cursor: pointer;
   position: relative;
 }
-.oc-pill[aria-pressed='true'], .oc-pill--radio:has(input:checked) { border: 2px solid var(--color-accent); background: #FDF1EC; color: #8A3A10; font-weight: 600; }
+.oc-pill[aria-pressed='true'], .oc-pill--radio:has(input:checked) { border: 2px solid var(--color-accent); background: var(--wine-soft); color: var(--color-accent); font-weight: 600; }
 .oc-pill--radio input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
 .oc-pill:focus-visible, .oc-pill--radio:has(input:focus-visible) { outline: 3px solid var(--color-accent-soft); }
 
@@ -244,7 +215,7 @@
 .oc-checks { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
 .oc-checks li { display: flex; gap: 10px; align-items: flex-start; }
 .oc-checks svg { flex: none; }
-.oc-checks__todo { color: #8A3A10; font-weight: 600; }
+.oc-checks__todo { color: var(--color-danger); font-weight: 600; }
 .oc-preview__empty { color: #5A6067; font-style: italic; }
 .oc-btn-link { text-decoration: none; }
 
@@ -264,7 +235,7 @@
 .oc-stepper__step.is-rejected .oc-stepper__bar { background: #B42318; }
 
 .oc-panel { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
-.oc-panel--answer { padding: 20px; border-radius: 16px; background: #FDF1EC; }
+.oc-panel--answer { padding: 20px; border-radius: 16px; background: var(--wine-soft); }
 .oc-panel__text { flex: 1; min-width: 220px; }
 .oc-panel__text p { margin: 4px 0 0; color: #3F454B; }
 .oc-panel__title { margin: 0; font-family: var(--font-display); font-size: 20px; }
@@ -281,17 +252,10 @@
 .oc-banner--ok { background: #E8F5EC; color: #1D5B33; }
 .oc-banner--bad { background: #FDECEA; color: #8A1C12; }
 
-.oc-items-table { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
-.oc-items-table td { padding: 12px 8px; border-bottom: 1px solid #ECEBE7; vertical-align: top; }
-.oc-items-table td:first-child { padding-left: 0; display: flex; flex-direction: column; gap: 2px; }
-.oc-items-table td:last-child { padding-right: 0; }
-.oc-items-table tr:last-child td { border-bottom: 0; }
-.oc-items-table__name { font-weight: 600; }
-
 .oc-events { margin: 0; padding: 0; list-style: none; }
 .oc-event { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid #ECEBE7; }
 .oc-event:first-child { border-top: 0; }
-.oc-event__icon { width: 32px; height: 32px; border-radius: 10px; background: #F0EFEC; color: #3F454B; display: flex; align-items: center; justify-content: center; }
+.oc-event__icon { width: 32px; height: 32px; border-radius: 10px; color: #3F454B; display: flex; align-items: center; justify-content: center; }
 .oc-event__text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .oc-event__title { font-weight: 600; overflow-wrap: anywhere; }
 
@@ -303,7 +267,7 @@
 .oc-dialog-fields { display: flex; flex-direction: column; gap: 12px; }
 .oc-dialog-gap { margin-top: 12px; }
 .oc-attach { display: flex; align-items: center; gap: 10px; padding: 12px; border: 1px solid #DCDDDF; border-radius: 8px; background: #F7F6F3; font-size: 14px; color: #3F454B; overflow-wrap: anywhere; }
-.oc-attach svg { flex: none; color: #A8420D; }
+.oc-attach svg { flex: none; color: var(--color-accent); }
 .oc-attach--bad { background: #FDECEA; border-color: #E4B4AE; color: #8A1C12; }
 .oc-share-app { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #DCDDDF; border-radius: 8px; }
 .oc-share-app > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
@@ -313,20 +277,20 @@
 .oc-radios { margin: 12px 0; padding: 0; border: 0; display: flex; flex-direction: column; gap: 8px; }
 .oc-radios legend { margin-bottom: 8px; }
 .oc-radio { min-height: 48px; padding: 0 14px; border: 1px solid #DCDDDF; border-radius: 10px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
-.oc-radio:has(input:checked) { border: 2px solid var(--color-accent); background: #FDF1EC; font-weight: 600; }
+.oc-radio:has(input:checked) { border: 2px solid var(--color-accent); background: var(--wine-soft); font-weight: 600; }
 .oc-radio input { accent-color: var(--color-accent); margin: 0; }
 
 /* ---------- Tablet ---------- */
 @media (max-width: 1023px) {
-  .oc-layout, .oc-layout--review { grid-template-columns: 1fr; }
+  .oc-layout, .oc-layout--review { grid-template-columns: minmax(0, 1fr); }
   .oc-summary { position: static; }
   .oc-item__fields { margin-right: 0; }
-  .oc-item__calc { margin-right: 0; }
+  .oc-item__calc, .oc-item__details { margin-right: 0; }
 }
 
 /* ---------- Celular ---------- */
 @media (max-width: 767px) {
-  .oc-filters { grid-template-columns: 1fr; gap: 10px; }
+  .oc-filters { grid-template-columns: minmax(0, 1fr); gap: 10px; }
 
   /* lista vira cartões (o cl-table já faz a base) */
   .oc-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; padding-right: 14px; }
@@ -346,14 +310,7 @@
   .oc-item__fields { margin: 0; }
   .oc-item__fields--unit, .oc-item__fields--area { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .oc-item__fields--unit > :last-child, .oc-item__fields--area > :last-child { grid-column: 1 / -1; }
-  .oc-item__calc { margin: 0; }
-
-  .oc-items-table, .oc-items-table tbody { display: block; }
-  .oc-items-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 12px; padding: 12px 0; border-bottom: 1px solid #ECEBE7; }
-  .oc-items-table tr:last-child { border-bottom: 0; }
-  .oc-items-table td { padding: 0; border: 0; }
-  .oc-items-table td:first-child { grid-column: 1 / -1; }
-  .oc-items-table td:nth-child(2) { font-size: 14px; }
+  .oc-item__calc, .oc-item__details { margin: 0; }
 
   .oc-panel { flex-direction: column; align-items: stretch; }
   .oc-panel__actions { display: grid; grid-template-columns: 1fr 1fr; }
@@ -364,3 +321,76 @@
   .oc-summary__value { font-size: 28px; }
   .oc-step-locked { padding: 18px 16px; border-radius: 20px; }
 }
+
+/* Selos de situação com ícone (18 px) */
+.oc-badge { gap: 6px; padding: 3px 10px 3px 4px; }
+
+/* Revisão (design 31/10): a prévia já é um cartão, sem cartão dentro de cartão */
+.oc-preview .zb-card { border: 0; padding: 0; box-shadow: none; }
+.oc-preview .zb-sum { align-self: flex-end; width: 380px; max-width: 100%; padding: 16px 18px; background: #F9F8F5; border: 1px solid #ECEBE7; border-radius: 14px; }
+.oc-item__piece { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+
+/* Duas colunas com a coluna do item estreita: campos em 2 × 2 para o preço caber inteiro */
+@media (min-width: 1024px) and (max-width: 1400px) {
+  .oc-item__fields--area { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Celular: Quantidade na linha dela, Largura e Altura lado a lado */
+@media (max-width: 767px) {
+  .oc-item__fields--area { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .oc-item__fields--area > :first-child, .oc-item__fields--area > :last-child { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  /* Celular: os valores vêm logo depois do andamento, não no fim da tela */
+  .oc-layout--detail { display: flex; flex-direction: column; align-items: stretch; }
+  .oc-layout--detail .oc-layout__main { display: contents; }
+  .oc-layout--detail .oc-layout__main > :first-child { order: 0; }
+  .oc-layout--detail .oc-aside { order: 1; }
+  .oc-layout--detail .oc-layout__main > :nth-child(n+2) { order: 2; }
+  /* O cartão não tem seta: o conteúdo usa a largura toda */
+  .oc-table.cl-table tbody tr { padding-right: 14px; }
+  .oc-pill { min-height: 44px; }
+}
+
+@media (max-width: 767px) {
+  .oc-layout--detail .oc-layout__main > *, .oc-layout--detail .oc-aside, .pd-layout .oc-layout__main > *, .pd-layout .oc-aside { min-width: 0; max-width: 100%; }
+}
+
+@media (max-width: 400px) {
+  .oc-stepper { gap: 4px; }
+  .oc-stepper__label { font-size: 11px; }
+  .oc-choices .oc-avatar { display: none; }
+}
+
+.oc-link-add { color: var(--color-accent); }
+
+
+/* v3: selos do topo em fundo claro */
+.oc-hero-badge { background: var(--color-neutral-soft); color: var(--color-ink); }
+.oc-hero-badge--outline { background: transparent; border-color: var(--color-border); }
+
+/* v3: com o menu lateral sobra menos largura; empilha antes */
+@media (max-width: 1180px) {
+  .oc-layout, .oc-layout--review { grid-template-columns: minmax(0, 1fr); }
+  .oc-summary { position: static; }
+}
+
+
+/* v3: etapas do orçamento */
+.oc-steps { margin: 0 0 20px; padding: 14px 18px; list-style: none; display: flex; gap: 12px; background: var(--color-surface); border: 1px solid var(--color-line); border-radius: var(--radius-card); }
+.oc-steps__item { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; font-size: 15px; color: var(--color-text-muted); }
+.oc-steps__item.is-current { color: var(--color-ink); font-weight: 700; }
+.oc-steps__n { flex: none; width: 28px; height: 28px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700; background: var(--color-neutral-soft); color: var(--color-text-muted); }
+.is-done .oc-steps__n { background: var(--color-success); color: #FFFFFF; }
+.is-current .oc-steps__n { background: var(--color-accent); color: #FFFFFF; }
+@media (max-width: 640px) {
+  .oc-steps { padding: 10px 12px; gap: 6px; }
+  .oc-steps__item { flex-direction: column; gap: 4px; font-size: 12.5px; text-align: center; }
+}
+
+/* HU32 — Venda direta */
+.zv-btn--direct { background: #FFFFFF; color: #1F4E8C; border: 1.5px solid #1F4E8C; }
+.zv-btn--direct:hover { background: #E8F0FA; }
+.oc-direct-note { display: flex; gap: 12px; padding: 16px; border-radius: 12px; background: #E8F0FA; color: #0F2A4A; line-height: 1.5; }
+.oc-direct-note svg { flex: none; color: #1F4E8C; }

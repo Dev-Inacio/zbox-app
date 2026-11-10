@@ -213,3 +213,47 @@ Pagamentos recebidos no período (não estornados), mais recentes primeiro:
 3. `Idempotency-Key`: guardar por quanto tempo? (sugestão: 24 h)
 4. Pedido cancelado com pagamento: só registra ou precisamos de "devolução"? (decisão da PO depois)
 5. `GET /api/dashboard` num endpoint só (recomendado: 1 chamada na tela inicial) ou o front junta `counts` + `summary`?
+
+## Regras novas do front (02/11)
+- **Material é um valor só por pedido.** `POST /api/orders/{id}/expenses` com `type: MATERIAL` quando já existe material: **409 `MATERIAL_ALREADY_SET`**. Para mudar o valor, usar o `PUT` do gasto.
+- **Nota fiscal (HU29):** `order.invoice` (`Invoice | null`) e `invoiceNumber` nas listas de pedidos e de "falta receber". Endpoints e validações em `docs/nota-fiscal-HU29.md`.
+
+
+## Financeiro: "O que entrou" agrupado por serviço
+
+`GET /api/financial/payments/by-order?from=&to=&page=&size=`: uma linha por pedido com pagamento no período. A paginação conta pedidos, não pagamentos. Campos: `orderId`, `orderNumber`, `customerName`, `amountCents` (soma no período), `lastPaidAt`, `payments[]` (`id`, `amountCents`, `method`, `paidAt`) e `split`. Pagamento estornado não entra.
+
+
+## Orçamento aprovado: reenviar, baixar e imprimir
+
+`POST /api/quotes/{id}/dispatches` também aceita orçamento `APPROVED`, inclusive com pedido entregue. Registra o envio no histórico e não muda a situação do orçamento.
+
+
+## Orçamento: dados do cliente
+
+Em `DRAFT` e `CONFIRMED`, o orçamento devolve os dados atuais do cadastro do cliente (nome, telefone, WhatsApp e endereço). A partir de `SENT`, os dados ficam congelados, para guardar o que o cliente recebeu. Uma nova versão volta a `DRAFT` e pega o cadastro atual.
+
+
+## Devolução ao cliente
+
+Dinheiro que voltou para o cliente, como num abatimento por defeito. É diferente de estorno, que corrige um pagamento lançado errado. Só ADMIN e MANAGER.
+
+- `POST /api/orders/{id}/refunds` com `{ amountCents, method, refundedAt, reason }` e header `Idempotency-Key`.
+- `POST /api/orders/{id}/refunds/{refundId}/cancel` desfaz uma devolução lançada por engano. Ela continua no histórico.
+- O pedido devolve `refunds[]` e `refundedCents`.
+
+Regras:
+- O valor vai até o recebido menos o já devolvido (`REFUND_EXCEEDS_RECEIVED`, `NOTHING_TO_REFUND`). A data não pode ser futura e o motivo é obrigatório.
+- `remainingCents` e `paymentStatus` não mudam: o cliente não fica devendo o valor devolvido.
+- O que o serviço rendeu passa a ser `total − devolvido`, e o que sobrou é `total − devolvido − material`.
+- Estorno que deixaria o recebido menor que o devolvido é recusado (`PAYMENT_HAS_REFUND`).
+- O Financeiro mostra "Entrou", "Devolvido a cliente" e "Ficou no caixa = entrou − devolvido", contados pela data de cada lançamento. `GET /api/financial/summary` ganha `refundedCents` e `refunds`.
+
+
+### Devolução com "não cobrar o restante"
+
+`POST /api/orders/{id}/refunds` aceita `waiveRemaining: true`, para o cliente que desistiu e não vai pagar mais nada. O back guarda em `refund.waivedCents` o que faltava receber e devolve `waivedCents` no pedido.
+
+- `remainingCents = total − recebido − waivedCents`, e o pedido sai de "Falta receber" e das cobranças.
+- O que o serviço rendeu passa a ser `total − devolvido − waivedCents`.
+- Desfazer a devolução faz o valor não cobrado voltar para `remainingCents`.

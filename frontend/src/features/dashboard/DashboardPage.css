@@ -26,7 +26,7 @@
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: #E9A06E;
+  color: var(--color-accent);
 }
 
 .dash-hero__title {
@@ -123,66 +123,11 @@
 }
 
 /* Número que pede ação: fundo e texto laranja (com texto, não só cor) */
-.stat--attention { background: #FDF1EC; }
+.stat--attention { background: var(--wine-soft); }
 .stat--attention .stat__label,
 .stat--attention .stat__value,
-.stat--attention .stat__hint { color: #8A3A10; }
+.stat--attention .stat__hint { color: var(--color-danger); }
 .stat--attention .stat__label { font-weight: 600; }
-
-/* ---------- Recentes: lista de atividades ---------- */
-.activity {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.activity__row {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: 14px 0;
-  border-top: 1px solid #ECEBE7;
-}
-
-.activity__row:first-child { border-top: 0; padding-top: 0; }
-.activity__row:last-child { padding-bottom: 0; }
-
-.activity__icon {
-  flex: none;
-  width: 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: #F0EFEC;
-  color: var(--color-ink);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.activity__text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.activity__title {
-  font-weight: 600;
-  overflow-wrap: anywhere; /* um texto longo sem espaço não estoura a tela */
-}
-
-.activity__detail {
-  font-size: 14px;
-  color: var(--color-text-muted);
-}
-
-.activity__when {
-  width: 72px;
-  text-align: right;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
 
 /* Selos de status */
 .badge {
@@ -202,11 +147,6 @@
 .badge--warn    { background: #FFF3E6; color: #7A3E06; }
 .badge--ok      { background: #E8F5EC; color: #1D5B33; }
 .badge--danger  { background: #FDECEA; color: #8A1C12; }
-
-/* Título da atividade é link para o pedido/orçamento */
-a.activity__title { color: var(--color-ink); text-decoration: none; }
-a.activity__title:hover { color: var(--color-accent); text-decoration: underline; }
-a.activity__title:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; border-radius: 4px; }
 
 /* ---------- Tablet ---------- */
 @media (max-width: 1023px) {
@@ -233,12 +173,6 @@ a.activity__title:focus-visible { outline: 3px solid var(--color-accent-soft); o
   .stat-grid { gap: 12px; }
   .stat { padding: 14px; gap: 6px; border-radius: 14px; }
   .stat__hint { display: none; }
-
-  /* Atividade em duas linhas: título em cima, selo e horário embaixo */
-  .activity__row { flex-wrap: wrap; align-items: flex-start; }
-  .activity__icon { display: none; }
-  .activity__text { flex-basis: 100%; }
-  .activity__detail { display: none; }
   .activity__when { width: auto; text-align: left; }
 }
 
@@ -265,14 +199,100 @@ a.activity__title:focus-visible { outline: 3px solid var(--color-accent-soft); o
 .dash-list__btn { height: 40px; padding: 0 14px; }
 .dash-list__due { display: flex; flex-direction: column; align-items: flex-end; font-variant-numeric: tabular-nums; }
 .dash-list__due span { font-size: 13px; color: var(--color-text-muted); white-space: nowrap; }
-.dash-list__due span.is-late { color: #8A3A10; font-weight: 600; }
+.dash-list__due span.is-late { color: var(--color-danger); font-weight: 600; }
 
 @media (max-width: 1023px) {
-  .dash-two { grid-template-columns: 1fr; gap: 20px; }
+  .dash-two { grid-template-columns: minmax(0, 1fr); gap: 20px; }
 }
 @media (max-width: 767px) {
   .stat--money .stat__value { font-size: 20px; }
   .dash-list__row { flex-wrap: wrap; gap: 8px 12px; }
   .dash-list__text { flex-basis: 60%; }
   .dash-list__btn { width: 100%; }
+}
+
+/* Linhas em blocos (design 31/10): "Clientes que ainda não pagaram" e "Em andamento" */
+.dash-block { display: flex; align-items: center; gap: 16px; }
+.dash-block .zb-alert { margin-top: 2px; }
+@media (max-width: 640px) {
+  .dash-block { flex-wrap: wrap; gap: 8px 12px; }
+  .dash-block .dash-list__text { flex-basis: 100%; }
+  .dash-block .dash-list__money { flex: 1; align-items: flex-start; }
+}
+
+/* "A receber" tem valor em dinheiro: no celular ocupa a linha inteira; "Prontos" também, para não sobrar buraco */
+@media (max-width: 640px) {
+  .stat-grid > li:nth-child(n + 3) { grid-column: 1 / -1; }
+}
+
+@media (max-width: 767px) {
+  .dash-list__title { display: inline-block; padding-block: 10px; margin-block: -10px; }
+}
+
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* v3: sem faixa escura; o card não sobe mais e o recuo lateral vem do layout */
+.dash-hero { background: transparent; color: var(--color-ink); }
+.dash-hero__inner { padding: 0 0 var(--space-3); }
+.dash-hero__date { font-size: var(--text-small); color: var(--color-text-muted); }
+.dash-hero__subtitle { color: var(--color-text-muted); }
+.dash { margin: 0 auto; padding: 0 0 var(--space-6); }
+@media (max-width: 767px) { .dash { margin-top: 0; padding: 0 0 var(--space-4); } }
+
+/* v3: com o menu lateral, 2 por linha até haver largura para os 4 (o valor em R$ precisa caber) */
+@media (min-width: 481px) and (max-width: 1499px) {
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* v3: com o menu lateral, as duas listas só ficam lado a lado em tela larga */
+@media (max-width: 1400px) {
+  .dash-two { grid-template-columns: minmax(0, 1fr); }
+}
+
+
+/* ===== v3: Início como nas imagens ===== */
+.dash-two { grid-template-columns: minmax(0, 1fr); }
+.dash-warn { display: flex; flex-direction: column; gap: 2px; padding: 14px 18px; border: 1px solid #EBD9B4; border-radius: 12px; background: var(--color-warning-soft); color: var(--color-ink); font-size: 15px; }
+
+/* Destaques: uma faixa só, com linhas separando */
+.stat-grid { gap: 0; }
+.stat-grid .zb-stat { background: transparent; border: 0; border-radius: 0; padding: 4px 18px; }
+.stat-grid > li + li { border-left: 1px solid var(--color-line); }
+.stat-grid .zb-stat__value { font-size: clamp(22px, 2vw, 28px); }
+@media (min-width: 1100px) { .stat-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 481px) and (max-width: 1099px) {
+  .stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); row-gap: 20px; }
+  .stat-grid > li:nth-child(odd) { border-left: 0; }
+}
+@media (max-width: 480px) {
+  .stat-grid { grid-template-columns: minmax(0, 1fr); row-gap: 16px; }
+  .stat-grid > li + li { border-left: 0; border-top: 1px solid var(--color-line); padding-top: 16px; }
+  .stat-grid .zb-stat { padding: 0; }
+}
+
+/* Listas em forma de tabela (no celular viram cartões) */
+.dash-rows { margin: 0; padding: 0; list-style: none; border: 1px solid var(--color-line); border-radius: 12px; overflow: hidden; }
+.dash-rows__head, .dash-rows__row { display: grid; align-items: center; gap: 12px; padding: 12px 16px; }
+.dash-rows--unpaid .dash-rows__head, .dash-rows--unpaid .dash-rows__row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+.dash-rows--progress .dash-rows__head, .dash-rows--progress .dash-rows__row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto; }
+.dash-rows__head { background: var(--color-row-head); font-size: 15px; font-weight: 700; color: var(--color-text-muted); }
+.dash-rows__row { border-top: 1px solid var(--color-line); }
+.dash-rows__money { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dash-rows__end { text-align: right; }
+.dash-rows .dash-list__btn { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 640px) {
+  .dash-rows__head { display: none; }
+  .dash-rows--unpaid .dash-rows__row, .dash-rows--progress .dash-rows__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .dash-rows__row:first-of-type { border-top: 0; }
+  .dash-rows--unpaid .dash-rows__row > :first-child, .dash-rows--progress .dash-rows__row > :first-child { grid-column: 1 / -1; }
+  .dash-rows--unpaid .dash-list__btn { grid-column: 1 / -1; justify-content: center; }
+}
+
+/* Colunas fixas no fim: cabeçalho e linhas alinhados */
+@media (min-width: 641px) {
+  .dash-rows--unpaid .dash-rows__head, .dash-rows--unpaid .dash-rows__row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) 130px; }
+  .dash-rows--progress .dash-rows__head, .dash-rows--progress .dash-rows__row { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) 110px; }
 }

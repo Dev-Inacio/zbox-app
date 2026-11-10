@@ -1,5 +1,6 @@
 import { useCallback, useEffect } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { AppIcon } from '../../components/ui/AppIcon'
 import { Button } from '../../components/ui/Button'
 import { useRequest } from '../../hooks/useRequest'
 import { QuoteDocument } from './QuoteDocument'
@@ -34,8 +35,8 @@ export function QuotePrintPage() {
   return (
     <div className="qp">
       <div className="qp__toolbar">
-        <Link to={`/orcamentos/${quoteId}`} className="qp__back">← Voltar para o orçamento</Link>
-        <Button onClick={() => window.print()} disabled={!data}>Imprimir ou salvar PDF</Button>
+        <Link to={`/orcamentos/${quoteId}`} className="qp__back"><AppIcon name="arrowLeft" />Voltar para o orçamento</Link>
+        <Button onClick={() => window.print()} disabled={!data}><AppIcon name="printer" size={24} onAccent />Imprimir ou salvar PDF</Button>
       </div>
       <div className="qp__page">
         {loading && <p className="qp__msg" role="status">Carregando…</p>}

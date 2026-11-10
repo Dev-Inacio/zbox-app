@@ -1,0 +1,60 @@
+/* Design tokens do ZBOX v3 · identidade AZUL.
+   Os componentes usam var(--nome). Trocar este arquivo recolore o sistema inteiro.
+   Os nomes antigos (--color-accent…) foram mantidos para nada quebrar. */
+:root {
+  /* Marca (os nomes --wine* ficaram por compatibilidade: agora são AZUL) */
+  --wine: #1F4E8C;          /* principal: botão principal, item ativo */
+  --wine-dark: #0F2A4A;     /* menu lateral */
+  --wine-2: #2B6CB0;        /* destaques, avatar */
+  --wine-soft: #E8F0FA;     /* fundos suaves (falta receber, ícone de card) */
+
+  /* Neutros */
+  --color-ink: #29252A;            /* texto principal */
+  --color-bg: #F6F5F3;             /* fundo da página */
+  --color-surface: #FFFFFF;        /* cards e campos */
+  --color-text-muted: #5C565D;     /* texto de apoio (nunca mais claro que isso) */
+  --color-border: #CFC8CB;         /* bordas de campos */
+  --color-line: #E5E0E2;           /* linhas e bordas de card */
+  --color-row-head: #F7F9FC;       /* cabeçalho de tabela */
+
+  /* Ação (nomes antigos → azul) */
+  --color-accent: var(--wine);
+  --color-accent-hover: var(--wine-dark);
+  --color-accent-soft: #9DBDE6;    /* anel de foco */
+  --color-on-accent: #FFFFFF;
+
+  /* Situações: sempre com texto junto, nunca só a cor */
+  --color-success: #247A50;  --color-success-soft: #E6F2EC;
+  --color-danger:  #B83240;  --color-danger-soft:  #FBEAEC;
+  --color-warning: #B7791F;  --color-warning-soft: #FBF1E1;
+  --color-info:    #2F5D8A;  --color-info-soft:    #E8EFF6;
+  --color-neutral: #6B656C;  --color-neutral-soft: #EFEDEE;
+
+  /* Tipografia (pensada para 60+) */
+  --font-display: 'Archivo', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --text-base: 17px;      /* texto padrão */
+  --text-read: 18px;      /* textos longos */
+  --text-small: 15px;     /* mínimo permitido */
+  --title-page: 32px;
+  --title-card: 22px;
+
+  /* Espaçamento: escala de 8 */
+  --space-1: 8px; --space-2: 16px; --space-3: 24px; --space-4: 32px; --space-6: 48px; --space-7: 56px;
+
+  /* Formas e medidas */
+  --radius: 10px;
+  --radius-card: 16px;
+  --control-height: 52px;     /* campos e botões principais */
+  --control-min: 48px;        /* nada clicável menor que isso */
+  --shadow-card: 0 1px 2px rgba(41, 37, 42, 0.04);
+
+  /* Layout */
+  --sidebar-w: 264px;
+  --page-max: 1200px;
+  --page-gutter: clamp(16px, 3vw, 40px);
+}
+
+html { font-size: var(--text-base); }
+body { background: var(--color-bg); color: var(--color-ink); font-family: var(--font-body); font-size: var(--text-base); line-height: 1.45; }
+:focus-visible { outline: 3px solid var(--color-accent-soft); outline-offset: 2px; }

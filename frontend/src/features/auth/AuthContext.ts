@@ -3,7 +3,7 @@ import type { AuthUser, LoginResponse } from './types'
 
 export type AuthContextValue = {
   user: AuthUser | null
-  notice: string | undefined                // aviso para a tela de login (ex.: "Você saiu da sua conta.")
+  notice: string | undefined                // aviso para a tela de login (ex.: "Sua sessão expirou. Entre de novo.")
   signIn: (response: LoginResponse) => void
   signOut: (notice?: string) => void
 }

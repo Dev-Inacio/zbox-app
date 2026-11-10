@@ -1,0 +1,13 @@
+/* HU29: nota fiscal no pedido */
+.inv-tag { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 3px 10px; border: 1px solid var(--color-line); border-radius: 999px; background: var(--wine-soft); color: var(--wine); font-size: 15px; font-weight: 600; white-space: nowrap; }
+.inv-tag--none { border: 1px dashed var(--color-border); background: transparent; color: var(--color-text-muted); font-weight: 500; }
+.inv-stack { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.inv-types { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
+.inv-types legend { margin-bottom: 8px; padding: 0; }
+.inv-type { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 14px; border: 1.5px solid var(--color-border); border-radius: var(--radius); cursor: pointer; }
+.inv-type:has(input:checked) { border-color: var(--wine); background: var(--wine-soft); font-weight: 600; }
+.inv-file { height: auto; padding: 12px; }
+dialog:has(.inv-view) { width: min(900px, 94vw); max-width: none; }
+.inv-view { display: flex; flex-direction: column; gap: 12px; }
+.inv-view__doc { display: block; width: 100%; height: 60vh; border: 1px solid var(--color-line); border-radius: var(--radius); object-fit: contain; }
+.inv-view__actions { display: flex; flex-wrap: wrap; gap: 8px; }

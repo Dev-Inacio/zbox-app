@@ -43,8 +43,11 @@
 
 .field__end {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 0;
+  bottom: 0;
+  right: 4px;
+  display: flex;
+  align-items: center;
 }
 
 .field__error {

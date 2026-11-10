@@ -19,19 +19,17 @@ export function PasswordInput(props: PasswordInputProps) {
       aria-pressed={visible}
       onClick={() => setVisible((v) => !v)}
     >
-      {visible ? (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M3 3l18 18" />
-          <path d="M10.6 5.1A10.6 10.6 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-3.2 4.1" />
-          <path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.6 7 10 7a10 10 0 0 0 5.4-1.6" />
-          <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
-        </svg>
-      ) : (
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z" />
+      {/* Olho fechado = senha escondida; olho aberto = senha à mostra */}
+      <svg className={`password-eye${visible ? ' is-open' : ''}`} width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <g className="password-eye__open">
+          <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" />
           <circle cx="12" cy="12" r="3" />
-        </svg>
-      )}
+        </g>
+        <g className="password-eye__closed">
+          <path d="M3 10c2.4 3.4 5.4 5 9 5s6.6-1.6 9-5" />
+          <path d="M12 15v3M6.5 13.2l-1.7 2.4M17.5 13.2l1.7 2.4" />
+        </g>
+      </svg>
     </button>
   )
 

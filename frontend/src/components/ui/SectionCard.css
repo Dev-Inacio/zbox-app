@@ -112,3 +112,8 @@
   .section-card { padding: 20px; border-radius: 20px; gap: 16px; }
   .section-card__title { font-size: 18px; }
 }
+
+.section-card__intro { margin: -8px 0 14px; font-size: 14px; color: var(--color-text-muted); }
+.section-card__intro strong { color: #9B1C1C; }
+
+.section-card.section-card--elevated { box-shadow: var(--shadow-card); }

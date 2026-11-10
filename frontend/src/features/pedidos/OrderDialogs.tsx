@@ -1,15 +1,18 @@
 import { useState } from 'react'
 import { Alert } from '../../components/ui/Alert'
+import { AppIcon } from '../../components/ui/AppIcon'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
+import { NoAutofill } from '../../components/ui/NoAutofill'
 import { ApiError } from '../auth/types'
-import { maskPhone, onlyDigits } from '../clientes/format'
+import { onlyDigits } from '../clientes/format'
 import { formatMoney, maskMoneyInput, parseDecimalToHundredths } from '../orcamentos/money'
-import { convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, registerCollection, reversePayment } from './ordersApi'
+import { addExpense, addRefund, cancelRefund, deleteExpense, updateExpense, convertQuoteToOrder, addPayment, cancelOrder, deliverOrder, getOrder, registerCollection, reversePayment } from './ordersApi'
+import { useCustomerWhatsapp } from '../../hooks/useCustomerWhatsapp'
 import { formatDay, todayIso } from './dates'
 import { collectionMessage } from './messages'
 import type { CollectTarget } from './messages'
-import { METHOD_LABEL, METHODS } from './labels'
-import type { Order, Payment, PaymentMethod } from './types'
+import { EXPENSE_TYPE_LABEL, METHOD_LABEL, METHODS } from './labels'
+import type { ExpenseType, Order, OrderExpense, OrderRefund, Payment, PaymentMethod } from './types'
 import type { Quote } from '../orcamentos/types'
 import '../orcamentos/Orcamentos.css'
 import './Pedidos.css'
@@ -155,7 +158,7 @@ export function ConvertToOrderDialog({ quote, onCancel, onDone }: { quote: Quote
               ))}
             </div>
             <MethodPills value={method} onChange={setMethod} name="forma-entrada" />
-            {errors.method && <p className="field__error">{errors.method}</p>}
+            {errors.method && !method && <p className="field__error">{errors.method}</p>}
           </div>
         )}
 
@@ -210,23 +213,26 @@ export function PaymentDialog({ target, onCancel, onDone }: { target: PaymentTar
   }
 
   return (
-    <ConfirmDialog open title="Registrar pagamento" confirmLabel="Registrar" loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
+    <ConfirmDialog open title="Registrar pagamento" confirmLabel={cents > 0 ? `Registrar ${formatMoney(cents)}` : 'Registrar'} loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
         <p className="pd-lead">Pedido #{target.number} · {target.customerName}</p>
         <div className="pd-sum pd-sum--one"><div className="pd-sum__row"><span>Falta receber</span><strong>{formatMoney(target.remainingCents)}</strong></div></div>
         <MoneyField id="valor-pagamento" label="Valor recebido" value={amount} onChange={setAmount} error={errors.amountCents} />
-        <button type="button" className="oc-pill pd-self-start" onClick={() => setAmount(maskMoneyInput(String(target.remainingCents)))} data-testid="tudo-que-falta">
-          Tudo que falta · {formatMoney(target.remainingCents)}
+        <button type="button" className="zv-btn zv-btn--full" onClick={() => setAmount(maskMoneyInput(String(target.remainingCents)))} data-testid="tudo-que-falta">
+          Recebi o valor total ({formatMoney(target.remainingCents)})
         </button>
         <MethodPills value={method} onChange={setMethod} name="forma-pagamento" />
-        {errors.method && <p className="field__error">{errors.method}</p>}
+        {errors.method && !method && <p className="field__error">{errors.method}</p>}
         <div className="pd-grid-2">
-          <DateField id="data-pagamento" label="Data" value={paidAt} max={today} onChange={setPaidAt} error={errors.paidAt} />
+          <DateField id="data-pagamento" label="Data do pagamento" value={paidAt} max={today} onChange={setPaidAt} error={errors.paidAt} />
           <div className="cl-field">
             <label htmlFor="obs-pagamento" className="cl-field__label">Observação (opcional)</label>
             <input autoComplete="off" id="obs-pagamento" className="cl-input" maxLength={120} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ex.: pago na loja" />
           </div>
         </div>
+        {!errors.paidAt && paidAt && paidAt <= today && paidAt.slice(0, 7) !== today.slice(0, 7) && (
+          <Alert variant="warning" data-testid="aviso-outro-mes">Este pagamento vai contar em {new Intl.DateTimeFormat('pt-BR', { month: 'long', year: 'numeric' }).format(new Date(`${paidAt}T12:00:00`))}, não neste mês. No Financeiro, ele aparece no período dessa data.</Alert>
+        )}
         {general && <Alert variant="error">{general}</Alert>}
       </div>
     </ConfirmDialog>
@@ -306,7 +312,7 @@ export function DeliverDialog({ order, onCancel, onDone }: { order: Order; onCan
             {paid === true && (
               <>
                 <MethodPills value={method} onChange={setMethod} name="forma-entrega" />
-                {errors.method && <p className="field__error">{errors.method}</p>}
+                {errors.method && !method && <p className="field__error">{errors.method}</p>}
               </>
             )}
             {paid === false && (
@@ -351,7 +357,7 @@ export function CancelOrderDialog({ order, onCancel, onDone }: { order: Order; o
     <ConfirmDialog open title="Cancelar este pedido?" confirmLabel="Cancelar pedido" cancelLabel="Voltar" variant="danger" loading={busy} loadingText="Cancelando…"
       confirmDisabled={reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
-        <p>Pedido cancelado não volta. Ele continua no histórico.</p>
+        <p>Pedido cancelado não volta. Ele continua no histórico, e o orçamento #{order.quote.number} fica como <strong>Recusado</strong>.</p>
         {order.paidCents > 0 && (
           <Alert variant="warning">Este pedido já recebeu {formatMoney(order.paidCents)}. Os pagamentos continuam registrados; a devolução do dinheiro, se houver, é feita fora do sistema.</Alert>
         )}
@@ -366,12 +372,15 @@ export function CancelOrderDialog({ order, onCancel, onDone }: { order: Order; o
 }
 
 // ---------- HU23: estornar (ADMIN/MANAGER) ----------
-export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { order: Order; payment: Payment; onCancel: () => void; onDone: Done }) {
+export function ReversePaymentDialog({ order, payment, onCancel, onDone, onRefundInstead }: { order: Order; payment: Payment; onCancel: () => void; onDone: Done; onRefundInstead: () => void }) {
   const [reason, setReason] = useState('')
+  const [cause, setCause] = useState<'MISTAKE' | 'RETURNED'>('MISTAKE')
+  const returned = cause === 'RETURNED'
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function submit() {
+    if (returned) { onRefundInstead(); return }
     if (reason.trim().length < 3 || busy) return
     setBusy(true)
     setError(null)
@@ -386,15 +395,124 @@ export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { ord
   }
 
   return (
-    <ConfirmDialog open title="Estornar pagamento?" confirmLabel="Estornar" variant="danger" loading={busy} loadingText="Estornando…"
-      confirmDisabled={reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
+    <ConfirmDialog open title="Estornar pagamento?" confirmLabel={returned ? 'Continuar para devolução' : 'Estornar'} variant="danger" loading={busy} loadingText="Estornando…"
+      confirmDisabled={!returned && reason.trim().length < 3} onCancel={onCancel} onConfirm={() => void submit()}>
       <div className="oc-dialog-fields">
         <p><strong>{formatMoney(payment.amountCents)}</strong> · {METHOD_LABEL[payment.method]} · {formatDay(payment.paidAt)}</p>
-        <p className="oc-small cl-muted">O pagamento não é apagado: fica riscado no histórico, e o valor volta para "falta receber".</p>
+        <fieldset className="pd-reverse-causes">
+          <legend className="cl-field__label">O que aconteceu?</legend>
+          <label className="pd-choice">
+            <input type="radio" name="motivo-estorno" checked={!returned} onChange={() => setCause('MISTAKE')} data-testid="estorno-engano" />
+            <b>Lancei errado</b>
+            <span>Valor errado, pedido errado ou o dinheiro não entrou. O valor volta para "falta receber".</span>
+          </label>
+          <label className="pd-choice">
+            <input type="radio" name="motivo-estorno" checked={returned} onChange={() => setCause('RETURNED')} data-testid="estorno-devolveu" />
+            <b>Devolvi o dinheiro ao cliente</b>
+            <span>O cliente não gostou ou desistiu. Registra uma devolução, e você escolhe se ainda cobra o restante.</span>
+          </label>
+        </fieldset>
+        {!returned && (
+          <label className="cl-field">
+            <span className="cl-field__label">Motivo</span>
+            <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: lançado no pedido errado" data-testid="motivo-estorno" />
+            <span className="cl-field__hint">O pagamento fica riscado no pedido, com este motivo.</span>
+          </label>
+        )}
+        {error && <Alert variant="error">{error}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+// Devolução: dinheiro que voltou para o cliente. O saldo a receber não muda.
+export function RefundDialog({ order, from, onCancel, onDone }: { order: Order; from?: Payment; onCancel: () => void; onDone: Done }) {
+  const today = todayIso()
+  const available = order.paidCents - order.refundedCents
+  // Vindo do estorno de um pagamento, já começa com o valor e a forma dele
+  const [amount, setAmount] = useState(from ? maskMoneyInput(String(Math.min(from.amountCents, available))) : '')
+  const [method, setMethod] = useState<PaymentMethod | null>(from?.method ?? null)
+  const [date, setDate] = useState(today)
+  const [reason, setReason] = useState('')
+  const [waive, setWaive] = useState(Boolean(from)) // o cliente desistiu: normalmente não se cobra mais
+  const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [general, setGeneral] = useState<string | null>(null)
+  const [idempotencyKey] = useState(() => crypto.randomUUID())
+  const cents = parseDecimalToHundredths(amount) ?? 0
+
+  async function submit() {
+    const e: Record<string, string> = {}
+    if (cents <= 0) e.amountCents = 'Informe um valor maior que R$ 0,00.'
+    else if (cents > available) e.amountCents = `O valor não pode ser maior que o recebido (${formatMoney(available)}).`
+    if (!method) e.method = 'Escolha a forma da devolução.'
+    if (!date) e.refundedAt = 'Informe a data.'
+    else if (date > today) e.refundedAt = 'A data da devolução não pode ser no futuro.'
+    if (reason.trim().length < 3) e.reason = 'Conte o motivo da devolução.'
+    setErrors(e)
+    setGeneral(null)
+    if (Object.keys(e).length || busy || !method) return
+    setBusy(true)
+    try {
+      onDone(await addRefund(order.id, { amountCents: cents, method, refundedAt: date, reason, waiveRemaining: waive && order.remainingCents > 0 }, idempotencyKey), `Devolução de ${formatMoney(cents)} registrada.${waive && order.remainingCents > 0 ? ' O restante não será cobrado.' : ''}`)
+    } catch (err) {
+      const r = readError(err)
+      setErrors(r.fields)
+      setGeneral(r.general)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title="Devolver ao cliente" confirmLabel={cents > 0 ? `Devolver ${formatMoney(cents)}` : 'Devolver'} variant="danger" loading={busy} loadingText="Registrando…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">Pedido #{order.number} · {order.customer.name}</p>
+        <p className="oc-small cl-muted">Use quando o dinheiro voltou para o cliente, como num abatimento por defeito. O cliente não fica devendo o valor devolvido. Se o pagamento foi lançado errado, use "Estornar".</p>
+        <div className="pd-sum pd-sum--one"><div className="pd-sum__row"><span>Pode devolver até</span><strong>{formatMoney(available)}</strong></div></div>
+        <MoneyField id="valor-devolucao" label="Valor devolvido" value={amount} onChange={setAmount} error={errors.amountCents} />
+        <button type="button" className="zv-btn zv-btn--full" onClick={() => setAmount(maskMoneyInput(String(available)))} data-testid="devolver-tudo">Devolver tudo ({formatMoney(available)})</button>
+        <MethodPills value={method} onChange={setMethod} name="forma-devolucao" />
+        {errors.method && !method && <p className="field__error">{errors.method}</p>}
+        <DateField id="data-devolucao" label="Data da devolução" value={date} max={today} onChange={setDate} error={errors.refundedAt} />
         <label className="cl-field">
           <span className="cl-field__label">Motivo</span>
-          <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Ex.: lançado no pedido errado" />
+          <textarea autoComplete="off" className="cl-input cl-textarea" rows={2} maxLength={200} value={reason} onChange={(ev) => setReason(ev.target.value)} placeholder="Ex.: acabamento com defeito" data-testid="motivo-devolucao" />
+          {errors.reason && <span className="field__error">{errors.reason}</span>}
         </label>
+        {order.remainingCents > 0 && (
+          <label className="pd-waive">
+            <input type="checkbox" checked={waive} onChange={(ev) => setWaive(ev.target.checked)} data-testid="nao-cobrar-restante" />
+            <span><b>Não cobrar o restante de {formatMoney(order.remainingCents)}</b><small>O cliente não vai pagar mais nada. O pedido sai de "Falta receber" e das cobranças.</small></span>
+          </label>
+        )}
+        {general && <Alert variant="error">{general}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+export function CancelRefundDialog({ order, refund, onCancel, onDone }: { order: Order; refund: OrderRefund; onCancel: () => void; onDone: Done }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    setError(null)
+    try {
+      onDone(await cancelRefund(order.id, refund.id), 'Devolução desfeita.')
+    } catch (err) {
+      const r = readError(err)
+      setError(r.general ?? Object.values(r.fields)[0] ?? NETWORK)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title="Desfazer devolução?" confirmLabel="Desfazer" variant="danger" loading={busy} loadingText="Desfazendo…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p><strong>{formatMoney(refund.amountCents)}</strong> · {METHOD_LABEL[refund.method]} · {formatDay(refund.refundedAt)}</p>
+        <p className="oc-small cl-muted">Use só se foi lançada por engano. Ela fica riscada no pedido{refund.waivedCents > 0 ? `, e os ${formatMoney(refund.waivedCents)} que não seriam cobrados voltam para "falta receber"` : ''}.</p>
         {error && <Alert variant="error">{error}</Alert>}
       </div>
     </ConfirmDialog>
@@ -403,12 +521,13 @@ export function ReversePaymentDialog({ order, payment, onCancel, onDone }: { ord
 
 // ---------- HU24: cobrar pelo WhatsApp ----------
 export function CollectDialog({ target, onCancel, onDone }: { target: CollectTarget; onCancel: () => void; onDone: Done }) {
-  const [phone, setPhone] = useState(maskPhone(target.customerWhatsapp ?? ''))
+  // Número já preenchido com o WhatsApp ATUAL do cliente (a cobrança só sabe o pedido: busca o cliente dele)
+  const { phone, setPhone, registered } = useCustomerWhatsapp(() => getOrder(target.id).then((o) => o.customer.id), target.customerWhatsapp)
   const [message, setMessage] = useState(collectionMessage(target))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const digits = onlyDigits(phone)
-  const invalid = digits.length !== 11
+  const invalid = digits.length !== 10 && digits.length !== 11
 
   function send() {
     if (invalid || busy) return
@@ -427,18 +546,125 @@ export function CollectDialog({ target, onCancel, onDone }: { target: CollectTar
     <ConfirmDialog open title={`Cobrar ${target.customerName.split(' ')[0]}`} confirmLabel="Abrir WhatsApp" loading={busy} loadingText="Abrindo…"
       confirmDisabled={invalid || message.trim() === ''} onCancel={onCancel} onConfirm={send}>
       <div className="oc-dialog-fields">
-        <label className="cl-field">
+        <NoAutofill><label className="cl-field">
           <span className="cl-field__label">WhatsApp</span>
-          <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} placeholder="(00) 00000-0000" aria-invalid={phone && invalid ? true : undefined} />
-        </label>
-        {!target.customerWhatsapp && <p className="oc-small cl-muted">O cliente não tem WhatsApp cadastrado. Digite o número para esta cobrança.</p>}
+          <input autoComplete="off" className="cl-input" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(00) 00000-0000" aria-invalid={phone && invalid ? true : undefined} />
+        </label></NoAutofill>
+        {!registered && <p className="oc-small cl-muted">O cliente não tem celular cadastrado. Digite o número para esta cobrança.</p>}
         <label className="cl-field">
           <span className="cl-field__label">Mensagem (pode editar)</span>
           <textarea autoComplete="off" className="cl-input cl-textarea" rows={5} value={message} onChange={(e) => setMessage(e.target.value)} data-testid="mensagem-cobranca" />
         </label>
-        <p className="oc-note">O WhatsApp abre com a mensagem pronta. <strong>Você revisa e aperta enviar</strong>; o ZBOX não envia sozinho. Fica registrado "Cobrado em" no pedido.</p>
+        <p className="oc-note">O WhatsApp abre com a mensagem pronta. <strong>Você revisa e aperta enviar</strong>; o sistema não envia sozinho. Fica registrado "Cobrado em" no pedido.</p>
         {error && <Alert variant="error">{error}</Alert>}
       </div>
+    </ConfirmDialog>
+  )
+}
+
+// ---------- HU27: lançar / corrigir gasto do serviço ----------
+export function ExpenseDialog({ order, expense, onCancel, onDone }: { order: Order; expense: OrderExpense | null; onCancel: () => void; onDone: (order: Order) => void }) {
+  const today = todayIso()
+  // Regra do cliente (11/10): só se lança MATERIAL. A mão de obra é o que sobra (calculada sozinha).
+  // Gasto antigo do tipo "mão de obra" continua com o tipo dele ao ser corrigido.
+  const type: ExpenseType = expense?.type ?? 'MATERIAL'
+  const [amount, setAmount] = useState(expense ? maskMoneyInput(String(expense.amountCents)) : '')
+  const [date, setDate] = useState(expense?.date ?? today)
+  const [busy, setBusy] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [general, setGeneral] = useState<string | null>(null)
+  const amountCents = parseDecimalToHundredths(amount) ?? 0
+
+  async function submit() {
+    const e: Record<string, string> = {}
+    if (amountCents <= 0) e.amountCents = 'Informe um valor maior que zero.'
+    if (!date) e.date = 'Informe a data do gasto.'
+    else if (date > today) e.date = 'A data do gasto não pode ser no futuro.'
+    setErrors(e)
+    setGeneral(null)
+    if (Object.keys(e).length || busy) return
+    setBusy(true)
+    try {
+      const body = { type, description: expense?.description ?? null, amountCents, date }
+      onDone(expense ? await updateExpense(order.id, expense.id, body) : await addExpense(order.id, body))
+    } catch (err) {
+      const r = readError(err)
+      setErrors(r.fields)
+      setGeneral(r.general)
+      setBusy(false)
+    }
+  }
+
+  return (
+    <ConfirmDialog open title={expense ? `Corrigir ${type === 'MATERIAL' ? 'material' : 'gasto'}` : 'Lançar material'} confirmLabel={expense ? 'Salvar' : 'Lançar material'} loading={busy} loadingText="Salvando…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">Pedido #{order.number} · {order.customer.name}</p>
+        <p className="oc-small cl-muted">
+          {type === 'MATERIAL'
+            ? 'Quanto gastou de material (alumínio, vidro, ferragens…). O que sobrar do valor do serviço é a sua mão de obra. Isto é o que você gastou: não muda o que o cliente deve.'
+            : 'Gasto antigo, lançado antes como mão de obra. Ele desconta do que sobra para você.'}
+        </p>
+        <div className="pd-grid-2">
+          <MoneyField id="gasto-valor" label="Valor" value={amount} onChange={setAmount} error={errors.amountCents} />
+          <DateField id="gasto-data" label="Data" value={date} max={today} onChange={setDate} error={errors.date} />
+        </div>
+        {general && <Alert variant="error">{general}</Alert>}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+// Financeiro → Gastos e lucro: "Editar gastos" de um serviço sem sair da tela.
+// Lista os gastos do pedido; cada um abre a mesma janela de corrigir/excluir do pedido.
+export function ExpensesListDialog({ order, onCancel, onEdit, onDelete }: {
+  order: Order; onCancel: () => void; onEdit: (e: OrderExpense) => void; onDelete: (e: OrderExpense) => void
+}) {
+  const expenses = [...(order.expenses ?? [])].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id)
+  return (
+    <ConfirmDialog open title={`Gastos do pedido #${order.number}`} confirmLabel="Fechar" hideCancel onCancel={onCancel} onConfirm={onCancel}>
+      <div className="oc-dialog-fields">
+        <p className="pd-lead">{order.customer.name} · serviço de <strong>{formatMoney(order.totalCents)}</strong></p>
+        {expenses.length === 0 ? (
+          <p className="oc-small cl-muted">Nenhum gasto lançado ainda.</p>
+        ) : (
+          <ul className="pd-payments pd-expenses" data-testid="lista-gastos-financeiro">
+            {expenses.map((e) => (
+              <li key={e.id}>
+                <span className="pd-payments__main">
+                  <span className="pd-payments__value">{formatMoney(e.amountCents)}</span>
+                  <span className="cl-muted oc-small"><i className={`pd-dot ${e.type === 'MATERIAL' ? 'is-material' : 'is-labor'}`} />{EXPENSE_TYPE_LABEL[e.type]} · {formatDay(e.date)}</span>
+                </span>
+                <span className="pd-payments__side">
+                  <button type="button" className="btn btn--secondary pd-expense-btn" onClick={() => onEdit(e)} aria-label={`Corrigir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="edit" size={24} />Corrigir</button>
+                  <button type="button" className="btn btn--secondary pd-expense-btn pd-expense-btn--danger" onClick={() => onDelete(e)} aria-label={`Excluir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="trash" size={24} />Excluir</button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </ConfirmDialog>
+  )
+}
+
+export function DeleteExpenseDialog({ order, expense, onCancel, onDone }: { order: Order; expense: OrderExpense; onCancel: () => void; onDone: (order: Order) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function submit() {
+    if (busy) return
+    setBusy(true)
+    try {
+      onDone(await deleteExpense(order.id, expense.id))
+    } catch (e) {
+      setError(readError(e).general ?? NETWORK)
+      setBusy(false)
+    }
+  }
+  return (
+    <ConfirmDialog open title="Excluir gasto?" confirmLabel="Excluir" variant="danger" loading={busy} loadingText="Excluindo…" onCancel={onCancel} onConfirm={() => void submit()}>
+      <p>{EXPENSE_TYPE_LABEL[expense.type]} · <strong>{formatMoney(expense.amountCents)}</strong> ({formatDay(expense.date)})</p>
+      <p className="oc-small cl-muted">Fica registrado quem excluiu e quando.</p>
+      {error && <Alert variant="error">{error}</Alert>}
     </ConfirmDialog>
   )
 }

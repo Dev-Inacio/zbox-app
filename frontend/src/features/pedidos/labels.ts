@@ -11,10 +11,10 @@ export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
 }
 
 export const PAYMENT_STATUS_LABEL: Record<PaymentStatus, string> = {
-  UNPAID: 'Não pago',
-  PARTIAL: 'Parcial',
+  UNPAID: 'Não pagou',
+  PARTIAL: 'Pagou uma parte',
   PAID: 'Pago',
-  OVERDUE: 'Pagamento atrasado',
+  OVERDUE: 'Atrasado',
 }
 
 export const METHOD_LABEL: Record<PaymentMethod, string> = {
@@ -40,4 +40,9 @@ export const NEXT_STEP: Partial<Record<OrderStatus, { to: OrderStatus; label: st
 export const PREVIOUS_STEP: Partial<Record<OrderStatus, OrderStatus>> = {
   IN_PRODUCTION: 'NEW',
   READY: 'IN_PRODUCTION',
+}
+
+export const EXPENSE_TYPE_LABEL: Record<'MATERIAL' | 'LABOR', string> = {
+  MATERIAL: 'Material',
+  LABOR: 'Outros gastos', // tipo antigo: hoje a mão de obra é o que sobra, não é lançada
 }

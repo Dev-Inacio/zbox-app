@@ -110,3 +110,9 @@
   .logo__name { animation: none; background-position: 50% 0; }
   .logo--lg .logo__mark { animation: none; }
 }
+
+/* v3 · logo oficial em imagem */
+.logo-img { display: block; width: auto; }
+.logo-img--md { height: 72px; }
+.logo-img--lg { height: 200px; }
+@media (max-width: 767px) { .logo-img--lg { height: 140px; } }

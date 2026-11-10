@@ -15,6 +15,7 @@ type ConfirmDialogProps = {
   children: ReactNode
   confirmLabel: string
   cancelLabel?: string
+  hideCancel?: boolean // janela só de leitura: fica só o botão principal
   variant?: 'primary' | 'danger'
   loading?: boolean
   loadingText?: string
@@ -24,7 +25,7 @@ type ConfirmDialogProps = {
 }
 
 export function ConfirmDialog({
-  open, title, children, confirmLabel, cancelLabel = 'Cancelar',
+  open, title, children, confirmLabel, cancelLabel = 'Cancelar', hideCancel = false,
   variant = 'primary', loading = false, loadingText, confirmDisabled = false, onConfirm, onCancel,
 }: ConfirmDialogProps) {
   const ref = useRef<HTMLDialogElement>(null)
@@ -52,9 +53,11 @@ export function ConfirmDialog({
       <h2 id={titleId} className="confirm-dialog__title">{title}</h2>
       <div className="confirm-dialog__body">{children}</div>
       <div className="confirm-dialog__actions">
+        {!hideCancel && (
         <Button className="btn--secondary" onClick={onCancel} disabled={loading}>
           {cancelLabel}
         </Button>
+        )}
         <Button
           className={variant === 'danger' ? 'btn--danger' : ''}
           onClick={onConfirm}

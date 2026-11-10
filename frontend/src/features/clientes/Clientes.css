@@ -180,13 +180,14 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
 
 .cl-search__icon {
   position: absolute;
-  left: 14px;
-  top: 14px;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%); /* ícone 3D de 24 px centralizado no campo */
   color: var(--color-text-muted);
   pointer-events: none;
 }
 
-.cl-search__input { padding-left: 44px; }
+.cl-search__input { padding-left: 50px; }
 
 /* ---------- Lista: tabela ---------- */
 .cl-table {
@@ -505,27 +506,6 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
 .cl-inactive-banner__text { flex: 1; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
 .cl-inactive-banner__text strong { font-size: 15px; }
 
-.cl-summary {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
-}
-
-.cl-summary li {
-  padding: 18px;
-  border-radius: 16px;
-  background: #F7F6F3;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.cl-summary__label { font-size: 14px; color: var(--color-text-muted); }
-.cl-summary__value { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1; }
-
 .cl-dl { margin: 0; display: flex; flex-direction: column; gap: 14px; }
 .cl-dl dt { font-size: 13px; color: var(--color-text-muted); }
 .cl-dl dd { margin: 2px 0 0; font-weight: 600; font-variant-numeric: tabular-nums; }
@@ -556,27 +536,6 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
   box-shadow: inset 0 -3px 0 var(--color-accent);
 }
 
-/* Histórico */
-.cl-history { margin: 0; padding: 0; list-style: none; }
-
-.cl-history__item {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto;
-  gap: 14px;
-  padding: 12px 0;
-  border-top: 1px solid #ECEBE7;
-}
-
-.cl-history__item:first-child { border-top: 0; padding-top: 0; }
-
-.cl-history__dot { width: 10px; height: 10px; margin-top: 6px; border-radius: 50%; background: #9AA0A6; }
-.cl-history__dot--latest { background: var(--color-accent); }
-.cl-history__text { display: flex; flex-direction: column; gap: 2px; }
-.cl-history__title { font-weight: 600; }
-.cl-history__by,
-.cl-history__when { font-size: 14px; color: var(--color-text-muted); }
-.cl-history__when { font-size: 13px; white-space: nowrap; }
-
 @media (prefers-reduced-motion: reduce) {
   .cl-skeleton__row span,
   .cl-cep__spinner { animation: none; }
@@ -587,9 +546,9 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
   .cl-filters { grid-template-columns: 1fr 1fr; }
   .cl-filters__search { grid-column: 1 / -1; }
 
-  .cl-form__section { grid-template-columns: 1fr; gap: 16px; }
+  .cl-form__section { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 
-  .cl-detail__grid { grid-template-columns: 1fr; }
+  .cl-detail__grid { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* ---------- Celular ---------- */
@@ -633,7 +592,6 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
   .cl-table__name a::after { content: ''; position: absolute; inset: 0; border-radius: 16px; }
   .cl-table__go { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 
-
   .cl-form__alert { padding: 16px 16px 0; }
   .cl-form__section { padding: 20px 16px; }
   .cl-form__fields--2,
@@ -644,19 +602,107 @@ button.cl-hero-btn { background: transparent; font-family: var(--font-body); cur
   .cl-form__footer { padding: 16px; flex-direction: column-reverse; }
   .cl-form__footer .btn { width: 100%; }
 
-  .cl-summary { gap: 8px; }
-  .cl-summary li { padding: 12px; }
-  .cl-summary__value { font-size: 22px; }
 
   .cl-inactive-banner { flex-wrap: wrap; }
   .cl-inactive-banner .btn { width: 100%; }
-
-  .cl-history__item { grid-template-columns: 20px minmax(0, 1fr); }
-  .cl-history__when { grid-column: 2; }
 }
 
 /* Aba "Pagamentos" do detalhe do cliente */
-.cl-pay-list { margin: 0; padding: 0; list-style: none; }
-.cl-pay-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 0; border-top: 1px solid #ECEBE7; font-variant-numeric: tabular-nums; }
-.cl-pay-list li:first-child { border-top: 0; }
-.cl-pay-list a { font-weight: 600; min-height: 44px; display: inline-flex; align-items: center; }
+
+/* Selo Ativo/Inativo com ícone (18 px) */
+.cl-badge { display: inline-flex; align-items: center; gap: 6px; padding-left: 4px; }
+
+/* Menu "…" do cabeçalho do cliente (design 31/10) */
+.cl-more { position: relative; }
+.cl-more__btn { padding-inline: 12px; }
+.cl-more__menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 20; min-width: 230px; padding: 6px; background: #FFFFFF; border: 1px solid #DCDDDF; border-radius: 12px; box-shadow: 0 12px 32px rgba(27, 31, 35, 0.18); }
+.cl-more__menu button { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: #9B1C1C; font: inherit; font-weight: 600; cursor: pointer; text-align: left; }
+.cl-more__menu button:hover, .cl-more__menu button:focus-visible { background: #FDECEA; }
+
+/* Resumo do cliente: quadros que abrem a aba certa (design 31/10) */
+.cl-stats { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.cl-stats > li { display: flex; min-width: 0; }
+
+/* Abas do cliente: cada linha é um bloco */
+.cl-tabs + [role='tabpanel'] { margin-top: 14px; }
+.cl-move { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.cl-move__text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.cl-move__title { font-weight: 700; color: var(--color-ink); text-decoration: none; }
+a.cl-move__title:hover { color: var(--color-accent); text-decoration: underline; }
+.cl-move__detail { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; font-size: 14px; color: var(--color-text-muted); }
+.cl-move__money { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-variant-numeric: tabular-nums; }
+.cl-move__money > span { font-size: 13px; color: var(--color-text-muted); }
+.cl-move__money.is-in strong { color: #1E5A35; }
+
+@media (max-width: 760px) {
+  .cl-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .cl-stats > li:last-child { grid-column: 1 / -1; }
+  .cl-move { flex-wrap: wrap; gap: 8px; }
+  .cl-move__text { flex-basis: 100%; }
+  .cl-move__money { flex-direction: row; align-items: baseline; gap: 8px; }
+}
+
+.cl-stats .zb-stat__value { font-size: 26px; overflow-wrap: anywhere; }
+.cl-move__detail a { color: inherit; font-weight: 600; text-decoration: none; }
+.cl-move__detail a:hover { color: var(--color-accent); text-decoration: underline; }
+@media (max-width: 640px) {
+  .cl-tabs { gap: 0; }
+  .cl-tabs__tab { padding: 0 4px; font-size: 14px; }
+}
+
+/* Celular bem estreito: as abas descem de linha em vez de cortar */
+@media (max-width: 400px) {
+  .cl-tabs { flex-wrap: wrap; overflow-x: visible; }
+}
+
+@media (max-width: 767px) {
+  .cl-move__title { display: inline-block; padding-block: 10px; margin-block: -10px; }
+  .cl-move__detail a { display: inline-block; padding-block: 12px; margin-block: -12px; }
+}
+
+/* Lista de clientes no celular (design 31/10): filtros num quadro e cada cliente num cartão branco */
+@media (max-width: 767px) {
+  .cl-customers { padding: 0; background: transparent; border: 0; box-shadow: none; }
+  .cl-customers .cl-card__header { display: none; }
+  .cl-customers .cl-filters { padding: 14px; background: #FFFFFF; border: 1px solid #DCDDDF; border-radius: 20px; box-shadow: 0 12px 32px rgba(27, 31, 35, 0.08); }
+  .cl-customers .cl-filters__search .cl-field__label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .cl-customers .cl-table tbody tr { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 14px; background: #FFFFFF; }
+  .cl-customers .cl-table tbody tr.is-inactive { background: #FAFAF8; }
+  .cl-customers .cl-table__name { flex: 1 1 60%; min-width: 0; }
+  .cl-customers .cl-table__type { order: 1; }
+  .cl-customers .cl-table__status { order: 2; }
+  .cl-customers .cl-table__contact { order: 3; flex: 0 1 auto; }
+  .cl-customers .cl-table__city { order: 4; flex: 0 1 auto; }
+  .cl-customers .cl-table__contact + .cl-table__city::before { content: '· '; }
+  .cl-customers .cl-table__contact { flex-basis: auto; }
+  .cl-customers .cl-table__status + * { flex-basis: auto; }
+  .cl-customers .cl-table__go { display: none; }
+  /* Quebra: nome e selos na 1ª linha; celular e cidade na 2ª */
+  .cl-customers .cl-table tbody tr::after { content: ''; order: 2; flex-basis: 100%; height: 0; }
+}
+
+@media (max-width: 480px) {
+  .cl-stats { grid-template-columns: minmax(0, 1fr); }
+  /* Três abas iguais numa linha só: nome em cima, contador embaixo */
+  .cl-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow-x: visible; }
+  .cl-tabs__tab { height: auto; min-height: 60px; padding: 6px 2px 8px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13.5px; }
+}
+
+/* Formulário no celular: todo campo ocupa a linha inteira */
+@media (max-width: 767px) {
+  .cl-form__section .field, .cl-form__section .cl-field, .cl-form__section .field__input { width: 100%; max-width: none; }
+  .cl-form__fields { grid-template-columns: minmax(0, 1fr); }
+  .cl-form__fields > * { grid-column: 1 / -1; min-width: 0; }
+}
+
+
+/* v3: botões do topo em fundo claro */
+.cl-hero-btn { border-color: var(--color-border); background: var(--color-surface); color: var(--color-ink); }
+button.cl-hero-btn { background: var(--color-surface); }
+.cl-hero-btn:hover:not(:disabled) { border-color: var(--color-accent); background: var(--wine-soft); color: var(--color-accent); }
+
+.cl-card.cl-card--elevated { box-shadow: var(--shadow-card); }
+
+@media (min-width: 768px) {
+  .cl-table thead th { font-size: 15px; font-weight: 700; letter-spacing: 0; text-transform: none; }
+}

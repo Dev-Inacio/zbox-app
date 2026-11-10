@@ -1,24 +1,33 @@
 import { useCallback, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { CircleCheck, Info, Plus, Zap } from 'lucide-react'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { PageHero } from '../../components/layout/PageHero'
+import { AppIcon } from '../../components/ui/AppIcon'
 import { Alert } from '../../components/ui/Alert'
 import { Button } from '../../components/ui/Button'
+import { CustomerCard } from '../../components/zbox/CustomerCard'
+import { PagedList } from '../../components/ui/PagedList'
 import { ConfirmDialog } from '../../components/ui/ConfirmDialog'
 import { Toast } from '../../components/ui/Toast'
+import { ItemsCard } from '../../components/zbox'
 import { useFlashMessage } from '../../hooks/useFlashMessage'
 import { useRequest } from '../../hooks/useRequest'
+import { INVOICE_ENABLED, InvoiceCard, InvoiceDialog, InvoiceFileDialog, InvoiceTag } from './Invoice'
 import { useAuth } from '../auth/useAuth'
 import { ApiError } from '../auth/types'
-import { formatDateTime, maskPhone, whatsappLink } from '../clientes/format'
+import { customerMobile, formatDateTime } from '../clientes/format'
 import { CardSkeleton, CustomerLoadError } from '../clientes/CustomerLoadStates'
-import { formatAreaM2, formatMeters, formatMoney } from '../orcamentos/money'
+import { discountLabel, toItemView } from '../orcamentos/itemView'
+import { formatMoney } from '../orcamentos/money'
 import { formatDay, formatDayShort, isoDateTimeToDay, sinceText } from './dates'
-import { METHOD_LABEL, NEXT_STEP, ORDER_STATUS_LABEL, ORDER_STEPS, PREVIOUS_STEP } from './labels'
-import { AlertIcon, OrderStatusBadge, PaymentStatusBadge } from './OrderBadges'
-import { CancelOrderDialog, CollectDialog, DeliverDialog, PaymentDialog, ReversePaymentDialog } from './OrderDialogs'
-import { canReversePayment } from './permissions'
+import { EXPENSE_TYPE_LABEL, METHOD_LABEL, NEXT_STEP, ORDER_STATUS_LABEL, ORDER_STEPS, PREVIOUS_STEP } from './labels'
+import { OrderStatusBadge, PaymentStatusBadge } from './OrderBadges'
+import { CancelOrderDialog, CancelRefundDialog, CollectDialog, DeleteExpenseDialog, DeliverDialog, ExpenseDialog, PaymentDialog, RefundDialog, ReversePaymentDialog } from './OrderDialogs'
+import { canReversePayment, canEditInvoice, canSeeProfit } from './permissions'
+import { formatPercentBR, LABOR_GOOD_PERCENT, LABOR_MIN_PERCENT, profitView } from './profitHealth'
+import type { HealthResult, ProfitHealth } from './profitHealth'
 import { changeOrderStatus, getOrder } from './ordersApi'
-import type { Order, OrderEvent, OrderStatus, Payment } from './types'
+import type { Order, OrderEvent, OrderExpense, OrderRefund, OrderStatus, Payment } from './types'
 import '../../components/ui/ButtonVariants.css'
 import '../clientes/Clientes.css'
 import '../orcamentos/Orcamentos.css'
@@ -27,7 +36,7 @@ import './Pedidos.css'
 // HU21 (andamento), HU22 (entregar), HU23 (pagamentos), HU24 (cobrar).
 // Regra de ouro: andamento e pagamento são coisas separadas. Entregar não é receber.
 
-type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | { reverse: Payment } | null
+type DialogKind = 'pay' | 'deliver' | 'cancel' | 'collect' | 'back' | 'expense' | 'invoice' | 'invoiceView' | 'refund' | { refundFrom: Payment } | { cancelRefund: OrderRefund } | { reverse: Payment } | { editExpense: OrderExpense } | { deleteExpense: OrderExpense } | null
 
 export function OrderDetailPage() {
   const { id } = useParams()
@@ -35,6 +44,7 @@ export function OrderDetailPage() {
 }
 
 function OrderDetail({ id }: { id: number }) {
+  const flash = (useLocation().state as { flash?: string } | null)?.flash ?? null
   const { user } = useAuth()
   const [attempt, setAttempt] = useState(0)
   const fetcher = useCallback(() => getOrder(id), [id])
@@ -84,21 +94,25 @@ function OrderDetail({ id }: { id: number }) {
 
   const active = order.status === 'NEW' || order.status === 'IN_PRODUCTION' || order.status === 'READY'
   const canCharge = order.status !== 'CANCELED' && order.remainingCents > 0
-  const collectTarget = { id: order.id, number: order.number, customerName: order.customer.name, customerWhatsapp: order.customer.whatsapp, remainingCents: order.remainingCents, deliveredOn: order.deliveredOn }
+  const collectTarget = { id: order.id, number: order.number, customerName: order.customer.name, customerWhatsapp: customerMobile(order.customer), remainingCents: order.remainingCents, deliveredOn: order.deliveredOn }
 
   return (
     <>
       <PageHero
-        title={`Pedido #${order.number}`}
+        title={`Pedido nº ${order.number}`}
         back={{ to: '/pedidos', label: 'Voltar para pedidos' }}
-        badge={<span className="pd-badges"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} /></span>}
-        subtitle={<>{order.customer.name} · do orçamento <Link to={`/orcamentos/${order.quote.id}?versao=${order.quote.version}`} className="pd-hero-link">#{order.quote.number} v{order.quote.version}</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</>}
+        badge={<span className="zv-tags"><OrderStatusBadge status={order.status} /><PaymentStatusBadge status={order.paymentStatus} />{order.invoice && <InvoiceTag number={order.invoice.number} />}</span>}
+        subtitle={order.directSale
+          ? <span className="pd-direct"><Zap size={18} strokeWidth={1.8} aria-hidden="true" /><span>{order.customer.name} · <b>Venda direta</b> · sem orçamento enviado · <Link to={`/orcamentos/${order.quote.id}`} className="pd-hero-link">ver orçamento guardado</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</span></span>
+          : <>{order.customer.name} · do orçamento <Link to={`/orcamentos/${order.quote.id}?versao=${order.quote.version}`} className="pd-hero-link">#{order.quote.number} v{order.quote.version}</Link> · criado em {formatDay(isoDateTimeToDay(order.createdAt))}</>}
       />
 
+      {flash && <div role="status" className="pd-flash"><CircleCheck size={24} strokeWidth={1.8} aria-hidden="true" /><span>{flash}</span></div>}
       <main className="page-body oc-layout pd-layout">
         <div className="oc-layout__main">
-          <section className="cl-card cl-card--elevated" aria-label="Andamento do pedido">
-            {order.status !== 'CANCELED' && <Steps status={order.status} />}
+          <section className="zv-card zv-card--steps" aria-labelledby="t-andamento">
+            <h2 id="t-andamento" className="zv-h2">Andamento</h2>
+            {order.status !== 'CANCELED' && <Steps order={order} />}
             <StepPanel order={order} busy={stepBusy}
               onNext={() => {
                 const next = NEXT_STEP[order.status]
@@ -117,53 +131,17 @@ function OrderDetail({ id }: { id: number }) {
             )}
           </section>
 
-          <section className="cl-card" aria-labelledby="t-itens-ped">
-            <h2 id="t-itens-ped" className="cl-card__title">Itens</h2>
-            <table className="oc-items-table">
-              <tbody>
-                {order.items.map((item) => (
-                  <tr key={item.id}>
-                    <td>
-                      <span className="oc-items-table__name">{item.description}</span>
-                      {item.chargeType === 'AREA' && item.widthCm && item.heightCm && (
-                        <span className="cl-muted oc-small">{item.quantity} {item.quantity === 1 ? 'peça' : 'peças'} de {formatMeters(item.widthCm)} × {formatMeters(item.heightCm)} m</span>
-                      )}
-                    </td>
-                    <td className="cl-muted">
-                      {item.chargeType === 'AREA'
-                        ? `${formatAreaM2((item.areaPerPieceCm2 ?? 0) * item.quantity)} m² × ${formatMoney(item.unitPriceCents)}`
-                        : `${item.quantity} ${item.unit ?? 'un'} × ${formatMoney(item.unitPriceCents)}`}
-                    </td>
-                    <td className="oc-num oc-strong">{formatMoney(item.subtotalCents)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="pd-items-total">
-              {order.discountCents > 0 && <><span>Subtotal {formatMoney(order.subtotalCents)}</span><span>Desconto − {formatMoney(order.discountCents)}</span></>}
-              <strong>Total {formatMoney(order.totalCents)}</strong>
-            </div>
-          </section>
+          <ItemsCard items={order.items.map(toItemView)} versionLabel={`Do orçamento nº ${order.quote.number} · ${order.quote.version}ª proposta`} />
 
-          <section className="cl-card" aria-labelledby="t-cliente-ped">
-            <h2 id="t-cliente-ped" className="cl-card__title">Cliente</h2>
-            <div className="pd-customer">
-              <span className="pd-customer__text">
-                <Link to={`/clientes/${order.customer.id}`} className="pd-customer__name">{order.customer.name}</Link>
-                <span className="cl-muted oc-small">{[order.customer.whatsapp ? maskPhone(order.customer.whatsapp) : order.customer.phone ? maskPhone(order.customer.phone) : null, order.customer.addressLine].filter(Boolean).join(' · ') || 'Sem contato cadastrado'}</span>
-              </span>
-              {order.customer.whatsapp && (
-                <a className="btn btn--secondary pd-btn-link" href={whatsappLink(order.customer.whatsapp)} target="_blank" rel="noopener noreferrer"><WhatsIcon />WhatsApp</a>
-              )}
-            </div>
-          </section>
+          <CustomerCard customer={order.customer} />
 
           <section className="cl-card" aria-labelledby="t-hist-ped">
             <h2 id="t-hist-ped" className="cl-card__title">Histórico</h2>
+            <PagedList items={order.events} noun="registros" render={(events) => (
             <ol className="oc-events" data-testid="historico-pedido">
-              {order.events.map((ev) => (
+              {events.map((ev) => (
                 <li key={ev.id} className="oc-event">
-                  <span className={`oc-event__icon pd-ev--${ev.type.toLowerCase()}`} aria-hidden="true">{eventIcon(ev)}</span>
+                  <span className="oc-event__icon" aria-hidden="true">{eventIcon(ev)}</span>
                   <span className="oc-event__text">
                     <span className="oc-event__title">{eventText(ev)}</span>
                     <span className="cl-muted oc-small">por {ev.userName}</span>
@@ -172,12 +150,17 @@ function OrderDetail({ id }: { id: number }) {
                 </li>
               ))}
             </ol>
+            )} />
           </section>
         </div>
 
         <aside className="oc-aside">
           <PaymentCard order={order} canReverse={canReversePayment(user?.role)}
-            onPay={() => setDialog('pay')} onCollect={() => setDialog('collect')} onReverse={(p) => setDialog({ reverse: p })} />
+            onPay={() => setDialog('pay')} onCollect={() => setDialog('collect')} onReverse={(p) => setDialog({ reverse: p })} onRefund={() => setDialog('refund')} onCancelRefund={(r) => setDialog({ cancelRefund: r })} />
+          {INVOICE_ENABLED && <InvoiceCard order={order} canEdit={canEditInvoice(user?.role)} onEdit={() => setDialog('invoice')} onView={() => setDialog('invoiceView')} />}
+          {canSeeProfit(user?.role) && order.profit && order.expenses && (
+            <ProfitCard order={order} onAdd={() => setDialog('expense')} onEdit={(e) => setDialog({ editExpense: e })} onDelete={(e) => setDialog({ deleteExpense: e })} />
+          )}
           {active && <Button className="btn--danger-outline" fullWidth onClick={() => setDialog('cancel')} data-testid="cancelar-pedido">Cancelar pedido</Button>}
         </aside>
       </main>
@@ -192,8 +175,22 @@ function OrderDetail({ id }: { id: number }) {
       )}
       {dialog === 'cancel' && <CancelOrderDialog order={order} onCancel={() => setDialog(null)} onDone={done('Pedido cancelado.')} />}
       {dialog === 'collect' && canCharge && <CollectDialog target={collectTarget} onCancel={() => setDialog(null)} onDone={done('WhatsApp aberto. Confira a mensagem e envie por lá.')} />}
-      {dialog !== null && typeof dialog === 'object' && (
-        <ReversePaymentDialog order={order} payment={dialog.reverse} onCancel={() => setDialog(null)} onDone={done('Pagamento estornado.')} />
+      {dialog === 'invoice' && <InvoiceDialog order={order} onCancel={() => setDialog(null)} onDone={(u, n) => done(`Nota fiscal ${n} anotada no pedido.`)(u)} />}
+      {dialog === 'invoiceView' && <InvoiceFileDialog order={order} onClose={() => setDialog(null)} />}
+      {dialog === 'expense' && <ExpenseDialog order={order} expense={null} onCancel={() => setDialog(null)} onDone={(u) => done('Material lançado.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'editExpense' in dialog && (
+        <ExpenseDialog order={order} expense={dialog.editExpense} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto corrigido.')(u)} />
+      )}
+      {dialog !== null && typeof dialog === 'object' && 'deleteExpense' in dialog && (
+        <DeleteExpenseDialog order={order} expense={dialog.deleteExpense} onCancel={() => setDialog(null)} onDone={(u) => done('Gasto excluído.')(u)} />
+      )}
+      {dialog === 'refund' && <RefundDialog order={order} onCancel={() => setDialog(null)} onDone={(u, message) => done(message ?? 'Devolução registrada.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'refundFrom' in dialog && <RefundDialog order={order} from={dialog.refundFrom} onCancel={() => setDialog(null)} onDone={(u, message) => done(message ?? 'Devolução registrada.')(u)} />}
+      {dialog !== null && typeof dialog === 'object' && 'cancelRefund' in dialog && (
+        <CancelRefundDialog order={order} refund={dialog.cancelRefund} onCancel={() => setDialog(null)} onDone={done('Devolução desfeita.')} />
+      )}
+      {dialog !== null && typeof dialog === 'object' && 'reverse' in dialog && (
+        <ReversePaymentDialog order={order} payment={dialog.reverse} onCancel={() => setDialog(null)} onDone={done('Pagamento estornado.')} onRefundInstead={() => setDialog({ refundFrom: dialog.reverse })} />
       )}
       <ConfirmDialog
         open={dialog === 'back'} title={`Voltar para ${ORDER_STATUS_LABEL[PREVIOUS_STEP[order.status] ?? 'NEW']}?`} confirmLabel="Voltar etapa" loading={stepBusy} loadingText="Salvando…"
@@ -208,21 +205,31 @@ function OrderDetail({ id }: { id: number }) {
 }
 
 // ---------- Etapas ----------
-function Steps({ status }: { status: OrderStatus }) {
+function Steps({ order }: { order: Order }) {
+  const status = order.status
   const current = ORDER_STEPS.indexOf(status)
+  const created = formatDayShort(isoDateTimeToDay(order.createdAt))
   return (
-    <ol className="oc-stepper" aria-label="Etapas do pedido">
+    <ol className="zv-steps" aria-label="Etapas do pedido">
       {ORDER_STEPS.map((s, i) => {
         const state = i < current || status === 'DELIVERED' ? 'done' : i === current ? 'current' : 'todo'
+        const when = s === 'NEW' ? created : s === 'DELIVERED' && order.deliveredOn ? formatDayShort(order.deliveredOn) : null
         return (
-          <li key={s} className={`oc-stepper__step is-${state}`} aria-current={state === 'current' ? 'step' : undefined}>
-            <span className="oc-stepper__bar" />
-            <span className="oc-stepper__label">{state === 'done' ? '✓ ' : ''}{ORDER_STATUS_LABEL[s]}</span>
+          <li key={s} className={`is-${state}`} aria-current={state === 'current' ? 'step' : undefined}>
+            <span className="zv-steps__bar" />
+            <span className="zv-steps__label">{state === 'done' ? '✓ ' : ''}{ORDER_STATUS_LABEL[s]}</span>
+            {when && <span className="zv-steps__when">{when}</span>}
           </li>
         )
       })}
     </ol>
   )
+}
+
+const NEXT_TEXT: Partial<Record<OrderStatus, string>> = {
+  NEW: 'Próximo passo: quando começar a fazer, inicie a produção.',
+  IN_PRODUCTION: 'Próximo passo: quando a produção terminar, marque como pronto.',
+  READY: 'Próximo passo: quando entregar ao cliente, marque como entregue.',
 }
 
 function StepPanel({ order, busy, onNext }: { order: Order; busy: boolean; onNext: () => void }) {
@@ -244,16 +251,10 @@ function StepPanel({ order, busy, onNext }: { order: Order; busy: boolean; onNex
     )
   }
   const next = NEXT_STEP[order.status]!
-  const createdDay = isoDateTimeToDay(order.createdAt)
   return (
-    <div className={`pd-step-panel pd-step-panel--${order.status.toLowerCase()}`}>
-      <div className="oc-panel__text">
-        <h2 className="oc-panel__title">{ORDER_STATUS_LABEL[order.status]}</h2>
-        <p>
-          Pedido feito em <strong>{formatDay(createdDay)}</strong> ({sinceText(createdDay)})
-        </p>
-      </div>
-      <Button onClick={onNext} loading={busy} loadingText="Salvando…" data-testid="proxima-etapa">
+    <div className="zv-next">
+      <span>{NEXT_TEXT[order.status]}</span>
+      <Button className="btn--secondary" onClick={onNext} loading={busy} loadingText="Salvando…" data-testid="proxima-etapa">
         {next.to === 'DELIVERED' ? <TruckIcon /> : next.to === 'IN_PRODUCTION' ? <PlayIcon /> : <CheckIcon />}
         {next.label}
       </Button>
@@ -262,56 +263,179 @@ function StepPanel({ order, busy, onNext }: { order: Order; busy: boolean; onNex
 }
 
 // ---------- Pagamento ----------
-function PaymentCard({ order, canReverse, onPay, onCollect, onReverse }: { order: Order; canReverse: boolean; onPay: () => void; onCollect: () => void; onReverse: (p: Payment) => void }) {
+function PaymentCard({ order, canReverse, onPay, onCollect, onReverse, onRefund, onCancelRefund }: { order: Order; canReverse: boolean; onPay: () => void; onCollect: () => void; onReverse: (p: Payment) => void; onRefund: () => void; onCancelRefund: (r: OrderRefund) => void }) {
   const pct = order.totalCents > 0 ? Math.min(100, Math.round((order.paidCents / order.totalCents) * 100)) : 0
   const overdue = order.paymentStatus === 'OVERDUE'
   const owes = order.remainingCents > 0 && order.status !== 'CANCELED'
   return (
-    <section className={`oc-summary pd-pay${overdue ? ' pd-pay--overdue' : ''}`} aria-labelledby="t-pagamento" data-testid="cartao-pagamento">
-      <h2 id="t-pagamento" className="cl-card__title">Pagamento</h2>
-      <div className="oc-summary__row"><span>Total do pedido</span><span>{formatMoney(order.totalCents)}</span></div>
-      <div className="oc-summary__row"><span>Recebido</span><span className="pd-plus" data-testid="recebido">{formatMoney(order.paidCents)}</span></div>
-      <div className="pd-progress" role="img" aria-label={`${pct}% recebido`}><span style={{ width: `${pct}%` }} /></div>
-      <div className="oc-summary__total">
-        {order.remainingCents > 0 ? (
-          <>
-            <span className={overdue ? 'pd-overdue-label' : 'cl-muted'}>{overdue && <AlertIcon size={14} />}{overdue ? 'Falta receber · pagamento atrasado' : 'Falta receber'}</span>
-            <span className="oc-summary__value" data-testid="falta-receber">{formatMoney(order.remainingCents)}</span>
-          </>
-        ) : (
-          <span className="pd-paid-ok">Tudo recebido.</span>
-        )}
+    <section className="zv-card zv-card--side" aria-labelledby="t-pagamento" data-testid="cartao-pagamento">
+      <div>
+        <h2 id="t-pagamento" className="zv-h2">Pagamento</h2>
+        <div className="zv-card__tag"><PaymentStatusBadge status={order.paymentStatus} /></div>
       </div>
-      {owes && <Button fullWidth onClick={onPay} data-testid="registrar-pagamento"><CashIcon />Registrar pagamento</Button>}
-      {owes && (order.status === 'DELIVERED' || order.paidCents > 0) && (
-        <Button className="btn--secondary" fullWidth onClick={onCollect} data-testid="cobrar"><WhatsIcon />Cobrar pelo WhatsApp</Button>
+      <dl className="zv-sum">
+        {order.discountCents > 0 && <div><dt>Subtotal</dt><dd>{formatMoney(order.subtotalCents)}</dd></div>}
+        {order.discountCents > 0 && <div className="zv-sum__off"><dt>Desconto{discountLabel(order.discountType, order.discountValue) ? ` (${discountLabel(order.discountType, order.discountValue)})` : ''}</dt><dd>− {formatMoney(order.discountCents)}</dd></div>}
+        <div className="zv-sum__total" data-testid="total"><dt>Total do pedido</dt><dd>{formatMoney(order.totalCents)}</dd></div>
+        <div><dt>Já recebido</dt><dd className="zv-sum__in" data-testid="recebido">{formatMoney(order.paidCents)}</dd></div>
+        {order.refundedCents > 0 && <div className="zv-sum__refund"><dt>Devolvido ao cliente</dt><dd data-testid="devolvido">− {formatMoney(order.refundedCents)}</dd></div>}
+        {order.waivedCents > 0 && <div className="zv-sum__refund"><dt>Não será cobrado</dt><dd data-testid="nao-cobrado">− {formatMoney(order.waivedCents)}</dd></div>}
+      </dl>
+      <div className="zv-bar" role="img" aria-label={`${pct}% recebido`}><span style={{ width: `${pct}%` }} /></div>
+      {order.remainingCents > 0 ? (
+        <div className={`zv-left${overdue ? ' is-late' : ''}`}>
+          <span>{overdue ? 'Falta receber · atrasado' : 'Falta receber'}</span>
+          <b data-testid="falta-receber">{formatMoney(order.remainingCents)}</b>
+        </div>
+      ) : (
+        <div className="zv-note zv-note--success"><span><b>{order.waivedCents > 0 || order.refundedCents > 0 ? 'Nada a receber' : 'Tudo recebido'}</b></span></div>
       )}
-      {order.lastCollectionAt && owes && <p className="oc-small cl-muted">Última cobrança: {formatDayShort(isoDateTimeToDay(order.lastCollectionAt))} ({sinceText(isoDateTimeToDay(order.lastCollectionAt))})</p>}
+      {owes && <button type="button" className="zv-btn zv-btn--primary zv-btn--big zv-btn--full" onClick={onPay} data-testid="registrar-pagamento"><CashIcon />Registrar pagamento</button>}
+      {owes && (order.status === 'DELIVERED' || order.paidCents > 0) && (
+        <button type="button" className="zv-btn zv-btn--full" onClick={onCollect} data-testid="cobrar"><WhatsIcon />Cobrar pelo WhatsApp</button>
+      )}
+      {order.lastCollectionAt && owes && <span className="zv-small">Última cobrança: {formatDayShort(isoDateTimeToDay(order.lastCollectionAt))}</span>}
 
-      <div className="pd-pay__list">
-        <span className="pd-overline">Pagamentos</span>
-        {order.payments.length === 0 ? (
-          <p className="oc-small cl-muted">Nenhum pagamento registrado ainda.</p>
-        ) : (
-          <ul className="pd-payments">
-            {order.payments.map((p) => (
-              <li key={p.id} className={p.reversed ? 'is-reversed' : undefined}>
-                <span className="pd-payments__main">
-                  <span className="pd-payments__value">{formatMoney(p.amountCents)}</span>
-                  <span className="cl-muted oc-small">{METHOD_LABEL[p.method]} · {formatDay(p.paidAt)}{p.note ? ` · ${p.note}` : ''}</span>
-                  {p.reversed && <span className="oc-small pd-reversed">Estornado: {p.reversedReason}</span>}
+      <b className="zv-side-title">Pagamentos</b>
+      {order.payments.length === 0 ? (
+        <span className="zv-small">Nenhum pagamento registrado ainda.</span>
+      ) : (
+        <PagedList items={order.payments} noun="pagamentos" render={(payments) => (
+        <ul className="zv-pays">
+          {payments.map((p) => (
+            <li key={p.id} className={p.reversed ? 'is-reversed' : undefined}>
+              <span className="zv-two">
+                <span>{p.note === 'Entrada' ? 'Entrada' : 'Pagamento'} · {METHOD_LABEL[p.method]}</span>
+                <span>{formatDay(p.paidAt)} · por {p.userName}</span>
+                {p.reversed && <span className="zv-pays__rev">Estornado: {p.reversedReason}</span>}
+              </span>
+              <span className="zv-pays__side">
+                <b>+ {formatMoney(p.amountCents)}</b>
+                {canReverse && !p.reversed && <button type="button" className="zv-textbtn" onClick={() => onReverse(p)} aria-label={`Estornar pagamento de ${formatMoney(p.amountCents)}`}>Estornar</button>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        )} />
+      )}
+      {order.refunds.length > 0 && (
+        <>
+          <b className="zv-side-title">Devoluções</b>
+          <ul className="zv-pays" data-testid="lista-devolucoes">
+            {order.refunds.map((r) => (
+              <li key={r.id} className={r.canceled ? 'is-reversed' : undefined}>
+                <span className="zv-two">
+                  <span>Devolvido · {METHOD_LABEL[r.method]}</span>
+                  <span>{formatDay(r.refundedAt)} · por {r.userName} · {r.reason}{r.waivedCents > 0 ? ` · restante de ${formatMoney(r.waivedCents)} não será cobrado` : ''}</span>
+                  {r.canceled && <span className="zv-pays__rev">Desfeita</span>}
                 </span>
-                <span className="pd-payments__side">
-                  <span className="cl-muted oc-small">{p.userName}</span>
-                  {canReverse && !p.reversed && <button type="button" className="pd-textlink pd-textlink--small" onClick={() => onReverse(p)}>Estornar</button>}
+                <span className="zv-pays__side">
+                  <b className="zv-pays__minus">− {formatMoney(r.amountCents)}</b>
+                  {canReverse && !r.canceled && <button type="button" className="zv-textbtn" onClick={() => onCancelRefund(r)} aria-label={`Desfazer devolução de ${formatMoney(r.amountCents)}`}>Desfazer</button>}
                 </span>
               </li>
             ))}
           </ul>
-        )}
-      </div>
-      {order.paymentTerms && <p className="oc-small cl-muted">Combinado: {order.paymentTerms}</p>}
+        </>
+      )}
+      {canReverse && order.paidCents - order.refundedCents > 0 && (
+        <button type="button" className="zv-btn zv-btn--full zv-btn--danger" onClick={onRefund} data-testid="devolver-cliente">Devolver ao cliente</button>
+      )}
+      {order.paymentTerms && <span className="zv-small">Combinado: {order.paymentTerms}</span>}
     </section>
+  )
+}
+
+// ---------- HU27: gastos e lucro (só ADMIN e MANAGER) ----------
+function ProfitCard({ order, onAdd, onEdit, onDelete }: { order: Order; onAdd: () => void; onEdit: (e: OrderExpense) => void; onDelete: (e: OrderExpense) => void }) {
+  const p = order.profit!
+  const expenses = order.expenses!
+  // Mesmas regras e frases do Financeiro (profitView)
+  const view = profitView({
+    totalCents: order.totalCents - order.refundedCents - order.waivedCents, materialCents: p.materialCents, expectedProfitCents: p.expectedProfitCents,
+  })
+  const { rate } = view
+  const loss = view.tone === 'loss'
+
+  return (
+    <section className="zv-card zv-card--side zv-card--tight" aria-labelledby="t-lucro" data-testid="cartao-lucro">
+      <div>
+        <h2 id="t-lucro" className="zv-h2">Gastos e lucro</h2>
+        <p className="zv-sub">Só Administrador e Gerente veem.</p>
+      </div>
+
+      {/* Sem nenhum gasto: só o aviso. Gasto antigo sem material continua no quadro completo, para poder corrigir */}
+      {expenses.length === 0 ? <>
+        <div className="zv-note zv-note--info" role="status" data-testid="falta-lancar-material">
+          <Info size={24} strokeWidth={1.8} aria-hidden="true" />
+          <span><b>Falta lançar o material</b><span>Lance quanto gastou de material para ver quanto sobrou para você.</span></span>
+        </div>
+        <div className="zv-line"><span>Valor do serviço</span><b>{formatMoney(order.totalCents - order.refundedCents - order.waivedCents)}</b></div>
+        <button type="button" className="zv-btn zv-btn--full" onClick={onAdd} data-testid="lancar-material"><Plus size={20} strokeWidth={1.8} aria-hidden="true" />Lançar material</button>
+      </> : <>
+      <div className={`pd-profit__big${loss ? ' is-loss' : view.tone === 'pending' ? ' is-pending' : ''}`}>
+        <span className="pd-profit__top">
+          <span className="pd-profit__title"><AppIcon name={loss ? 'alert' : 'profit'} size={36} />{view.title}</span>
+          {rate && !loss && <span className={`pd-health__tag pd-profit__tag pd-health--${rate.health.toLowerCase()}`}><AppIcon name="check" size={20} />{HEALTH_LABEL[rate.health]}</span>}
+        </span>
+        <strong data-testid="lucro">{formatMoney(view.valueCents)}</strong>
+        <span className="pd-profit__margin">{view.note}</span>
+      </div>
+
+      {/* A conta, curta: serviço − material = sua mão de obra (o recebido já está no quadro Pagamento) */}
+      <dl className="pd-calc">
+        <div><dt>Valor do serviço</dt><dd>{formatMoney(order.totalCents - order.refundedCents - order.waivedCents)}</dd></div>
+        <div><dt className="pd-calc__icon"><AppIcon name="material" size={24} />− Material</dt><dd data-testid="total-material">− {formatMoney(p.materialCents)}</dd></div>
+        {/* Gasto antigo lançado como "mão de obra" (antes de 11/10) ainda desconta */}
+        {p.laborCents > 0 && <div><dt>Outros gastos</dt><dd>− {formatMoney(p.laborCents)}</dd></div>}
+        <div className={`pd-calc__total${p.expectedProfitCents < 0 ? ' is-neg' : ''}`}>
+          <dt className="pd-calc__icon"><AppIcon name={p.expectedProfitCents < 0 ? 'alert' : 'labor'} size={24} />{p.expectedProfitCents < 0 ? 'Prejuízo' : '= Sua mão de obra'}</dt>
+          <dd data-testid="total-mao-de-obra">{formatMoney(p.expectedProfitCents)}{rate && p.expectedProfitCents >= 0 && ` (${formatPercentBR(rate.percent)})`}</dd>
+        </div>
+      </dl>
+
+      {rate && <HealthGauge rate={rate} />}
+
+      {/* Um valor de material por pedido: depois de lançado, só editar (botão "Editar" na lista abaixo) */}
+      {p.materialCents === 0 && <Button className="btn--secondary" fullWidth onClick={onAdd} data-testid="lancar-gasto"><PlusIcon />Lançar material</Button>}
+
+      <ul className="pd-payments pd-expenses" data-testid="lista-gastos">
+        {expenses.map((e) => (
+          <li key={e.id}>
+            <span className="pd-payments__main">
+              <span className="pd-payments__value">{formatMoney(e.amountCents)}</span>
+              <span className="cl-muted oc-small"><i className={`pd-dot ${e.type === 'MATERIAL' ? 'is-material' : 'is-labor'}`} />{EXPENSE_TYPE_LABEL[e.type]}{e.description ? ` · ${e.description}` : ''} · {formatDayShort(e.date)}</span>
+            </span>
+            <span className="pd-payments__side">
+              <button type="button" className="btn btn--secondary pd-expense-btn" onClick={() => onEdit(e)} aria-label={`Corrigir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="edit" size={24} />Corrigir</button>
+              <button type="button" className="btn btn--secondary pd-expense-btn pd-expense-btn--danger" onClick={() => onDelete(e)} aria-label={`Excluir gasto de ${EXPENSE_TYPE_LABEL[e.type]} ${formatMoney(e.amountCents)}`}><AppIcon name="trash" size={24} />Excluir</button>
+            </span>
+          </li>
+        ))}
+      </ul>
+      </>}
+    </section>
+  )
+}
+
+// Régua da mão de obra: 0% a 60% do valor do serviço, com a faixa normal (30% a 45%) marcada
+const HEALTH_LABEL: Record<ProfitHealth, string> = { OUT_OF_POCKET: 'Prejuízo', LOW: 'Prejuízo', NORMAL: 'Normal', GREAT: 'Ótimo' }
+
+function HealthGauge({ rate }: { rate: HealthResult }) {
+  const scale = 60
+  const pos = (n: number) => `${Math.min(100, Math.max(0, (n / scale) * 100))}%`
+  return (
+    <div className={`pd-health pd-health--${rate.health.toLowerCase()}`} data-testid="regua-mao-de-obra">
+      <div className="pd-health__track" role="img" aria-label={`${formatPercentBR(rate.percent)} do valor do serviço. Normal de ${LABOR_MIN_PERCENT}% a ${LABOR_GOOD_PERCENT}%.`}>
+        <span className="pd-health__ok" style={{ left: pos(LABOR_MIN_PERCENT), width: `calc(${pos(LABOR_GOOD_PERCENT)} - ${pos(LABOR_MIN_PERCENT)})` }} />
+        <span className="pd-health__great" style={{ left: pos(LABOR_GOOD_PERCENT), right: 0 }} />
+        <span className="pd-health__mark" style={{ left: pos(rate.percent) }} />
+      </div>
+      <div className="pd-health__scale" aria-hidden="true">
+        <span>0%</span><span style={{ left: pos(LABOR_MIN_PERCENT) }}>{LABOR_MIN_PERCENT}%</span><span style={{ left: pos(LABOR_GOOD_PERCENT) }}>{LABOR_GOOD_PERCENT}%</span><span>{scale}%</span>
+      </div>
+      <p className="pd-health__legend">Verde claro: normal ({LABOR_MIN_PERCENT}% a {LABOR_GOOD_PERCENT}%) · Verde escuro: ótimo (acima de {LABOR_GOOD_PERCENT}%)</p>
+    </div>
   )
 }
 
@@ -328,6 +452,8 @@ function eventText(ev: OrderEvent): string {
     case 'DELIVERED': return `Entregue · recebido por ${ev.detail ?? '—'}`
     case 'PAYMENT': return `Pagamento de ${ev.detail ?? ''}`
     case 'PAYMENT_REVERSED': return `Pagamento estornado · ${ev.detail ?? ''}`
+    case 'REFUND': return `Devolvido ao cliente · ${ev.detail ?? ''}`
+    case 'REFUND_CANCELED': return `Devolução desfeita · ${ev.detail ?? ''}`
     case 'COLLECTION': return 'Cobrado pelo WhatsApp'
     case 'CANCELED': return `Cancelado · ${ev.detail ?? ''}`
   }
@@ -336,28 +462,33 @@ function eventText(ev: OrderEvent): string {
 function eventIcon(ev: OrderEvent) {
   switch (ev.type) {
     case 'PAYMENT':
-    case 'PAYMENT_REVERSED': return <CashIcon />
+    case 'PAYMENT_REVERSED':
+    case 'REFUND':
+    case 'REFUND_CANCELED': return <CashIcon />
     case 'DELIVERED': return <TruckIcon />
     case 'COLLECTION': return <WhatsIcon />
     case 'STATUS_CHANGED': return ev.detail?.endsWith('READY') ? <CheckIcon /> : <PlayIcon />
-    case 'CANCELED': return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 18L18 6" /></svg>
-    default: return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7l9-4 9 4-9 4z" /><path d="M3 7v10l9 4 9-4V7" /></svg>
+    case 'CANCELED': return <AppIcon name="cancel" size={24} />
+    default: return <AppIcon name="order" size={24} />
   }
 }
 
 // ---------- Ícones ----------
-function WhatsIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 0 1-13.5 7.8L3 21l1.2-4.5A9 9 0 1 1 21 12z" /></svg>
+function WhatsIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="chat" size={24} onAccent={onAccent} />
 }
-function CashIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="6" width="18" height="13" rx="2" /><path d="M3 10h18" /><path d="M7 15h3" /></svg>
+function CashIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="payment" size={24} onAccent={onAccent} />
 }
-function TruckIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h11v10H3z" /><path d="M14 10h4l3 3v3h-7" /><circle cx="7" cy="18" r="2" /><circle cx="17" cy="18" r="2" /></svg>
+function TruckIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="truck" size={24} onAccent={onAccent} />
 }
-function PlayIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M7 5l11 7-11 7z" /></svg>
+function PlayIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="play" size={24} onAccent={onAccent} />
 }
-function CheckIcon() {
-  return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" aria-hidden="true"><path d="M5 12l5 5 9-10" /></svg>
+function CheckIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="check" size={24} onAccent={onAccent} />
+}
+function PlusIcon({ onAccent = false }: { onAccent?: boolean }) {
+  return <AppIcon name="plus" size={24} onAccent={onAccent} />
 }

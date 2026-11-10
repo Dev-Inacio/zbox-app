@@ -1,5 +1,7 @@
+import type { PieceType } from '../../assets/pecas/pieceTypes'
+
 // Tipo da peça descoberto pelas palavras da descrição (os itens são texto livre, não há catálogo).
-// Usado para escolher o desenho do PDF e para mostrar a dica no editor.
+// Usado para escolher o desenho do PDF e mostrar a dica no editor.
 
 export type PieceKind =
   | 'BOX'
@@ -11,19 +13,6 @@ export type PieceKind =
   | 'ROOF' | 'SKYLIGHT' | 'STORM_GRATE' | 'SILL' | 'AC_BRACKET'
   | 'MIRROR' | 'GLASS' | 'GENERIC'
 
-export const PIECE_LABEL: Record<PieceKind, string> = {
-  BOX: 'Box',
-  GATE: 'Portão de grade', GATE_SLIDING: 'Portão de correr', GATE_TILTING: 'Portão basculante',
-  DOOR: 'Porta de abrir', DOOR_SLIDING: 'Porta de correr', DOOR_PIVOT: 'Porta pivotante',
-  DOOR_GLASS: 'Porta com vidro', DOOR_BALCONY: 'Porta balcão',
-  WINDOW_SLIDING: 'Janela de correr', WINDOW_FIXED: 'Esquadria fixa', WINDOW_PROJECTING: 'Janela maxim-ar',
-  WINDOW_TILT: 'Basculante', WINDOW_BOCA_DE_LOBO: 'Janela boca de lobo', LOUVER: 'Veneziana',
-  GRILLE: 'Grade de proteção', RAILING: 'Guarda-corpo', HANDRAIL: 'Corrimão',
-  FACADE: 'Fachada de vidro', PARTITION: 'Divisória', SCREEN: 'Tela mosquiteiro',
-  ROOF: 'Cobertura', SKYLIGHT: 'Claraboia', STORM_GRATE: 'Grelha/bueiro', SILL: 'Peitoril',
-  AC_BRACKET: 'Suporte de ar-condicionado',
-  MIRROR: 'Espelho', GLASS: 'Vidro', GENERIC: 'Peça',
-}
 
 function normalize(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -240,19 +229,25 @@ export function detectLeaves(description: string): number {
   return Math.min(6, Math.max(2, n))
 }
 
-// Tipos de correr: mostram "· N folhas" na dica do editor
-export function isSliding(kind: PieceKind): boolean {
-  return kind === 'WINDOW_SLIDING' || kind === 'DOOR_SLIDING' || kind === 'DOOR_BALCONY'
+const KIND_TO_TYPE: Partial<Record<PieceKind, PieceType>> = {
+  BOX: 'box-de-correr',
+  GATE: 'portao-de-abrir-2-folhas', GATE_SLIDING: 'portao-de-correr', GATE_TILTING: 'portao-basculante',
+  DOOR: 'porta-de-abrir', DOOR_SLIDING: 'porta-de-correr', DOOR_PIVOT: 'porta-pivotante', DOOR_GLASS: 'porta-de-vidro-com-fixo', DOOR_BALCONY: 'porta-de-correr',
+  WINDOW_SLIDING: 'janela-de-correr-2-folhas', WINDOW_PROJECTING: 'janela-maxim-ar', WINDOW_TILT: 'janela-basculante', WINDOW_BOCA_DE_LOBO: 'janela-boca-de-lobo', LOUVER: 'veneziana',
+  GRILLE: 'grade-de-protecao', RAILING: 'guarda-corpo-de-vidro', HANDRAIL: 'corrimao',
+  FACADE: 'fachada-pele-de-vidro', PARTITION: 'divisoria', SCREEN: 'tela-mosquiteira', ROOF: 'cobertura-de-policarbonato', MIRROR: 'espelho',
 }
 
-// Proporção (largura/altura) usada quando o item não tem medidas
-export const DEFAULT_RATIO: Record<PieceKind, number> = {
-  BOX: 0.75,
-  GATE: 1.6, GATE_SLIDING: 1.8, GATE_TILTING: 1.4,
-  DOOR: 0.45, DOOR_SLIDING: 1.1, DOOR_PIVOT: 0.5, DOOR_GLASS: 0.45, DOOR_BALCONY: 1.1,
-  WINDOW_SLIDING: 1.25, WINDOW_FIXED: 1.2, WINDOW_PROJECTING: 1.3, WINDOW_TILT: 0.9, WINDOW_BOCA_DE_LOBO: 1, LOUVER: 1.2,
-  GRILLE: 1.2, RAILING: 2.4, HANDRAIL: 2.6,
-  FACADE: 1.3, PARTITION: 1.6, SCREEN: 1.2,
-  ROOF: 1.8, SKYLIGHT: 1.6, STORM_GRATE: 2.2, SILL: 3.2, AC_BRACKET: 1.3,
-  MIRROR: 0.7, GLASS: 1.2, GENERIC: 0.8,
+// Escolhe o desenho da peça pelo que foi digitado. null = não reconheceu (fica "Outra peça")
+export function suggestPieceType(description: string): PieceType | null {
+  const t = understand(description)
+  if (t.includes('camarao')) return 'porta-camarao'
+  if (t.includes('alcapao')) return 'alcapao'
+  if (t.includes('marinheiro')) return 'escada-marinheiro'
+  if (t.includes('varanda') || t.includes('sacada')) return 'fechamento-de-varanda'
+  if (t.includes('contramarco')) return 'contramarco'
+  const kind = detectPiece(description)
+  if (kind === 'BOX' && t.includes('abrir')) return 'box-de-abrir'
+  if (kind === 'WINDOW_SLIDING' && detectLeaves(description) >= 3) return 'janela-de-correr-4-folhas'
+  return KIND_TO_TYPE[kind] ?? null
 }

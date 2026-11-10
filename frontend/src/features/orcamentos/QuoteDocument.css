@@ -18,7 +18,7 @@
 
 .qd__mono { font-family: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace; font-weight: 500; }
 .qd__muted { color: #5A6067; }
-.qd__accent { color: #A8420D; }
+.qd__accent { color: var(--color-accent); }
 .qd__strong { font-weight: 700; }
 .qd__right { text-align: right; }
 
@@ -30,13 +30,12 @@
   text-transform: uppercase;
   color: #5A6067;
 }
-.qd__label--accent { color: #A8420D; margin-bottom: 3px; }
-.qd__label--light { color: #E9A06E; }
+.qd__label--accent { color: var(--color-accent); margin-bottom: 3px; }
+.qd__label--light { color: var(--color-accent); }
 
 /* Cabeçalho: marca | caixa do documento */
 .qd__header { display: grid; grid-template-columns: minmax(0, 1fr) auto; border-bottom: 1.5px solid #1B1F23; }
 .qd__brand { padding: 20px 24px; display: flex; align-items: center; gap: 12px; min-width: 0; }
-.qd__mascot { height: 58px; width: auto; }
 .qd__brand-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .qd__name {
   font-family: var(--font-display);
@@ -45,7 +44,7 @@
   line-height: 1;
   letter-spacing: 0.08em;
   color: #2A2F34;
-  text-shadow: 1px 1px 0 #C2592A, 2px 2px 0 #7E3415;
+  text-shadow: 1px 1px 0 var(--color-accent), 2px 2px 0 var(--wine-dark);
 }
 .qd__tagline { font-size: 8.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: #5A6067; }
 .qd__contact { font-size: 10.5px; color: #5A6067; margin-top: 4px; }
@@ -74,6 +73,7 @@
 .qd__drawing { width: 96px; height: 78px; }
 .qd__desc { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .qd__desc-title { font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.qd__details { font-size: 12.5px; color: #3F454B; font-style: italic; overflow-wrap: anywhere; }
 .qd__desc .qd__mono { font-size: 11px; }
 .qd__row .qd__strong { font-size: 13.5px; }
 
@@ -88,12 +88,12 @@
 
 /* Celular: o documento continua legível (empilha o que for largo) */
 @media (max-width: 640px) {
-  .qd:not(.qd--paper) .qd__header, .qd:not(.qd--paper) .qd__footer { grid-template-columns: 1fr; }
+  .qd:not(.qd--paper) .qd__header, .qd:not(.qd--paper) .qd__footer { grid-template-columns: minmax(0, 1fr); }
   .qd:not(.qd--paper) .qd__docbox { border-left: 0; border-top: 1.5px solid #1B1F23; }
   .qd:not(.qd--paper) .qd__terms { border-right: 0; border-bottom: 1.5px solid #1B1F23; }
   .qd:not(.qd--paper) .qd__row { grid-template-columns: 24px minmax(0, 1fr) auto; }
   .qd:not(.qd--paper) .qd__row--head span:nth-child(2), .qd:not(.qd--paper) .qd__drawing { display: none; }
-  .qd:not(.qd--paper) .qd__customer { grid-template-columns: 1fr; gap: 4px; }
+  .qd:not(.qd--paper) .qd__customer { grid-template-columns: minmax(0, 1fr); gap: 4px; }
 }
 
 /* Arquivo PDF: folha A4 inteira (a caixa do valor final vai até o pé da página) */
@@ -105,4 +105,54 @@
 /* Impressão: cores de fundo saem no papel */
 @media print {
   .qd { max-width: none; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+
+/* Cabeçalho com a logo oficial (11/10): metálica, precisa de fundo escuro */
+.qd__header {
+  grid-template-columns: minmax(0, 1fr) 260px;
+  background: radial-gradient(120% 140% at 0% 0%, #262C33 0%, #15191D 55%, #0E1114 100%);
+  color: #E8EAED;
+  border-bottom: 0;
+  box-shadow: inset 0 -4px 0 var(--color-accent);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.qd__brand { gap: 26px; padding: 22px 28px 26px; align-items: center; }
+.qd__logo { height: 104px; width: auto; flex-shrink: 0; }
+.qd__brand-text { gap: 12px; padding-left: 26px; border-left: 1px solid #3A4149; }
+.qd__header .qd__name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.qd__info { display: flex; flex-direction: column; gap: 2px; }
+.qd__info-label { font-size: 8.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-accent); }
+.qd__info-value { font-size: 11px; line-height: 1.45; color: #C9CED4; }
+.qd__info-value--big { font-size: 15px; font-weight: 700; color: #FFFFFF; font-variant-numeric: tabular-nums; }
+
+.qd__header .qd__docbox { grid-template-columns: 1fr 1fr; align-content: stretch; border-left: 1px solid #3A4149; background: rgba(255, 255, 255, 0.03); }
+.qd__header .qd__doctitle { display: flex; align-items: center; justify-content: center; background: none; color: #FFFFFF; font-size: 19px; letter-spacing: 0.24em; padding: 22px 12px 14px; border-bottom: 1px solid #3A4149; }
+.qd__header .qd__docfield { color: #FFFFFF; padding: 12px 14px 18px; font-size: 14px; }
+.qd__header .qd__docfield + .qd__docfield { border-left-color: #3A4149; }
+.qd__header .qd__label { color: var(--color-accent); }
+@media (max-width: 640px) {
+  .qd:not(.qd--paper) .qd__header { grid-template-columns: minmax(0, 1fr); }
+  .qd:not(.qd--paper) .qd__brand { flex-direction: column; align-items: flex-start; gap: 16px; padding: 18px 18px 20px; }
+  .qd:not(.qd--paper) .qd__logo { height: 84px; }
+  .qd:not(.qd--paper) .qd__brand-text { border-left: 0; padding-left: 0; }
+  .qd:not(.qd--paper) .qd__docbox { border-left: 0; border-top: 1px solid #3A4149; }
+}
+.qd__header .qd__mono { white-space: nowrap; }
+
+/* Modelo BRANCO para tudo (decisão 11/10): Imprimir, Baixar PDF e WhatsApp saem iguais.
+   Fundo branco gasta pouca tinta e a logo metálica aparece bem. Estas regras vêm depois do
+   cabeçalho escuro acima e trocam só as cores (a estrutura continua a mesma). */
+.qd__header { background: #FFFFFF; color: #1B1F23; box-shadow: none; border-bottom: 2px solid #1B1F23; }
+.qd__brand-text { border-left-color: #C9CCD0; }
+.qd__info-label, .qd__header .qd__label { color: #5A6067; }
+.qd__info-value { color: #3F454B; }
+.qd__info-value--big { color: #1B1F23; }
+.qd__header .qd__docbox { background: none; border-left: 1.5px solid #1B1F23; }
+.qd__header .qd__doctitle { color: #1B1F23; border-bottom-color: #C9CCD0; }
+.qd__header .qd__docfield { color: #1B1F23; }
+.qd__header .qd__docfield + .qd__docfield { border-left-color: #C9CCD0; }
+.qd__final { background: #FFFFFF; color: #1B1F23; border-top: 2px solid #1B1F23; }
+.qd__final .qd__label, .qd__final .qd__label--light { color: #5A6067; }
+@media (max-width: 640px) {
+  .qd:not(.qd--paper) .qd__docbox { border-top-color: #C9CCD0; }
 }

@@ -6,8 +6,7 @@ import { onlyDigits } from './format'
 export type CustomerFormValues = {
   name: string
   type: '' | 'PERSON' | 'COMPANY'
-  phone: string
-  whatsapp: string
+  whatsapp: string // "Celular": um número só, usado para WhatsApp e para ligar
   zipCode: string
   street: string
   number: string
@@ -38,15 +37,9 @@ export function validateField(field: keyof CustomerFormValues, values: CustomerF
       if (value.length > 120) return 'O nome pode ter no máximo 120 caracteres.'
       return undefined
 
-    case 'phone': {
-      const d = onlyDigits(value)
-      if (d && d.length !== 10 && d.length !== 11) return 'Número incompleto. Confira o telefone.'
-      return undefined
-    }
-
     case 'whatsapp': {
       const d = onlyDigits(value)
-      if (d && d.length !== 11) return 'Número incompleto. Confira o WhatsApp.'
+      if (d && d.length !== 10 && d.length !== 11) return 'Número incompleto. Confira o celular com DDD.'
       return undefined
     }
 

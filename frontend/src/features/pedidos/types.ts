@@ -1,4 +1,4 @@
-import type { QuoteCustomer, QuoteItem } from '../orcamentos/types'
+import type { DiscountType, QuoteCustomer, QuoteItem } from '../orcamentos/types'
 
 // Tipos que espelham o contrato de Pedidos e Financeiro (docs/contrato-api-pedidos-financeiro.md).
 // Dinheiro em CENTAVOS (inteiro). Datas sem hora em "YYYY-MM-DD". Data-hora em ISO 8601.
@@ -24,13 +24,42 @@ export type Payment = {
   reversedReason: string | null
 }
 
+// Devolução: dinheiro que VOLTOU para o cliente (ex.: abatimento por defeito). O cliente não fica devendo.
+// Diferente de estorno, que corrige um pagamento lançado errado e faz o valor voltar a "falta receber".
+export type OrderRefund = {
+  id: number
+  amountCents: number
+  method: PaymentMethod
+  refundedAt: string // YYYY-MM-DD
+  reason: string
+  waivedCents: number // restante que deixou de ser cobrado junto com esta devolução
+  userName: string
+  createdAt: string
+  canceled: boolean // lançada por engano e desfeita
+}
+
+export type RefundRequest = Pick<OrderRefund, 'amountCents' | 'method' | 'refundedAt' | 'reason'> & { waiveRemaining?: boolean }
+
 export type OrderEvent = {
   id: number
-  type: 'CREATED' | 'STATUS_CHANGED' | 'DELIVERED' | 'PAYMENT' | 'PAYMENT_REVERSED' | 'COLLECTION' | 'CANCELED'
+  type: 'CREATED' | 'STATUS_CHANGED' | 'DELIVERED' | 'PAYMENT' | 'PAYMENT_REVERSED' | 'REFUND' | 'REFUND_CANCELED' | 'COLLECTION' | 'CANCELED'
   detail: string | null
   userName: string
   createdAt: string
 }
+
+// HU29: o ZBOX não emite a nota, só guarda o número (e o arquivo, opcional)
+export type InvoiceType = 'SERVICE' | 'PRODUCT' | 'BOTH'
+export type Invoice = {
+  number: string
+  issuedAt: string // YYYY-MM-DD
+  type: InvoiceType
+  notes: string | null
+  hasFile: boolean
+  updatedBy: string
+  updatedAt: string
+}
+export type InvoiceRequest = Pick<Invoice, 'number' | 'issuedAt' | 'type' | 'notes'>
 
 export type Order = {
   id: number
@@ -38,9 +67,12 @@ export type Order = {
   status: OrderStatus
   paymentStatus: PaymentStatus
   quote: { id: number; number: string; version: number }
+  directSale?: boolean // HU32 — veio de Venda direta (sem orçamento enviado)
   customer: QuoteCustomer
   items: QuoteItem[]
   subtotalCents: number
+  discountType: DiscountType | null
+  discountValue: number | null // PERCENT: centésimos de % | AMOUNT: centavos
   discountCents: number
   totalCents: number
   paidCents: number
@@ -55,11 +87,46 @@ export type Order = {
   canceledAt: string | null
   cancelReason: string | null
   payments: Payment[]
+  refunds: OrderRefund[]
+  refundedCents: number
+  waivedCents: number // o que o cliente não vai mais pagar
   lastCollectionAt: string | null
   events: OrderEvent[]
+  invoice: Invoice | null
+  // HU27: só vem para ADMIN e MANAGER. Para EMPLOYEE o back manda null.
+  expenses: OrderExpense[] | null
+  profit: ProfitSummary | null
 }
 
+// ---------- HU27: gastos e lucro do serviço ----------
+// Decisão da PO (11/10): só dois tipos, bem resumido.
+export type ExpenseType = 'MATERIAL' | 'LABOR'
+
+export type OrderExpense = {
+  id: number
+  type: ExpenseType
+  description: string | null
+  amountCents: number
+  date: string // YYYY-MM-DD
+  userName: string
+  createdAt: string
+}
+
+// Calculado pelo BACK. O front só mostra.
+export type ProfitSummary = {
+  materialCents: number
+  laborCents: number
+  expensesCents: number
+  profitCents: number         // o que já sobrou de verdade: recebido − gastos (0 até receber). Negativo só quando é prejuízo
+  expectedProfitCents: number // quando receber tudo: total do pedido − gastos (negativo = prejuízo)
+  marginPercent: number       // profitCents ÷ total, 1 casa decimal
+  cashBalanceCents: number // recebido − gastos (pode ser negativo)
+}
+
+export type ExpenseRequest = { type: ExpenseType; description: string | null; amountCents: number; date: string }
+
 export type OrderSummary = {
+  invoiceNumber: string | null
   id: number
   number: string
   customerName: string
