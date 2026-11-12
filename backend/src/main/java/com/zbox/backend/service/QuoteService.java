@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -80,5 +81,41 @@ public class QuoteService {
         AuditLog savedLog = auditLogRepository.save(auditLog);
 
         return quoteMapper.toResponse(saved, 1, List.of(savedLog));
+    }
+
+    @Transactional(readOnly = true)
+    public QuoteResponse findById(Long id, Integer version) {
+
+        Quote quote = quoteRepository.findById(id)
+                .orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND, "Orçamento não encontrado."));
+
+        List<Quote> versions = quoteRepository.findByNumberOrderByVersionAsc(quote.getNumber());
+
+        Quote selected = quote;
+
+        if (version != null) {
+            selected = null;
+
+            for (Quote v : versions) {
+                if (v.getVersion() == version) {
+                    selected = v;
+                    break;
+                }
+            }
+        }
+        if (selected == null) {
+            throw new BusinessException(ErrorCode.QUOTE_VERSION_NOT_FOUND, "Versão do orçamento não encontrada.");
+        }
+
+        int latestVersion = versions.get(versions.size() - 1).getVersion();
+
+        List<Long> ids = new ArrayList<>();
+        for (Quote v : versions) {
+            ids.add(v.getId());
+        }
+
+        List<AuditLog> events = auditLogRepository.findByEntityTypeAndEntityIdInOrderByCreatedAtAsc(AuditEntity.QUOTE, ids);
+
+        return quoteMapper.toResponse(selected, latestVersion, events);
     }
 }
