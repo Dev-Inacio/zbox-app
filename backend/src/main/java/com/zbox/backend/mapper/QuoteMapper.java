@@ -4,6 +4,7 @@ import com.zbox.backend.dto.QuoteCustomerResponse;
 import com.zbox.backend.dto.QuoteEventResponse;
 import com.zbox.backend.dto.QuoteItemResponse;
 import com.zbox.backend.dto.QuoteResponse;
+import com.zbox.backend.dto.QuoteSummaryResponse;
 import com.zbox.backend.enums.ChargeType;
 import com.zbox.backend.model.Address;
 import com.zbox.backend.model.AuditLog;
@@ -122,5 +123,17 @@ public class QuoteMapper {
                 customer.getWhatsapp(),
                 customer.getPhone(),
                 buildAddressLine(customer.getAddress()));
+    }
+
+    public QuoteSummaryResponse toSummary(Quote quote) {
+        String customerName = quote.getCustomer().getName();
+
+        return new QuoteSummaryResponse(quote.getId(),
+                quote.getNumber(),
+                quote.getVersion(),
+                customerName,
+                quote.getCreatedAt(),
+                quote.getTotalCents(),
+                quote.getStatus());
     }
 }
