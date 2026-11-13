@@ -29,7 +29,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 @Service
 public class QuoteService {
@@ -54,6 +53,40 @@ public class QuoteService {
 
     private String getUserName(String login) {
         return usuarioService.buscarPorUsuario(login).getName();
+    }
+
+    private Quote getQuoteOrThrow(Long id) {
+        return quoteRepository.findById(id).orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND, "Orçamento não encontrado."));
+    }
+
+    private QuoteResponse buildResponse(Quote quote) {
+        List<Quote> versions = quoteRepository.findByNumberOrderByVersionAsc(quote.getNumber());
+
+        int latestVersion = versions.get(versions.size() - 1).getVersion();
+
+        List<Long> ids = new ArrayList<>();
+
+        for (Quote v : versions) {
+            ids.add(v.getId());
+        }
+
+        List<AuditLog> events = auditLogRepository.findByEntityTypeAndEntityIdInOrderByCreatedAtAsc(AuditEntity.QUOTE, ids);
+
+        return quoteMapper.toResponse(quote, latestVersion, events);
+    }
+
+    private void saveLog(Quote quote, String action, String detail, String login) {
+        AuditLog auditLog = new AuditLog();
+
+        auditLog.setEntityType(AuditEntity.QUOTE);
+        auditLog.setEntityId(quote.getId());
+        auditLog.setAction(action);
+        auditLog.setDetail(detail);
+        auditLog.setVersion(quote.getVersion());
+        auditLog.setUserName(getUserName(login));
+        auditLog.setCreatedAt(Instant.now());
+
+        auditLogRepository.save(auditLog);
     }
 
     @Transactional
@@ -96,8 +129,7 @@ public class QuoteService {
     @Transactional(readOnly = true)
     public QuoteResponse findById(Long id, Integer version) {
 
-        Quote quote = quoteRepository.findById(id)
-                .orElseThrow(() -> new BusinessException(ErrorCode.QUOTE_NOT_FOUND, "Orçamento não encontrado."));
+        Quote quote = getQuoteOrThrow(id);
 
         List<Quote> versions = quoteRepository.findByNumberOrderByVersionAsc(quote.getNumber());
 
@@ -117,16 +149,7 @@ public class QuoteService {
             throw new BusinessException(ErrorCode.QUOTE_VERSION_NOT_FOUND, "Versão do orçamento não encontrada.");
         }
 
-        int latestVersion = versions.get(versions.size() - 1).getVersion();
-
-        List<Long> ids = new ArrayList<>();
-        for (Quote v : versions) {
-            ids.add(v.getId());
-        }
-
-        List<AuditLog> events = auditLogRepository.findByEntityTypeAndEntityIdInOrderByCreatedAtAsc(AuditEntity.QUOTE, ids);
-
-        return quoteMapper.toResponse(selected, latestVersion, events);
+        return buildResponse(selected);
     }
 
     @Transactional(readOnly = true)
