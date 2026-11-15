@@ -186,7 +186,7 @@ function QuoteTable({ items }: { items: QuoteSummary[] }) {
                 <td className="zv-m-hide">{q.customerName}</td>
                 <td className="zv-m-hide"><QuoteStatusBadge status={q.status} /></td>
                 <td className="zv-r zv-m-right"><b>{formatMoney(q.totalCents)}</b><span className="zv-m-only"><QuoteStatusBadge status={q.status} /></span></td>
-                <td className="zv-r zv-m-hide"><Link to={to} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`${draft ? 'Continuar' : 'Ver'} orçamento ${q.number}`}>{draft ? 'Continuar' : 'Ver'}</Link></td>
+                <td className="zv-r zv-see"><Link to={to} className="zv-btn zv-btn--sm" aria-label={`${draft ? 'Continuar' : 'Ver'} orçamento ${q.number}`}>{draft ? 'Continuar' : 'Ver'}</Link></td>
               </tr>
             )
           })}
