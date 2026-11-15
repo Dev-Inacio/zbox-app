@@ -188,7 +188,7 @@ function OrderTable({ items }: { items: OrderSummary[] }) {
               <td><span className="inv-stack"><PaymentStatusBadge status={o.paymentStatus} />{o.status === 'DELIVERED' && <InvoiceTag number={o.invoiceNumber} />}</span></td>
               <td className="zv-m-hide"><DateCell o={o} /></td>
               <td className="zv-r"><span className="pd-list-money"><b>{formatMoney(o.totalCents)}</b>{o.status !== 'CANCELED' && <span data-testid="lista-falta">{o.remainingCents > 0 ? `Falta ${formatMoney(o.remainingCents)}` : 'Tudo pago'}</span>}</span></td>
-              <td className="zv-r zv-m-hide"><Link to={`/pedidos/${o.id}`} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`Ver pedido ${o.number}`}>Ver</Link></td>
+              <td className="zv-r zv-see"><Link to={`/pedidos/${o.id}`} className="zv-btn zv-btn--sm" aria-label={`Ver pedido ${o.number}`}>Ver</Link></td>
             </tr>
           ))}
         </tbody>

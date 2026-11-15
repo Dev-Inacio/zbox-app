@@ -30,7 +30,7 @@ function BocaDeLobo({ size, className }: { size: number; className: string }) {
 export function PieceDrawing({ type, size = 48, className = 'zb-piece' }: { type: PieceType | null | undefined; size?: number; className?: string }) {
   const t = type ?? 'outra-peca-sob-medida'
   if (t === 'janela-boca-de-lobo') return <BocaDeLobo size={size} className={className} />
-  return <img src={`/pecas/${t}.svg`} alt="" width={size} height={Math.round(size * 78 / 96)} className={className} />
+  return <img src={`${import.meta.env.BASE_URL}pecas/${t}.svg`} alt="" width={size} height={Math.round(size * 78 / 96)} className={className} />
 }
 
 // Linha embaixo do item no editor: [desenho] Desenho no PDF: Janela boca de lobo
