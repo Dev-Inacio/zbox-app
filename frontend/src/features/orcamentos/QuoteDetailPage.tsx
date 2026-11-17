@@ -420,7 +420,7 @@ function WhatsAppDialog({ open, quote, busy, error, onCancel, onSent }: {
 
 function defaultWhatsAppMessage(quote: Quote): string {
   const firstName = quote.customer.name.split(' ')[0]
-  return `Olá, ${firstName}! Aqui está o seu orçamento nº ${quote.number} da Zezinho Esquadrinhas.\nCaso tenha alguma dúvida, estamos à disposição.`
+  return `Olá, ${firstName}! Aqui está o seu orçamento nº ${quote.number} da Zezinho Esquadrias.\nCaso tenha alguma dúvida, estamos à disposição.`
 }
 
 // Como o PDF chega no WhatsApp:

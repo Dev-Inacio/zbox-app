@@ -1,12 +1,16 @@
-/* Design tokens do ZBOX v3 · identidade AZUL.
+/* Design tokens · identidade ZEZINHO ESQUADRIAS: grafite + laranja (cores das blusas).
    Os componentes usam var(--nome). Trocar este arquivo recolore o sistema inteiro.
    Os nomes antigos (--color-accent…) foram mantidos para nada quebrar. */
 :root {
-  /* Marca (os nomes --wine* ficaram por compatibilidade: agora são AZUL) */
-  --wine: #1F4E8C;          /* principal: botão principal, item ativo */
-  --wine-dark: #0F2A4A;     /* menu lateral */
-  --wine-2: #2B6CB0;        /* destaques, avatar */
-  --wine-soft: #E8F0FA;     /* fundos suaves (falta receber, ícone de card) */
+  /* Marca (os nomes --wine* ficaram por compatibilidade: agora são GRAFITE + LARANJA) */
+  --wine: #B8540F;          /* principal: laranja escuro (texto branco legível, contraste 4.9:1) */
+  --wine-dark: #2B2D30;     /* grafite: menu lateral */
+  --wine-2: #E8711A;        /* laranja vivo das blusas: destaques, avatar */
+  --wine-soft: #FCEFE4;     /* fundos suaves (falta receber, ícone de card) */
+  --graphite: #3C3F43;      /* grafite médio (fim do degradê do menu) */
+  --side-text: #F1F2F3;     /* texto do menu */
+  --side-muted: #B9BDC2;    /* títulos do menu */
+  --side-line: #4A4E53;     /* linhas do menu */
 
   /* Neutros */
   --color-ink: #29252A;            /* texto principal */
@@ -15,12 +19,12 @@
   --color-text-muted: #5C565D;     /* texto de apoio (nunca mais claro que isso) */
   --color-border: #CFC8CB;         /* bordas de campos */
   --color-line: #E5E0E2;           /* linhas e bordas de card */
-  --color-row-head: #F7F9FC;       /* cabeçalho de tabela */
+  --color-row-head: #F8F7F6;       /* cabeçalho de tabela */
 
-  /* Ação (nomes antigos → azul) */
+  /* Ação (nomes antigos → laranja) */
   --color-accent: var(--wine);
   --color-accent-hover: var(--wine-dark);
-  --color-accent-soft: #9DBDE6;    /* anel de foco */
+  --color-accent-soft: #F5B98A;    /* anel de foco */
   --color-on-accent: #FFFFFF;
 
   /* Situações: sempre com texto junto, nunca só a cor */

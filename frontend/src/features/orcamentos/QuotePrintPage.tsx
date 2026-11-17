@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { AppIcon } from '../../components/ui/AppIcon'
 import { Button } from '../../components/ui/Button'
@@ -32,6 +32,15 @@ export function QuotePrintPage() {
     }
   }, [data, autoPrint])
 
+  // Celular: a mesma folha A4 do computador, só reduzida para caber (nada se rearruma nem some)
+  const [zoom, setZoom] = useState(1)
+  useEffect(() => {
+    const fit = () => setZoom(Math.min(1, (window.innerWidth - 32) / 794))
+    fit()
+    window.addEventListener('resize', fit)
+    return () => window.removeEventListener('resize', fit)
+  }, [])
+
   return (
     <div className="qp">
       <div className="qp__toolbar">
@@ -41,7 +50,7 @@ export function QuotePrintPage() {
       <div className="qp__page">
         {loading && <p className="qp__msg" role="status">Carregando…</p>}
         {!loading && Boolean(error) && <p className="qp__msg" role="alert">Não foi possível carregar o orçamento.</p>}
-        {data && company && <QuoteDocument quote={data} company={company} />}
+        {data && company && <div className="qp__sheet" style={{ zoom }}><QuoteDocument quote={data} company={company} paper /></div>}
       </div>
     </div>
   )
