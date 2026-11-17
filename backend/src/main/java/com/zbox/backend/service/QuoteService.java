@@ -2,9 +2,12 @@ package com.zbox.backend.service;
 
 import com.zbox.backend.dto.PageResponse;
 import com.zbox.backend.dto.QuoteCreateRequest;
+import com.zbox.backend.dto.QuoteItemRequest;
 import com.zbox.backend.dto.QuoteResponse;
 import com.zbox.backend.dto.QuoteSummaryResponse;
+import com.zbox.backend.dto.QuoteUpdateRequest;
 import com.zbox.backend.enums.AuditEntity;
+import com.zbox.backend.enums.ChargeType;
 import com.zbox.backend.enums.CustomerStatus;
 import com.zbox.backend.enums.ErrorCode;
 import com.zbox.backend.enums.QuoteStatus;
@@ -13,9 +16,11 @@ import com.zbox.backend.mapper.QuoteMapper;
 import com.zbox.backend.model.AuditLog;
 import com.zbox.backend.model.Customer;
 import com.zbox.backend.model.Quote;
+import com.zbox.backend.model.QuoteItem;
 import com.zbox.backend.repository.AuditLogRepository;
 import com.zbox.backend.repository.CustomerRepository;
 import com.zbox.backend.repository.QuoteRepository;
+import com.zbox.backend.util.MoneyCalculator;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -231,37 +236,76 @@ public class QuoteService {
         counts.put("ALL", all);
         return counts;
     }
+
+    @Transactional
+    public QuoteResponse update(Long id, QuoteUpdateRequest request, String login) {
+
+        Quote quote = getQuoteOrThrow(id);
+
+        if (quote.getStatus() != QuoteStatus.DRAFT) {
+            throw new BusinessException(ErrorCode.QUOTE_NOT_EDITABLE, "Só orçamentos em rascunho podem ser editados.");
+        }
+
+        List<QuoteItem> newItems = new ArrayList<>();
+
+        long subtotal = 0;
+
+        for (QuoteItemRequest r : request.getItems()) {
+
+            if (r.getChargeType() == ChargeType.AREA && (r.getWidthCm() == null || r.getHeightCm() == null)) {
+                throw new BusinessException(ErrorCode.VALIDATION_ERROR, "Largura e altura são obrigatórias para cobrança por área.");
+            }
+
+            QuoteItem item = new QuoteItem();
+
+            item.setDescription(r.getDescription());
+            item.setChargeType(r.getChargeType());
+            item.setQuantity(r.getQuantity());
+            item.setUnitPriceCents(r.getUnitPriceCents());
+            if (r.getChargeType() == ChargeType.AREA) {
+                item.setWidthCm(r.getWidthCm());
+                item.setHeightCm(r.getHeightCm());
+                item.setUnit(null);
+            } else {
+                item.setUnit(r.getUnit());
+                item.setWidthCm(null);
+                item.setHeightCm(null);
+            }
+
+            long itemSubtotal = MoneyCalculator.itemSubtotal(r.getChargeType(), r.getQuantity(), r.getWidthCm(), r.getHeightCm(), r.getUnitPriceCents());
+            item.setSubtotalCents(itemSubtotal);
+            subtotal += itemSubtotal;
+
+            newItems.add(item);
+        }
+
+        long discountCents = 0;
+        long discountValue = 0;
+
+        if (request.getDiscountType() != null) {
+            discountValue = request.getDiscountValue() == null ? 0 : request.getDiscountValue();
+            discountCents = MoneyCalculator.discount(subtotal, request.getDiscountType(), discountValue);
+        }
+
+        long total = MoneyCalculator.total(subtotal, discountCents);
+
+        quote.getItems().clear();
+
+        for (QuoteItem i : newItems) {
+            quote.addItem(i);
+        }
+
+        quote.setSubtotalCents(subtotal);
+        quote.setDiscountType(request.getDiscountType());
+        quote.setDiscountValue(discountValue);
+        quote.setDiscountCents(discountCents);
+        quote.setTotalCents(total);
+        quote.setPaymentTerms(request.getPaymentTerms());
+        quote.setNotes(request.getNotes());
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+        saveLog(saved, "UPDATED", null, login);
+        return buildResponse(saved);
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
