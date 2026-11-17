@@ -3,7 +3,7 @@
 /* ---------- Selos: sempre com texto ---------- */
 .pd-badge { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .pd-badge--new { background: #F0EFEC; color: #3F454B; }
-.pd-badge--in_production { background: #E6EEF8; color: #1F4E85; }
+.pd-badge--in_production { background: var(--wine-soft); color: var(--wine); }
 .pd-badge--ready { background: #E3F2F1; color: #145C57; }
 .pd-badge--delivered { background: #E8F5EC; color: #1D5B33; }
 .pd-badge--canceled { background: #F0EFEC; color: #5A6067; }
@@ -35,7 +35,7 @@
 .pd-dash { color: var(--color-text-muted); }
 
 /* ---------- Detalhe ---------- */
-.pd-stage { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #EEF3FA; flex-wrap: wrap; }
+.pd-stage { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: var(--wine-soft); flex-wrap: wrap; }
 .pd-stage--late { background: var(--wine-soft); }
 .pd-stage--done { background: #E8F5EC; }
 .pd-stage--canceled { background: #F0EFEC; }
@@ -132,7 +132,7 @@
 .pd-hero-link { color: var(--color-accent); font-weight: 600; }
 .pd-hero-link:hover { color: #FFFFFF; }
 .pd-step-panel { display: flex; align-items: center; gap: 20px; padding: 20px; border-radius: 16px; background: #F0EFEC; flex-wrap: wrap; }
-.pd-step-panel--in_production { background: #EEF3FA; }
+.pd-step-panel--in_production { background: var(--wine-soft); }
 .pd-step-panel--ready { background: #E3F2F1; }
 .pd-step-panel.is-late { background: var(--wine-soft); }
 .pd-late-text { color: var(--color-danger); font-weight: 700; }
@@ -312,8 +312,8 @@
 
 /* HU32 — Venda direta */
 .pd-direct { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pd-direct svg { color: #1F4E8C; flex: none; }
-.pd-direct b { color: #1F4E8C; }
+.pd-direct svg { color: var(--wine); flex: none; }
+.pd-direct b { color: var(--wine); }
 .pd-flash { display: flex; gap: 14px; align-items: center; margin: 0 40px 8px; padding: 18px 22px; border-radius: 14px; background: #E6F2EC; border: 1px solid #B9DCC8; color: #1B5E3D; font-size: 17px; }
 .pd-flash svg { color: #247A50; flex: none; }
 @media (max-width: 720px) { .pd-flash { margin: 0 16px 8px; } }

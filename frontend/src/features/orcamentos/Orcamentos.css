@@ -12,7 +12,7 @@
 .oc-badge { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
 .oc-badge--draft { background: #ECEBE7; color: #3F454B; }
 .oc-badge--confirmed { background: #EEF1F4; color: #2F3A46; }
-.oc-badge--sent { background: #E6EEF8; color: #1F4E85; }
+.oc-badge--sent { background: var(--wine-soft); color: var(--wine); }
 .oc-badge--approved { background: #E8F5EC; color: #1D5B33; }
 .oc-badge--rejected { background: #FDECEA; color: #8A1C12; }
 .oc-badge--canceled { background: #F0EFEC; color: #5A6067; }
@@ -390,7 +390,7 @@
 }
 
 /* HU32 — Venda direta */
-.zv-btn--direct { background: #FFFFFF; color: #1F4E8C; border: 1.5px solid #1F4E8C; }
-.zv-btn--direct:hover { background: #E8F0FA; }
-.oc-direct-note { display: flex; gap: 12px; padding: 16px; border-radius: 12px; background: #E8F0FA; color: #0F2A4A; line-height: 1.5; }
-.oc-direct-note svg { flex: none; color: #1F4E8C; }
+.zv-btn--direct { background: #FFFFFF; color: var(--wine); border: 1.5px solid var(--wine); }
+.zv-btn--direct:hover { background: var(--wine-soft); }
+.oc-direct-note { display: flex; gap: 12px; padding: 16px; border-radius: 12px; background: var(--wine-soft); color: var(--wine-dark); line-height: 1.5; }
+.oc-direct-note svg { flex: none; color: var(--wine); }

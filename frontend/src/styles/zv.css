@@ -499,7 +499,7 @@ form.cl-card.cl-card, .cl-card:has(> form .cl-form__section), .cl-card:has(> .cl
 .qp__toolbar { flex-wrap: wrap; }
 @media (max-width: 1100px) {
   .zv-table td.zv-m-hide, .zv-table th { white-space: normal; }
-  [data-testid="tabela-pedidos"] th:nth-child(4), [data-testid="tabela-pedidos"] td:nth-child(4), [data-testid="tabela-pedidos"] th:nth-child(6), [data-testid="tabela-pedidos"] td:nth-child(6) { display: none; }
+  [data-testid="tabela-pedidos"] th:nth-child(4), [data-testid="tabela-pedidos"] td:nth-child(4) { display: none; }
 }
 @media (max-width: 767px) {
   .cl-form__footer.cl-form__footer { padding: 16px 18px 18px; }
@@ -548,3 +548,57 @@ form.cl-card.cl-card, .cl-card:has(> form .cl-form__section), .cl-card:has(> .cl
 .login__logo-wrap .login__logo-img.login__logo-img { width: min(100%, 250px); }
 @media (max-width: 900px) { .login__brand.login__brand .login__logo-img { width: 104px; } }
 @media (max-width: 900px) and (max-height: 500px) { .login__brand.login__brand .login__logo-img { width: 64px; } }
+
+/* Listas: botão "Ver" em todas, também no celular (linha própria, largura toda) */
+@media (max-width: 767px) {
+  .zv-table tbody td.zv-see { display: block !important; flex: 1 1 100% !important; grid-column: 1 / -1 !important; width: 100%; text-align: left; }
+  .zv-table tbody td.zv-see .zv-btn { width: 100%; justify-content: center; }
+}
+
+/* Login: logo maior */
+.login__logo-wrap .login__logo-img.login__logo-img { width: min(100%, 340px); }
+@media (max-width: 900px) { .login__brand.login__brand .login__logo-img { width: 150px; } }
+@media (max-width: 900px) and (max-height: 500px) { .login__brand.login__brand .login__logo-img { width: 84px; } }
+
+/* Login mais sóbrio: grafite e prata, com o laranja só como detalhe */
+.login .login__brand {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 22%, rgba(255,255,255,.07) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 40% at 100% 100%, rgba(232,113,26,.14) 0%, transparent 70%),
+    linear-gradient(160deg, #2E3034 0%, #1E2023 50%, #141517 100%);
+}
+.login .login__fx {
+  background:
+    linear-gradient(135deg, transparent 0 14%, rgba(255,255,255,.07) 14% 17%, transparent 17% 20%, rgba(232,113,26,.35) 20% 20.6%,
+                    transparent 20.6% 74%, rgba(232,113,26,.3) 74% 74.6%, transparent 74.6% 79%, rgba(255,255,255,.06) 79% 84%, transparent 84%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.025) 0 2px, transparent 2px 6px);
+}
+.login .login__logo-wrap::before { background: radial-gradient(ellipse at center, rgba(255,255,255,.12) 0%, rgba(232,113,26,.08) 40%, transparent 70%); }
+.login .login__pitch::before { background: radial-gradient(ellipse at 35% 50%, rgba(255,255,255,.06) 0%, transparent 72%); }
+.login .login__headline { text-shadow: 0 2px 14px rgba(0,0,0,.55); }
+.login .login__dot { background: #D9DCE0; box-shadow: 0 0 8px 1px rgba(255,255,255,.35); }
+.login .login__sweep--2 { background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent); }
+.login .login__panel, .login > :last-child {
+  background:
+    radial-gradient(circle at 85% 10%, #ECEDEF 0%, transparent 45%),
+    radial-gradient(circle at 10% 95%, #EEEDEC 0%, transparent 40%),
+    radial-gradient(rgba(43,45,48,.08) 1px, transparent 1px) 0 0 / 22px 22px,
+    #F5F4F2;
+}
+
+/* Login: efeito discreto e parado (sem faixas animadas nem pontinhos); só textura fina e uma linha de luz */
+.login .login__dot, .login .login__sweep { display: none; }
+.login .login__fx {
+  animation: none;
+  background:
+    linear-gradient(135deg, transparent 0 62%, rgba(255,255,255,.05) 62% 62.3%, transparent 62.3% 66%, rgba(232,113,26,.22) 66% 66.25%, transparent 66.25%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 1px, transparent 1px 5px);
+}
+.login .login__brand {
+  background:
+    radial-gradient(ellipse 80% 55% at 50% 25%, rgba(255,255,255,.06) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 50% at 50% 120%, rgba(0,0,0,.45) 0%, transparent 70%),
+    linear-gradient(165deg, #2C2E32 0%, #1C1E21 55%, #131416 100%);
+}
+.login .login__logo-wrap::before { animation: none; opacity: .8; background: radial-gradient(ellipse at center, rgba(255,255,255,.08) 0%, transparent 65%); }
+.login .login__pitch::before { animation: none; background: none; }

@@ -36,3 +36,12 @@
 /* v3: barra do imprimir em azul-marinho */
 .qp__toolbar { background: var(--wine-dark); }
 .qp__back { color: #FFFFFF; }
+
+/* Folha A4 igual em qualquer tela; no celular ela só fica menor (zoom) */
+.qp__sheet { width: 794px; margin: 0 auto; }
+.qp__page .qd--paper { min-height: 1123px; }
+@media (max-width: 840px) { .qp__page { padding: 16px; } }
+@media print {
+  .qp__sheet { zoom: 1 !important; width: auto; }
+  .qp__page .qd--paper { width: auto; min-height: calc(297mm - 20mm - 4mm); }
+}

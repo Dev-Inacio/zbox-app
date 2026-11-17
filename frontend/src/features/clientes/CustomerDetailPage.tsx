@@ -267,7 +267,7 @@ function QuoteRows({ items }: { items: QuoteSummary[] }) {
                 <td><span className="zv-two"><Link to={`/orcamentos/${q.id}`}>Nº {q.number}</Link><span>{q.orderNumber ? `Virou o pedido nº ${q.orderNumber}` : `${word} em ${formatDay(isoDateTimeToDay(q.statusAt ?? q.createdAt))}`}</span></span></td>
                 <td><QuoteStatusBadge status={q.status} /></td>
                 <td className="zv-r"><b>{formatMoney(q.totalCents)}</b></td>
-                <td className="zv-r zv-m-hide"><Link to={`/orcamentos/${q.id}`} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`Ver orçamento ${q.number}`}>Ver</Link></td>
+                <td className="zv-r zv-see"><Link to={`/orcamentos/${q.id}`} className="zv-btn zv-btn--sm" aria-label={`Ver orçamento ${q.number}`}>Ver</Link></td>
               </tr>
             )
           })}
@@ -290,7 +290,7 @@ function OrderRows({ items }: { items: OrderSummary[] }) {
                 <td><span className="zv-two"><Link to={`/pedidos/${o.id}`}>Nº {o.number}</Link><span>Criado em {formatDay(isoDateTimeToDay(o.createdAt))}</span></span></td>
                 <td><span className="zv-tags"><OrderStatusBadge status={o.status} />{o.status !== 'CANCELED' && <PaymentStatusBadge status={o.paymentStatus} />}</span></td>
                 <td className="zv-r"><b>{formatMoney(owes ? o.remainingCents : 0)}</b></td>
-                <td className="zv-r zv-m-hide"><Link to={`/pedidos/${o.id}`} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`Ver pedido ${o.number}`}>Ver</Link></td>
+                <td className="zv-r zv-see"><Link to={`/pedidos/${o.id}`} className="zv-btn zv-btn--sm" aria-label={`Ver pedido ${o.number}`}>Ver</Link></td>
               </tr>
             )
           })}
@@ -311,7 +311,7 @@ function PaymentRows({ items }: { items: ReceivedPayment[] }) {
               <td><span className="zv-two"><Link to={`/pedidos/${p.orderId}`}>{p.refund ? 'Devolução' : p.note === 'Entrada' ? 'Entrada' : 'Pagamento'} · pedido nº {p.orderNumber}</Link><span>{formatDay(p.paidAt)} · por {p.userName}{p.refund ? ` · ${p.note}` : ''}</span></span></td>
               <td>{METHOD_LABEL[p.method]}</td>
               <td className={`zv-r ${p.refund ? 'zv-late' : 'zv-green'}`}><b>{p.refund ? '−' : '+'} {formatMoney(p.amountCents)}</b></td>
-              <td className="zv-r zv-m-hide"><Link to={`/pedidos/${p.orderId}`} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`Ver pedido ${p.orderNumber}`}>Ver</Link></td>
+              <td className="zv-r zv-see"><Link to={`/pedidos/${p.orderId}`} className="zv-btn zv-btn--sm" aria-label={`Ver pedido ${p.orderNumber}`}>Ver</Link></td>
             </tr>
           ))}
         </tbody>

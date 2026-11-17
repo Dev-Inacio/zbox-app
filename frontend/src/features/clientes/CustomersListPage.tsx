@@ -202,7 +202,7 @@ function CustomerTable({ items }: { items: CustomerSummary[] }) {
                 <td className="zv-m-hide">{mobile ? maskPhone(mobile) : '—'}</td>
                 <td className="zv-m-hide">{city ?? '—'}</td>
                 <td><StatusBadge status={c.status} /></td>
-                <td className="zv-r zv-m-hide"><Link to={`/clientes/${c.id}`} className="zv-btn zv-btn--sm" tabIndex={-1} aria-label={`Ver ${c.name}`}>Ver</Link></td>
+                <td className="zv-r zv-see"><Link to={`/clientes/${c.id}`} className="zv-btn zv-btn--sm" aria-label={`Ver ${c.name}`}>Ver</Link></td>
               </tr>
             )
           })}
