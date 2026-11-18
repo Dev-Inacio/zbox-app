@@ -94,6 +94,46 @@ public class QuoteService {
         auditLogRepository.save(auditLog);
     }
 
+    private void requireStatus(Quote quote, QuoteStatus... allowed) {
+        for (QuoteStatus status : allowed) {
+            if (quote.getStatus() == status) {
+                return;
+            }
+        }
+        throw new BusinessException(ErrorCode.INVALID_QUOTE_STATUS_TRANSITION, "Operação não permitida para o status atual do orçamento.");
+    }
+
+    @Transactional
+    public QuoteResponse confirm(Long id, String login) {
+        Quote quote = getQuoteOrThrow(id);
+        if (quote.getStatus() == QuoteStatus.CONFIRMED) {
+            return buildResponse(quote);
+        }
+
+        requireStatus(quote, QuoteStatus.DRAFT);
+
+        if (quote.getItems().isEmpty()) {
+            throw new BusinessException(ErrorCode.QUOTE_CANNOT_BE_CONFIRMED, "O orçamento precisa ter ao menos um item.");
+        }
+
+        if (quote.getTotalCents() <= 0) {
+            throw new BusinessException(ErrorCode.QUOTE_CANNOT_BE_CONFIRMED, "O total do orçamento precisa ser maior que zero.");
+        }
+
+        if (quote.getCustomer().getStatus() == CustomerStatus.INACTIVE) {
+            throw new BusinessException(ErrorCode.QUOTE_CANNOT_BE_CONFIRMED, "Cliente inativo não pode ter orçamento confirmado.");
+        }
+
+        quote.setStatus(QuoteStatus.CONFIRMED);
+        quote.setConfirmedAt(Instant.now());
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+        saveLog(saved, "CONFIRMED", null, login);
+
+        return buildResponse(saved);
+    }
+
     @Transactional
     public QuoteResponse create(QuoteCreateRequest request, String login) {
 
@@ -306,6 +346,22 @@ public class QuoteService {
 
         Quote saved = quoteRepository.save(quote);
         saveLog(saved, "UPDATED", null, login);
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse backToDraft(Long id, String login) {
+        Quote quote = getQuoteOrThrow(id);
+        requireStatus(quote, QuoteStatus.CONFIRMED);
+
+        quote.setStatus(QuoteStatus.DRAFT);
+        quote.setConfirmedAt(null);
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+
+        saveLog(saved, "BACK_TO_DRAFT", null, login);
+
         return buildResponse(saved);
     }
 }
