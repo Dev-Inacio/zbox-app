@@ -63,4 +63,14 @@ public class QuoteController {
     public QuoteResponse update(@PathVariable Long id, @Valid @RequestBody QuoteUpdateRequest request, Authentication authentication) {
         return quoteService.update(id, request, authentication.getName());
     }
+
+    @PostMapping("/{id}/confirm")
+    public QuoteResponse confirm(@PathVariable Long id, Authentication authentication) {
+        return quoteService.confirm(id, authentication.getName());
+    }
+
+    @PostMapping("/{id}/back-to-draft")
+    public QuoteResponse backToDraft(@PathVariable Long id, Authentication authentication) {
+        return quoteService.backToDraft(id, authentication.getName());
+    }
 }
