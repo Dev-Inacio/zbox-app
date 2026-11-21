@@ -1,8 +1,11 @@
 package com.zbox.backend.service;
 
 import com.zbox.backend.dto.PageResponse;
+import com.zbox.backend.dto.QuoteApproveRequest;
 import com.zbox.backend.dto.QuoteCreateRequest;
+import com.zbox.backend.dto.QuoteDispatchRequest;
 import com.zbox.backend.dto.QuoteItemRequest;
+import com.zbox.backend.dto.QuoteRejectRequest;
 import com.zbox.backend.dto.QuoteResponse;
 import com.zbox.backend.dto.QuoteSummaryResponse;
 import com.zbox.backend.dto.QuoteUpdateRequest;
@@ -361,6 +364,62 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
 
         saveLog(saved, "BACK_TO_DRAFT", null, login);
+
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse dispatch(Long id, QuoteDispatchRequest request, String login) {
+        Quote quote = getQuoteOrThrow(id);
+
+        requireStatus(quote, QuoteStatus.CONFIRMED, QuoteStatus.SENT);
+
+        if (quote.getStatus() == QuoteStatus.CONFIRMED) {
+            quote.setStatus(QuoteStatus.SENT);
+            quote.setSentAt(Instant.now());
+        }
+
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+
+        saveLog(saved, "DISPATCHED", request.getChannel().name(), login);
+
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse approve(Long id, QuoteApproveRequest request, String login) {
+        Quote quote = getQuoteOrThrow(id);
+
+        requireStatus(quote, QuoteStatus.SENT);
+
+        quote.setStatus(QuoteStatus.APPROVED);
+        quote.setApprovalMethod(request.getMethod());
+        quote.setDecidedAt(Instant.now());
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+
+        saveLog(saved, "APPROVED", request.getMethod().name(), login);
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse reject(Long id, QuoteRejectRequest request, String login) {
+        Quote quote = getQuoteOrThrow(id);
+
+        requireStatus(quote, QuoteStatus.SENT);
+
+        quote.setStatus(QuoteStatus.REJECTED);
+        quote.setRejectionReason(request.getReason());
+        quote.setDecisionNote(request.getNote());
+        quote.setDecidedAt(Instant.now());
+        quote.setUpdatedAt(Instant.now());
+
+        Quote saved = quoteRepository.save(quote);
+
+        saveLog(saved, "REJECTED", request.getReason().name(), login);
 
         return buildResponse(saved);
     }
