@@ -1,7 +1,10 @@
 package com.zbox.backend.controller;
 
 import com.zbox.backend.dto.PageResponse;
+import com.zbox.backend.dto.QuoteApproveRequest;
 import com.zbox.backend.dto.QuoteCreateRequest;
+import com.zbox.backend.dto.QuoteDispatchRequest;
+import com.zbox.backend.dto.QuoteRejectRequest;
 import com.zbox.backend.dto.QuoteResponse;
 import com.zbox.backend.dto.QuoteSummaryResponse;
 import com.zbox.backend.dto.QuoteUpdateRequest;
@@ -72,5 +75,21 @@ public class QuoteController {
     @PostMapping("/{id}/back-to-draft")
     public QuoteResponse backToDraft(@PathVariable Long id, Authentication authentication) {
         return quoteService.backToDraft(id, authentication.getName());
+    }
+
+    @PostMapping("/{id}/dispatches")
+    public QuoteResponse dispatch(@PathVariable Long id, @Valid @RequestBody QuoteDispatchRequest request, Authentication authentication) {
+        return quoteService.dispatch(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/approve")
+    public QuoteResponse approve(@PathVariable Long id, @Valid @RequestBody QuoteApproveRequest request, Authentication authentication) {
+        return quoteService.approve(id, request, authentication.getName());
+    }
+
+
+    @PostMapping("/{id}/reject")
+    public QuoteResponse reject(@PathVariable Long id, @Valid @RequestBody QuoteRejectRequest request, Authentication authentication) {
+        return quoteService.reject(id, request, authentication.getName());
     }
 }
