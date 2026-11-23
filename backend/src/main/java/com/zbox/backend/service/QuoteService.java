@@ -2,6 +2,7 @@ package com.zbox.backend.service;
 
 import com.zbox.backend.dto.PageResponse;
 import com.zbox.backend.dto.QuoteApproveRequest;
+import com.zbox.backend.dto.QuoteCancelRequest;
 import com.zbox.backend.dto.QuoteCreateRequest;
 import com.zbox.backend.dto.QuoteDispatchRequest;
 import com.zbox.backend.dto.QuoteItemRequest;
@@ -420,6 +421,26 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
 
         saveLog(saved, "REJECTED", request.getReason().name(), login);
+
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse cancel(Long id, QuoteCancelRequest request, String login) {
+        Quote quote = getQuoteOrThrow(id);
+
+        requireStatus(quote, QuoteStatus.DRAFT, QuoteStatus.CONFIRMED, QuoteStatus.SENT);
+
+
+        quote.setStatus(QuoteStatus.CANCELED);
+        quote.setDecisionNote(request.getReason());
+        quote.setDecidedAt(Instant.now());
+        quote.setUpdatedAt(Instant.now());
+
+
+        Quote saved = quoteRepository.save(quote);
+
+        saveLog(saved, "CANCELED", request.getReason(), login);
 
         return buildResponse(saved);
     }

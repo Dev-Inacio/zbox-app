@@ -2,6 +2,7 @@ package com.zbox.backend.controller;
 
 import com.zbox.backend.dto.PageResponse;
 import com.zbox.backend.dto.QuoteApproveRequest;
+import com.zbox.backend.dto.QuoteCancelRequest;
 import com.zbox.backend.dto.QuoteCreateRequest;
 import com.zbox.backend.dto.QuoteDispatchRequest;
 import com.zbox.backend.dto.QuoteRejectRequest;
@@ -91,5 +92,10 @@ public class QuoteController {
     @PostMapping("/{id}/reject")
     public QuoteResponse reject(@PathVariable Long id, @Valid @RequestBody QuoteRejectRequest request, Authentication authentication) {
         return quoteService.reject(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/cancel")
+    public QuoteResponse cancel(@PathVariable Long id, @Valid @RequestBody QuoteCancelRequest request, Authentication authentication) {
+        return quoteService.cancel(id, request, authentication.getName());
     }
 }
