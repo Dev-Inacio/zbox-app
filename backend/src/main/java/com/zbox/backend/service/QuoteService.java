@@ -10,6 +10,7 @@ import com.zbox.backend.dto.QuoteRejectRequest;
 import com.zbox.backend.dto.QuoteResponse;
 import com.zbox.backend.dto.QuoteSummaryResponse;
 import com.zbox.backend.dto.QuoteUpdateRequest;
+import com.zbox.backend.dto.QuoteVersionRequest;
 import com.zbox.backend.enums.AuditEntity;
 import com.zbox.backend.enums.ChargeType;
 import com.zbox.backend.enums.CustomerStatus;
@@ -182,7 +183,7 @@ public class QuoteService {
 
         List<Quote> versions = quoteRepository.findByNumberOrderByVersionAsc(quote.getNumber());
 
-        Quote selected = quote;
+        Quote selected = versions.get(versions.size()-1);
 
         if (version != null) {
             selected = null;
@@ -431,7 +432,6 @@ public class QuoteService {
 
         requireStatus(quote, QuoteStatus.DRAFT, QuoteStatus.CONFIRMED, QuoteStatus.SENT);
 
-
         quote.setStatus(QuoteStatus.CANCELED);
         quote.setDecisionNote(request.getReason());
         quote.setDecidedAt(Instant.now());
@@ -441,6 +441,57 @@ public class QuoteService {
         Quote saved = quoteRepository.save(quote);
 
         saveLog(saved, "CANCELED", request.getReason(), login);
+
+        return buildResponse(saved);
+    }
+
+    @Transactional
+    public QuoteResponse createVersion(Long id, QuoteVersionRequest request, String login) {
+
+        Quote old = getQuoteOrThrow(id);
+
+        requireStatus(old, QuoteStatus.SENT, QuoteStatus.REJECTED);
+
+        String reason = request == null ? null : request.getReason();
+
+        Quote created = new Quote();
+
+        created.setNumber(old.getNumber());
+        created.setVersion(old.getVersion() + 1);
+        created.setStatus(QuoteStatus.DRAFT);
+        created.setCustomer(old.getCustomer());
+        created.setCreatedAt(Instant.now());
+        created.setVersionReason(reason);
+
+        created.setSubtotalCents(old.getSubtotalCents());
+        created.setDiscountType(old.getDiscountType());
+        created.setDiscountValue(old.getDiscountValue());
+        created.setDiscountCents(old.getDiscountCents());
+        created.setTotalCents(old.getTotalCents());
+        created.setPaymentTerms(old.getPaymentTerms());
+        created.setNotes(old.getNotes());
+
+        for (QuoteItem i : old.getItems()) {
+            QuoteItem copy = new QuoteItem();
+
+            copy.setDescription(i.getDescription());
+            copy.setChargeType(i.getChargeType());
+            copy.setQuantity(i.getQuantity());
+            copy.setUnit(i.getUnit());
+            copy.setWidthCm(i.getWidthCm());
+            copy.setHeightCm(i.getHeightCm());
+            copy.setUnitPriceCents(i.getUnitPriceCents());
+            copy.setSubtotalCents(i.getSubtotalCents());
+
+            created.addItem(copy);
+        }
+        old.setStatus(QuoteStatus.SUPERSEDED);
+        old.setUpdatedAt(Instant.now());
+        quoteRepository.save(old);
+
+        Quote saved = quoteRepository.save(created);
+
+        saveLog(saved, "NEW_VERSION", reason, login);
 
         return buildResponse(saved);
     }

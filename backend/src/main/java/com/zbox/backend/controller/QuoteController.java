@@ -9,6 +9,7 @@ import com.zbox.backend.dto.QuoteRejectRequest;
 import com.zbox.backend.dto.QuoteResponse;
 import com.zbox.backend.dto.QuoteSummaryResponse;
 import com.zbox.backend.dto.QuoteUpdateRequest;
+import com.zbox.backend.dto.QuoteVersionRequest;
 import com.zbox.backend.service.QuoteService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -97,5 +98,11 @@ public class QuoteController {
     @PostMapping("/{id}/cancel")
     public QuoteResponse cancel(@PathVariable Long id, @Valid @RequestBody QuoteCancelRequest request, Authentication authentication) {
         return quoteService.cancel(id, request, authentication.getName());
+    }
+
+    @PostMapping("/{id}/versions")
+    public ResponseEntity<QuoteResponse> createVersion(@PathVariable Long id, @Valid @RequestBody(required = false) QuoteVersionRequest request, Authentication authentication) {
+        QuoteResponse body = quoteService.createVersion(id, request, authentication.getName());
+        return ResponseEntity.created(URI.create("/api/quotes/" + body.getId())).body(body);
     }
 }
