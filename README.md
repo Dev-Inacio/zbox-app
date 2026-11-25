@@ -239,9 +239,6 @@ cd backend
 ./mvnw test
 ```
 
-Hoje há testes unitários do `MoneyCalculator`, que concentra as regras de dinheiro (itens por unidade e por área, arredondamento, desconto percentual e em valor, e o limite do desconto). Os fluxos de orçamento foram validados de ponta a ponta com requisições reais e conferência das tabelas no MySQL. Testes automatizados da camada de serviço estão nos próximos passos.
-
-
 ## Autoria
 
 - **Back-end (API, regras de negócio, banco, segurança e testes):** José Inácio. Desenvolvimento 100% próprio.
