@@ -1,1 +1,7 @@
 .idea/
+node_modules/
+target/
+dist/
+*.log
+.env
+.env.local
