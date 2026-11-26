@@ -132,7 +132,7 @@ CREATE USER 'developer'@'%' IDENTIFIED BY 'SUA_SENHA_AQUI';
 GRANT ALL PRIVILEGES ON zbox_db.* TO 'developer'@'%';
 ```
 
-As tabelas são criadas automaticamente na primeira execução (`spring.jpa.hibernate.ddl-auto=update`, configuração de desenvolvimento).
+No perfil `dev`, as tabelas são criadas automaticamente na primeira execução (`spring.jpa.hibernate.ddl-auto=update`).
 
 ### 2. Variáveis de ambiente
 
@@ -140,6 +140,11 @@ As tabelas são criadas automaticamente na primeira execução (`spring.jpa.hibe
 |---|---|
 | `DB_PASSWORD` | Senha do usuário `developer` do MySQL |
 | `JWT_SECRET` | Segredo usado para assinar os tokens. Use pelo menos 32 caracteres aleatórios (o ideal é 64) |
+| `DB_URL` | URL JDBC do banco (apenas perfil `prod`) |
+| `DB_USERNAME` | Usuário do banco (apenas perfil `prod`) |
+| `CORS_ALLOWED_ORIGINS` | Origens liberadas no CORS, separadas por vírgula (apenas perfil `prod`) |
+
+O perfil padrão é `dev` (`spring.profiles.active=dev`): URL do banco, usuário e CORS já estão em `application-dev.properties`, então só `DB_PASSWORD` e `JWT_SECRET` precisam ser definidas. O perfil `prod` (`SPRING_PROFILES_ACTIVE=prod`) exige as cinco variáveis, usa `ddl-auto=validate` (o schema precisa existir) e desliga o log de SQL.
 
 Exemplo de geração do segredo e exportação no Linux/macOS:
 
@@ -163,7 +168,7 @@ cd backend
 ./mvnw spring-boot:run        # Windows: mvnw.cmd spring-boot:run
 ```
 
-A API sobe em `http://localhost:8080`. A origem liberada no CORS é configurada em `cors.allowed-origins` (padrão: `http://localhost:5173`).
+A API sobe em `http://localhost:8080`. No perfil `dev`, a origem liberada no CORS é `http://localhost:5173`; no `prod`, ela vem de `CORS_ALLOWED_ORIGINS`.
 
 ### 4. Primeiro acesso
 
@@ -242,6 +247,6 @@ cd backend
 ## Autoria
 
 - **Back-end (API, regras de negócio, banco, segurança e testes):** José Inácio. Desenvolvimento 100% próprio.
-- **Front-end (React e interface):** Thayna.
+- **Front-end (React e interface):** Thayná Dias · [GitHub](https://github.com/ThaynaDias).
 
 Contato: [GitHub](https://github.com/Dev-Inacio) · [LinkedIn](https://www.linkedin.com/in/inaciojose/)
