@@ -16,7 +16,6 @@ Sistema de gestão para serralheria e esquadrias: cadastro de clientes, dados da
 - [Como rodar](#como-rodar)
 - [API](#api)
 - [Testes](#testes)
-- [Próximos passos](#próximos-passos)
 - [Autoria](#autoria)
 
 ---
@@ -240,22 +239,9 @@ cd backend
 ./mvnw test
 ```
 
-Hoje há testes unitários do `MoneyCalculator`, que concentra as regras de dinheiro (itens por unidade e por área, arredondamento, desconto percentual e em valor, e o limite do desconto). Os fluxos de orçamento foram validados de ponta a ponta com requisições reais e conferência das tabelas no MySQL. Testes automatizados da camada de serviço estão nos próximos passos.
-
-## Próximos passos
-
-- [ ] Testes automatizados do `QuoteService` (máquina de estados e versionamento)
-- [ ] Integração contínua com GitHub Actions
-- [ ] Perfis `dev` e `prod` para configuração de ambiente
-- [ ] Documentação interativa da API (OpenAPI/Swagger)
-- [ ] Migrations versionadas (Flyway) e execução com Docker Compose
-- [ ] M5: pedidos e pagamentos, com bloqueio otimista e chave de idempotência
-- [ ] M6: financeiro e dashboard
-- [ ] M7: PDF gerado no servidor e link de compartilhamento
-
 ## Autoria
 
-- **Back-end (API, regras de negócio, banco, segurança e testes):** José Inácio Eneas da Silva. Desenvolvimento 100% próprio.
-- **Front-end (React e interface):** Thayná Dias Nascimento.
+- **Back-end (API, regras de negócio, banco, segurança e testes):** José Inácio. Desenvolvimento 100% próprio.
+- **Front-end (React e interface):** Thayna.
 
-Contato: [GitHub](https://github.com/Dev-Inacio) · [LinkedIn](https://www.linkedin.com/in/SEU-PERFIL)
+Contato: [GitHub](https://github.com/Dev-Inacio) · [LinkedIn](https://www.linkedin.com/in/inaciojose/)
